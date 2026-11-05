@@ -24,6 +24,10 @@ PostgREST), Vercel par hosted. Diesel Converter wali proven pattern.
    `easy-khata-v2.sql` chalayein — ye `khata_profiles` me `phone`
    (WhatsApp number) column add karta hai. Naye setup ke liye poori
    `easy-khata.sql` hi kaafi hai (phone column us me bhi hai).
+   **v3 update:** admin panel + security hardening ke liye
+   `easy-khata-v3.sql` chalayein — is me v2 ka phone column bhi hai,
+   to sirf v3 chalana kaafi hai (v2 alag se chalane ki zaroorat nahi).
+   Admin = a.m.a63425@gmail.com (config.js me set hai).
 2. `config.js` me `SUPABASE_URL` aur `SUPABASE_ANON_KEY` pehle se set hain
    (AI CV Maker / Diesel wala bewx project; publishable key — security RLS
    se hai, service key kabhi nahi dalni).

@@ -7,6 +7,7 @@
   var API = cfg.SUPABASE_URL;
   var ANON = cfg.SUPABASE_ANON_KEY;
   var SESSION_KEY = "easykhata_auth";
+  var ADMIN_EMAIL = cfg.ADMIN_EMAIL || "";
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) {
@@ -72,6 +73,9 @@
     } catch (e) {}
   }
   function myId() { return session && session.user ? session.user.id : ""; }
+  function isAdmin() {
+    return !!ADMIN_EMAIL && session && session.user && session.user.email === ADMIN_EMAIL;
+  }
   function myName() {
     if (!session || !session.user) return "";
     var m = session.user.user_metadata || {};
@@ -281,7 +285,7 @@
   }
 
   function profilesQuery(withPhone) {
-    return sb("khata_profiles?select=id,name,email" + (withPhone ? ",phone" : "") + "&order=name.asc");
+    return sb("khata_profiles?select=id,name,email,created_at" + (withPhone ? ",phone" : "") + "&order=name.asc");
   }
 
   function loadAll() {
@@ -323,6 +327,55 @@
     renderTxnFilterOptions();
     renderTxns();
     fillMyPhone();
+    renderAdmin();
+  }
+
+  /* ---------- admin panel ---------- */
+  function setAdminMsg(text, ok) {
+    var el = $("adminMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function renderAdmin() {
+    var box = $("adminBox");
+    if (!isAdmin()) { box.hidden = true; return; }
+    box.hidden = false;
+    var me = myId();
+    $("adminStats").textContent = "Total users: " + profiles.length + " · Total records: " + txns.length;
+    if (!profiles.length) {
+      $("adminUserList").innerHTML = '<p class="empty">Abhi koi user nahi hai.</p>';
+      return;
+    }
+    var html = "";
+    profiles.forEach(function (p) {
+      var count = 0;
+      txns.forEach(function (t) {
+        if (t.payer_id === p.id || t.receiver_id === p.id || t.created_by === p.id) count++;
+      });
+      var del = p.id === me
+        ? '<span class="p-net zero">Admin (aap)</span>'
+        : '<button class="btn-danger" type="button" data-admin-del="' + esc(p.id) + '">Delete user</button>';
+      html += '<div class="person"><div><div class="p-name">' + esc(p.name || p.email) + '</div>' +
+        '<div class="p-detail">' + esc(p.email || "") + (p.phone ? ' · ' + esc(p.phone) : '') + '</div>' +
+        '<div class="p-detail">' + count + ' record · Joined ' + esc(fmtDate(p.created_at)) + '</div></div>' +
+        '<div class="p-actions">' + del + '</div></div>';
+    });
+    $("adminUserList").innerHTML = html;
+  }
+  function deleteUser(id) {
+    var p = findPerson(id);
+    if (!p || id === myId()) return;
+    if (!window.confirm("'" + (p.name || p.email) + "' ko delete kar dein?\n\nUs ka account, profile aur tamam record delete ho jayein ge. Ye wapas nahi ho sakta.")) return;
+    sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
+      .then(function (res) {
+        if (!res.ok) {
+          if (res.status === 404) { setAdminMsg("Admin delete ke liye easy-khata-v3.sql chalana hai (BEWX SQL Editor).", false); return; }
+          setAdminMsg("User delete nahi hua — dobara koshish karein.", false);
+          return;
+        }
+        setAdminMsg("User delete ho gaya.", true);
+        loadAll();
+      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
 
   function renderMonthStats() {
@@ -555,6 +608,8 @@
       if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      } else if (isAdmin()) {
+        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
       html += '<div class="txn"><div><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
         '<div class="t-sub">' + esc(t.note || "Khana") + ' · ' + esc(fmtDate(t.txn_date)) + '</div></div>' +
@@ -677,6 +732,10 @@
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
     if (b) deleteTxn(b.getAttribute("data-del"));
+  });
+  $("adminUserList").addEventListener("click", function (e) {
+    var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
+    if (d) deleteUser(d.getAttribute("data-admin-del"));
   });
 
   /* ---------- PWA: offline ---------- */

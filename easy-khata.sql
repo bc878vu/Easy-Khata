@@ -62,3 +62,40 @@ create policy "khata_transactions_update_own" on public.khata_transactions
 drop policy if exists "khata_transactions_delete_own" on public.khata_transactions;
 create policy "khata_transactions_delete_own" on public.khata_transactions
   for delete to authenticated using (created_by = auth.uid());
+
+-- v3: Admin (Asad) kisi bhi record/profile ko delete kar sake.
+drop policy if exists "khata_transactions_delete_admin" on public.khata_transactions;
+create policy "khata_transactions_delete_admin" on public.khata_transactions
+  for delete to authenticated using ((auth.jwt() ->> 'email') = 'a.m.a63425@gmail.com');
+
+drop policy if exists "khata_profiles_delete_admin" on public.khata_profiles;
+create policy "khata_profiles_delete_admin" on public.khata_profiles
+  for delete to authenticated using ((auth.jwt() ->> 'email') = 'a.m.a63425@gmail.com');
+
+-- v3: Insert hardening — record sirf tab jab banane wala khud us len den me ho.
+drop policy if exists "khata_transactions_insert_own" on public.khata_transactions;
+create policy "khata_transactions_insert_own" on public.khata_transactions
+  for insert to authenticated with check (
+    created_by = auth.uid()
+    and (payer_id = auth.uid() or receiver_id = auth.uid())
+  );
+
+-- v3: Admin user delete (profile + records + login account). Sirf admin chala sakta hai.
+create or replace function public.admin_delete_user(target_id uuid)
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  if (auth.jwt() ->> 'email') <> 'a.m.a63425@gmail.com' then
+    raise exception 'not admin';
+  end if;
+  delete from public.khata_transactions
+    where payer_id = target_id or receiver_id = target_id or created_by = target_id;
+  delete from public.khata_profiles where id = target_id;
+  delete from auth.users where id = target_id;
+end;
+$$;
+
+revoke all on function public.admin_delete_user(uuid) from public;
+grant execute on function public.admin_delete_user(uuid) to authenticated;

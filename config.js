@@ -6,5 +6,6 @@
    NEVER put a service-role key in this file. */
 window.EASY_KHATA_CONFIG = {
   SUPABASE_URL: "https://bewxefxjbvbumajflhfw.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_HcJP12XHbtaBbskA8PwJRA_0GS-xNa3"
+  SUPABASE_ANON_KEY: "sb_publishable_HcJP12XHbtaBbskA8PwJRA_0GS-xNa3",
+  ADMIN_EMAIL: "a.m.a63425@gmail.com"
 };
