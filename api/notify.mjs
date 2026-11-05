@@ -1,12 +1,12 @@
 // Easy Khata — push notify endpoint (Vercel serverless function).
-// App band ho to bhi notification pohanchane ke liye:
-//  1. Sender (jis ne record save kiya) is endpoint ko call karta hai.
-//  2. Function sender ka Supabase JWT check karta hai, phir verify karta hai
-//     ke sender aur recipient ke darmiyan abhi koi record bana hai (last 5 min).
-//  3. Phir recipient ki push subscriptions (service-role key se) parh kar
-//     web-push se notification bhejta hai. Expired subs (410) delete ho jati hain.
+// To deliver a notification even when the app is closed:
+//  1. The sender (who saved the record) calls this endpoint.
+//  2. The function checks the sender's Supabase JWT, then verifies
+//     that a record was just created between the sender and the recipient (last 5 min).
+//  3. Then it reads the recipient's push subscriptions (with the service-role key)
+//     and sends the notification via web-push. Expired subs (410) are deleted.
 //
-// Env vars (Vercel dashboard, kabhi repo me nahi):
+// Env vars (Vercel dashboard, never in the repo):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:...)
 import webpush from "web-push";
@@ -49,11 +49,11 @@ export default async function handler(req, res) {
   try { body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {}); } catch (e) { body = {}; }
   const recipientId = String(body.recipientId || "");
   const title = String(body.title || "Easy Khata").slice(0, 80);
-  const text = String(body.body || "Naya record aaya hai.").slice(0, 200);
+  const text = String(body.body || "A new record arrived.").slice(0, 200);
   if (!recipientId || recipientId === sender.id) return json(res, 400, { error: "bad_recipient" });
 
-  // Verify: sender aur recipient ke darmiyan abhi (last 5 min) koi record bana ho.
-  // Is se koi bhi is endpoint se random users ko spam nahi kar sakta.
+  // Verify: a record was just created between the sender and the recipient (last 5 min).
+  // This stops anyone from spamming random users through this endpoint.
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const q = new URLSearchParams({
     select: "id",
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
   } catch (e) { recent = false; }
   if (!recent) return json(res, 403, { error: "no_recent_record" });
 
-  // Recipient ki subscriptions parhein.
+  // Read the recipient's subscriptions.
   let subs = [];
   try {
     const r = await fetch(

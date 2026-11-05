@@ -1,15 +1,15 @@
 /* Easy Khata service worker — installable + offline shell.
-   CACHE v1: app shell cache-first; khata ledger GETs network-first with
-   cache fallback (last-synced hisab offline bhi nazar aaye). Auth, POST aur
-   DELETE hamesha network-only — offline likha record sync nahi hota, is
-   liye naya record likhne ke liye internet chahiye. */
-var CACHE = "easy-khata-v16";
+   CACHE v1: app shell cache-first; ledger GETs network-first with
+   cache fallback (last-synced balance is visible offline too). Auth, POST and
+   DELETE are always network-only — a record written offline doesn't sync, so
+   you need internet to write a new record. */
+var CACHE = "easy-khata-v17";
 var SHELL = [
   "./",
   "index.html",
   "styles.css?v=13",
   "config.js?v=3",
-  "app.js?v=21",
+  "app.js?v=22",
   "manifest.webmanifest",
   "icons/icon.svg"
 ];
@@ -34,7 +34,7 @@ self.addEventListener("push", function (e) {
   try { data = e.data ? e.data.json() : {}; } catch (err) { data = { body: e.data ? e.data.text() : "" }; }
   var title = data.title || "Easy Khata";
   var options = {
-    body: data.body || "Naya record aaya hai.",
+    body: data.body || "A new record arrived.",
     icon: "icons/icon.svg",
     badge: "icons/icon.svg",
     tag: data.tag || "easy-khata",
@@ -61,25 +61,25 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
 
   if (url.host === API_HOST) {
-    // Khata data: pehle network, offline ho to last-synced cache.
+    // Ledger data: network first, last-synced cache when offline.
     if (url.pathname.indexOf("/rest/v1/khata_") === 0) {
       e.respondWith(fetch(req).then(function (res) {
         if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
         return res;
       }).catch(function () { return caches.match(req); }));
     }
-    return; // baqi API calls (auth waghera): network-only
+    return; // other API calls (auth etc.): network-only
   }
 
   if (url.origin !== self.location.origin) return;
 
   if (req.mode === "navigate") {
-    // Page: pehle network (taaza HTML), offline ho to cached shell.
+    // Page: network first (fresh HTML), cached shell when offline.
     e.respondWith(fetch(req).catch(function () { return caches.match("index.html"); }));
     return;
   }
 
-  // Baqi same-origin files: cache-first, background me taaza karein.
+  // Other same-origin files: cache-first, refresh in the background.
   e.respondWith(caches.match(req).then(function (cached) {
     var net = fetch(req).then(function (res) {
       if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }

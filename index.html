@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ur-Latn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Easy Khata — Khana ka Len Den</title>
-<meta name="description" content="Easy Khata — doston ke sath khane ka len den ka hisab. Kis ne kitne diye, kis se kitne liye, har bande ka hisab aik jagah.">
+<title>Easy Khata — Food Money Ledger</title>
+<meta name="description" content="Easy Khata — track food money with friends. Who paid how much, who owes whom, everyone's balance in one place.">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#14532d">
 <meta name="mobile-web-app-capable" content="yes">
@@ -18,7 +18,7 @@
     <span class="brand-mark">📒</span>
     <div>
       <h1>Easy Khata</h1>
-      <p>Khana ka len den — saaf hisab</p>
+      <p>Food money, clear accounts</p>
     </div>
   </div>
   <div class="top-actions">
@@ -39,10 +39,10 @@
         <span id="drawerEmail" class="muted"></span>
       </div>
     </div>
-    <button id="drawerCloseBtn" class="icon-btn dark" type="button" title="Band karein">✕</button>
+    <button id="drawerCloseBtn" class="icon-btn dark" type="button" title="Close">✕</button>
   </div>
   <nav class="drawer-nav">
-    <button id="navKhataBtn" class="drawer-item" type="button">📒 Mera Khata</button>
+    <button id="navKhataBtn" class="drawer-item" type="button">📒 My Ledger</button>
     <button id="navAdminBtn" class="drawer-item" type="button" hidden>🛡️ Admin Panel</button>
   </nav>
   <div class="drawer-section">
@@ -50,28 +50,28 @@
     <button id="themeBtn" class="drawer-item" type="button"><span id="themeIcon">🌙</span> Dark mode</button>
     <button id="pushToggleBtn" class="drawer-item" type="button">🔔 Notifications: Off</button>
     <div class="field" style="margin-top:12px">
-      <label for="myPhone">Mera WhatsApp number</label>
-      <input id="myPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
-      <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Number save karein</button>
+      <label for="myPhone">My WhatsApp number</label>
+      <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
+      <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Save number</button>
       <p id="phoneMsg" class="msg" role="status"></p>
     </div>
-    <button id="changePassBtn" class="drawer-item" type="button">🔑 Password badlein</button>
+    <button id="changePassBtn" class="drawer-item" type="button">🔑 Change password</button>
     <div id="changePassBox" hidden>
       <div class="field">
-        <label for="newPass1">Naya password</label>
+        <label for="newPass1">New password</label>
         <div class="pw-wrap">
-          <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
-          <button id="changeEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          <input id="newPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+          <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
       <div class="field">
-        <label for="newPass2">Naya password dobara</label>
+        <label for="newPass2">New password again</label>
         <div class="pw-wrap">
-          <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
-          <button id="changeEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          <input id="newPass2" type="password" autocomplete="new-password" placeholder="Type again">
+          <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
-      <button id="savePassBtn" class="btn btn-primary" type="button">Password save karein</button>
+      <button id="savePassBtn" class="btn btn-primary" type="button">Save password</button>
       <p id="passMsg" class="msg" role="status"></p>
     </div>
   </div>
@@ -83,8 +83,8 @@
 <main class="wrap">
 
   <div id="setupBox" class="card setup" hidden>
-    <h2>Database setup baqi hai</h2>
-    <p>App tayyar hai, lekin Supabase me tables abhi nahi bane. Repo ke <code>easy-khata.sql</code> file ko Supabase SQL Editor me chala dein, phir page refresh karein.</p>
+    <h2>Database setup pending</h2>
+    <p>The app is ready, but the tables are not created in Supabase yet. Run the <code>easy-khata.sql</code> file from the repo in the Supabase SQL Editor, then refresh the page.</p>
   </div>
 
   <!-- Auth -->
@@ -92,59 +92,59 @@
     <div id="authForm">
     <div class="tabs">
       <button id="tabLogin" class="tab active" type="button">Login</button>
-      <button id="tabSignup" class="tab" type="button">Naya Account</button>
+      <button id="tabSignup" class="tab" type="button">New Account</button>
     </div>
 
     <div id="signupNameRow" class="field" hidden>
-      <label for="authName">Apna naam</label>
-      <input id="authName" type="text" placeholder="Misal: Asad" autocomplete="name">
+      <label for="authName">Your name</label>
+      <input id="authName" type="text" placeholder="Example: Asad" autocomplete="name">
     </div>
     <div id="signupPhoneRow" class="field" hidden>
       <label for="authPhone">Phone / WhatsApp number</label>
-      <input id="authPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
+      <input id="authPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
     </div>
     <div class="field">
       <label for="authEmail">Email</label>
-      <input id="authEmail" type="email" placeholder="apna@email.com" autocomplete="email">
+      <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email">
     </div>
     <div class="field">
       <label for="authPassword">Password</label>
       <div class="pw-wrap">
-        <input id="authPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="current-password">
-        <button id="authEye" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+        <input id="authPassword" type="password" placeholder="At least 6 characters" autocomplete="current-password">
+        <button id="authEye" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
       </div>
-      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
+      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Forgot password?</button></div>
     </div>
     <p id="authMsg" class="msg" role="status"></p>
-    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
-    <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain. Phone number WhatsApp reminders ke liye hai — baad me bhi add kar sakte hain.</p>
+    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Log in</button>
+    <p class="hint">As soon as your account is created, your name appears in the ledger — then friends can pick you for shared expenses. Your phone number is for WhatsApp reminders — you can add it later too.</p>
     </div>
     <div id="forgotBox" hidden>
       <div class="field">
         <label for="forgotEmail">Email</label>
-        <input id="forgotEmail" type="email" placeholder="apna@email.com" autocomplete="email">
+        <input id="forgotEmail" type="email" placeholder="you@email.com" autocomplete="email">
       </div>
-      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Reset link bhejein</button>
+      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Send reset link</button>
       <p id="forgotMsg" class="msg" role="status"></p>
-      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Wapas login par</button></p>
+      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Back to login</button></p>
     </div>
     <div id="resetBox" hidden>
-      <p class="muted">Naya password likhein.</p>
+      <p class="muted">Enter a new password.</p>
       <div class="field">
-        <label for="resetPassword">Naya password</label>
+        <label for="resetPassword">New password</label>
         <div class="pw-wrap">
-          <input id="resetPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="new-password">
-          <button id="resetEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          <input id="resetPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+          <button id="resetEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
       <div class="field">
-        <label for="resetPassword2">Naya password dobara</label>
+        <label for="resetPassword2">New password again</label>
         <div class="pw-wrap">
-          <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
-          <button id="resetEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          <input id="resetPassword2" type="password" placeholder="Type again" autocomplete="new-password">
+          <button id="resetEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
-      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Password badlein</button>
+      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Change password</button>
       <p id="resetMsg" class="msg" role="status"></p>
     </div>
   </section>
@@ -154,17 +154,17 @@
 
     <div class="summary">
       <div class="sum-card given">
-        <span class="sum-label">Maine diye</span>
+        <span class="sum-label">I gave</span>
         <strong id="sumGiven">Rs 0</strong>
         <span id="sumGivenCount" class="sum-sub"></span>
       </div>
       <div class="sum-card taken">
-        <span class="sum-label">Maine liye</span>
+        <span class="sum-label">I took</span>
         <strong id="sumTaken">Rs 0</strong>
         <span id="sumTakenCount" class="sum-sub"></span>
       </div>
       <div class="sum-card net">
-        <span class="sum-label">Mera net hisab</span>
+        <span class="sum-label">My net balance</span>
         <strong id="sumNet">Rs 0</strong>
         <span id="sumNetSub" class="sum-sub"></span>
       </div>
@@ -173,62 +173,62 @@
     <div id="monthStats" class="month-stats" hidden></div>
     <div id="insightStats" class="month-stats" hidden></div>
     <div class="actions-row">
-      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
+      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Share my balance</button>
     </div>
 
     <div class="card accent" id="txnFormCard">
-      <h2 id="txnFormTitle">Naya record likhein</h2>
+      <h2 id="txnFormTitle">Add a new record</h2>
       <form id="txnForm">
         <div class="field" id="txnPersonRow">
-          <label for="txnPerson">Kis ke sath?</label>
+          <label for="txnPerson">With whom?</label>
           <select id="txnPerson"></select>
         </div>
-        <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Contact add karein (jo app par nahi)</button></div>
+        <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Add a contact (not on the app)</button></div>
         <div id="addContactBox" hidden>
-          <div class="field"><label for="newContactName">Naam</label><input id="newContactName" type="text" maxlength="80" placeholder="Misal: Maha Chaudhary"></div>
-          <div class="field"><label for="newContactPhone">Phone number (optional — isi number se baad me us ka account link ho jaye ga)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Misal: 0300 1234567"></div>
+          <div class="field"><label for="newContactName">Name</label><input id="newContactName" type="text" maxlength="80" placeholder="Example: Maha Chaudhary"></div>
+          <div class="field"><label for="newContactPhone">Phone number (optional — this number will link to their account later)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
           <div class="row">
-            <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Contact list se chunein</button>
-            <button id="saveContactBtn" class="btn btn-primary" type="button">Contact save karein</button>
+            <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Choose from contacts</button>
+            <button id="saveContactBtn" class="btn btn-primary" type="button">Save contact</button>
           </div>
           <p id="contactMsg" class="msg" role="status"></p>
         </div>
         <div class="field" id="txnDirRow">
-          <label>Len den ki kisam</label>
+          <label>Type of transaction</label>
           <div class="seg">
-            <label class="seg-opt"><input type="radio" name="txnDir" value="given" checked> Maine diye</label>
-            <label class="seg-opt"><input type="radio" name="txnDir" value="taken"> Maine liye</label>
+            <label class="seg-opt"><input type="radio" name="txnDir" value="given" checked> I gave</label>
+            <label class="seg-opt"><input type="radio" name="txnDir" value="taken"> I took</label>
           </div>
         </div>
         <div class="field">
-          <label class="check"><input id="txnSplit" type="checkbox"> Aik khana, kayi dost — raqam barabar bantein</label>
+          <label class="check"><input id="txnSplit" type="checkbox"> One meal, several friends — split the amount equally</label>
         </div>
         <div id="splitBox" class="field" hidden>
-          <label>Dost chunein (jin ke sath bantna hai)</label>
+          <label>Choose friends (to split with)</label>
           <div id="splitList" class="split-list"></div>
           <p id="splitHint" class="muted"></p>
         </div>
         <div class="field">
-          <label for="txnAmount">Raqam (Rs)</label>
-          <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Misal: 500" required>
+          <label for="txnAmount">Amount (Rs)</label>
+          <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500" required>
         </div>
         <div class="field">
-          <label for="txnNote">Kis cheez ke? (khana, chai, lunch...)</label>
-          <input id="txnNote" type="text" placeholder="Misal: Lunch — biryani" maxlength="120">
+          <label for="txnNote">What for? (food, tea, lunch...)</label>
+          <input id="txnNote" type="text" placeholder="Example: Lunch — biryani" maxlength="120">
         </div>
         <div class="field">
-          <label for="txnDate">Tareekh</label>
+          <label for="txnDate">Date</label>
           <input id="txnDate" type="date" required>
         </div>
         <p id="txnMsg" class="msg" role="status"></p>
-        <button class="btn btn-primary btn-block" type="submit">Record save karein</button>
-        <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Edit cancel karein</button>
+        <button class="btn btn-primary btn-block" type="submit">Save record</button>
+        <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Cancel edit</button>
       </form>
     </div>
 
     <div class="card">
-      <h2>Har bande se hisab</h2>
-      <p class="muted">Har dost ke sath — aap ne use kitne diye, us se kitne liye.</p>
+      <h2>Balance with everyone</h2>
+      <p class="muted">With each friend — how much you gave them, how much you took from them.</p>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
     </div>
@@ -236,17 +236,17 @@
 
     <div class="card">
       <div class="list-head">
-        <h2>Saara khata</h2>
+        <h2>Full ledger</h2>
         <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
       </div>
-      <p class="muted">Sab doston ke tamam record — naya pehle.</p>
+      <p class="muted">All records with all friends — newest first.</p>
       <div class="toolbar">
-        <input id="txnSearch" type="search" placeholder="Search — naam, khana ya raqam...">
-        <select id="txnFilterPerson"><option value="">Sab log</option></select>
-        <label class="date-wrap"><span>Se</span><input id="txnFrom" type="date" title="Se (tareekh)"></label>
-        <label class="date-wrap"><span>Tak</span><input id="txnTo" type="date" title="Tak (tareekh)"></label>
-        <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
-        <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
+        <input id="txnSearch" type="search" placeholder="Search — name, food or amount...">
+        <select id="txnFilterPerson"><option value="">Everyone</option></select>
+        <label class="date-wrap"><span>From</span><input id="txnFrom" type="date" title="From (date)"></label>
+        <label class="date-wrap"><span>To</span><input id="txnTo" type="date" title="To (date)"></label>
+        <button id="clearFilterBtn" class="btn btn-ghost" type="button">Clear filters</button>
+        <button id="exportCsvBtn" class="btn btn-soft" type="button">Download CSV</button>
       </div>
       <div id="txnList" class="txns"></div>
     </div>
@@ -255,19 +255,19 @@
 
   <section id="notifView" hidden>
     <div class="card">
-      <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
+      <button id="notifBackBtn" class="btn btn-ghost" type="button">← Back to Ledger</button>
       <h2 style="margin-top:10px">Notifications</h2>
-      <p class="muted">Jab koi aap ke sath record save kare, to yahan message aa jaye ga.</p>
-      <button id="markAllReadBtn" class="btn btn-soft" type="button">Sab ko parha hua karein</button>
+      <p class="muted">When someone saves a record with you, a message will appear here.</p>
+      <button id="markAllReadBtn" class="btn btn-soft" type="button">Mark all as read</button>
       <div id="notifList" class="notifs" style="margin-top:12px"></div>
     </div>
   </section>
 
   <section id="adminView" hidden>
     <div class="card">
-      <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
+      <button id="adminBackBtn" class="btn btn-ghost" type="button">← Back to Ledger</button>
       <h2 style="margin-top:10px">Admin Panel — Users</h2>
-      <p class="muted">Sirf admin (Asad) dekh sakta hai. User par click karein — us ka poora hisab, edit, password, block aur delete sab yahin se.</p>
+      <p class="muted">Only the admin (Asad) can see this. Click a user — their full balance, edit, password, block and delete are all here.</p>
       <p id="adminStats" class="muted"></p>
       <p id="adminMsg" class="msg" role="status"></p>
       <div id="adminUserList" class="people"></div>
@@ -276,7 +276,7 @@
 
   <section id="adminUserView" hidden>
     <div class="card">
-      <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas Users par</button>
+      <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Back to Users</button>
       <h2 id="adminUserTitle" style="margin-top:10px"></h2>
       <p id="adminUserBadges"></p>
       <dl class="kv">
@@ -287,46 +287,46 @@
       </dl>
       <div id="adminUserSummary" class="summary"></div>
       <div class="detail-actions">
-        <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit karein</button>
-        <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Password badlein</button>
-        <button id="adminBlockBtn" class="btn btn-danger" type="button">Block karein</button>
+        <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
+        <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
+        <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
         <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
       </div>
       <div id="adminEditBox" hidden>
-        <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
-        <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Misal: 0300 1234567"></div>
-        <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
+        <div class="field"><label for="adminEditName">Name</label><input id="adminEditName" type="text" maxlength="80"></div>
+        <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
+        <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save</button>
         <p id="adminEditMsg" class="msg" role="status"></p>
       </div>
       <div id="adminPassBox" hidden>
-        <div class="field"><label for="adminNewPass1">Naya password</label>
+        <div class="field"><label for="adminNewPass1">New password</label>
           <div class="pw-wrap">
-            <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
-            <button id="adminEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+            <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+            <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
           </div>
         </div>
-        <div class="field"><label for="adminNewPass2">Naya password dobara</label>
+        <div class="field"><label for="adminNewPass2">New password again</label>
           <div class="pw-wrap">
-            <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
-            <button id="adminEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+            <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Type again">
+            <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
           </div>
         </div>
-        <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
+        <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Save password</button>
         <p id="adminPassMsg" class="msg" role="status"></p>
       </div>
-      <h3 style="margin-top:16px">Amount set karein (admin)</h3>
-      <p class="muted">Is user ke liye record banayein — shuruati hisab ya correction. Record aap aur is user ke darmiyan bane ga, aur use notification bhi jaye gi.</p>
-      <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Misal: 500"></div>
+      <h3 style="margin-top:16px">Set amount (admin)</h3>
+      <p class="muted">Create a record for this user — an opening balance or a correction. The record will be between you and this user, and they will also get a notification.</p>
+      <div class="field"><label for="adminSetAmount">Amount (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
       <div class="field"><label>Direction</label>
         <div class="seg">
-          <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
-          <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
+          <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> To receive from user</label>
+          <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> To pay to user</label>
         </div>
       </div>
-      <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Misal: Shuruati hisab"></div>
-      <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Amount set karein</button>
+      <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
+      <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Set amount</button>
       <p id="adminSetMsg" class="msg" role="status"></p>
-      <h3 style="margin-top:16px">Is user ka khata</h3>
+      <h3 style="margin-top:16px">This user's ledger</h3>
       <div id="adminUserTxns" class="txns"></div>
       <p id="adminUserMsg" class="msg" role="status"></p>
     </div>
@@ -335,23 +335,23 @@
 </main>
 
 <footer class="foot">
-  <p>Easy Khata — apna hisab, saaf hisab.</p>
+  <p>Easy Khata — your balance, clear accounts.</p>
 </footer>
 
-<button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
+<button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
 <script src="config.js?v=3"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
-      <h3 id="confirmTitle">Confirm karein?</h3>
+      <h3 id="confirmTitle">Confirm?</h3>
       <p id="confirmText" class="muted"></p>
       <div class="row">
         <button id="confirmCancelBtn" class="btn btn-neutral" type="button">Cancel</button>
-        <button id="confirmOkBtn" class="btn btn-primary" type="button">Confirm karein</button>
+        <button id="confirmOkBtn" class="btn btn-primary" type="button">Confirm</button>
       </div>
     </div>
   </div>
 
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>
