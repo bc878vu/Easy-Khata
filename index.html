@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="ur-Latn">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <header class="topbar">
@@ -111,6 +111,7 @@
     </div>
 
     <div id="monthStats" class="month-stats" hidden></div>
+    <div id="insightStats" class="month-stats" hidden></div>
     <div class="actions-row">
       <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
     </div>
@@ -126,16 +127,24 @@
     <div class="card">
       <h2 id="txnFormTitle">Naya record likhein</h2>
       <form id="txnForm">
-        <div class="field">
+        <div class="field" id="txnPersonRow">
           <label for="txnPerson">Kis ke sath?</label>
           <select id="txnPerson"></select>
         </div>
-        <div class="field">
+        <div class="field" id="txnDirRow">
           <label>Len den ki kisam</label>
           <div class="seg">
             <label class="seg-opt"><input type="radio" name="txnDir" value="given" checked> Maine diye</label>
             <label class="seg-opt"><input type="radio" name="txnDir" value="taken"> Maine liye</label>
           </div>
+        </div>
+        <div class="field">
+          <label class="check"><input id="txnSplit" type="checkbox"> Aik khana, kayi dost — raqam barabar bantein</label>
+        </div>
+        <div id="splitBox" class="field" hidden>
+          <label>Dost chunein (jin ke sath bantna hai)</label>
+          <div id="splitList" class="split-list"></div>
+          <p id="splitHint" class="muted"></p>
         </div>
         <div class="field">
           <label for="txnAmount">Raqam (Rs)</label>
@@ -176,6 +185,10 @@
       <div class="toolbar">
         <input id="txnSearch" type="search" placeholder="Search — naam, khana ya raqam...">
         <select id="txnFilterPerson"><option value="">Sab log</option></select>
+        <input id="txnFrom" type="date" title="Se (tareekh)">
+        <input id="txnTo" type="date" title="Tak (tareekh)">
+        <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
+        <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
       </div>
       <div id="txnList" class="txns"></div>
     </div>
@@ -196,6 +209,6 @@
 </footer>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

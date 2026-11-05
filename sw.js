@@ -3,13 +3,13 @@
    cache fallback (last-synced hisab offline bhi nazar aaye). Auth, POST aur
    DELETE hamesha network-only — offline likha record sync nahi hota, is
    liye naya record likhne ke liye internet chahiye. */
-var CACHE = "easy-khata-v3";
+var CACHE = "easy-khata-v4";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=2",
+  "styles.css?v=3",
   "config.js?v=2",
-  "app.js?v=9",
+  "app.js?v=10",
   "manifest.webmanifest",
   "icons/icon.svg"
 ];

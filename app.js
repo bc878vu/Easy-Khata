@@ -124,6 +124,9 @@
   var editingId = null;
   var txnSearchText = "";
   var txnFilterPerson = "";
+  var txnFromDate = "";
+  var txnToDate = "";
+  var splitMode = false;
   var myPhone = "";
 
   function profileName(id) {
@@ -188,28 +191,34 @@
 
   function ensureProfile() {
     var u = session.user;
-    var meta = u.user_metadata || {};
-    var name = meta.full_name || "";
-    var phone = meta.phone || "";
-    var body = { id: u.id, name: name, email: u.email || "", phone: phone || null };
-    return sb("khata_profiles?on_conflict=id", {
-      method: "POST",
-      prefer: "resolution=merge-duplicates,return=minimal",
-      body: body
-    }).then(function (res) {
-      if (res.ok) return;
-      // Phone column abhi nahi bana (v2 SQL nahi chala) to phone ke baghair save karein.
-      if (res.body && res.body.code === "42703") {
-        delete body.phone;
-        return sb("khata_profiles?on_conflict=id", {
-          method: "POST",
-          prefer: "resolution=merge-duplicates,return=minimal",
-          body: body
-        }).then(function (res2) {
-          if (!res2.ok) throw new Error("profile save failed");
-        });
-      }
-      throw new Error("profile save failed");
+    // Pehle check karein: profile pehle se hai to use chhedein nahi.
+    // (Purana code har login par signup-time naam/number se overwrite kar deta tha —
+    // settings se badla hua number agle login par wapas purana ho jata tha.)
+    return sb("khata_profiles?id=eq." + encodeURIComponent(u.id) + "&select=id", {}).then(function (res) {
+      if (res.ok && res.body && res.body.length) return;
+      var meta = u.user_metadata || {};
+      var name = meta.full_name || "";
+      var phone = meta.phone || "";
+      var body = { id: u.id, name: name, email: u.email || "", phone: phone || null };
+      return sb("khata_profiles?on_conflict=id", {
+        method: "POST",
+        prefer: "resolution=merge-duplicates,return=minimal",
+        body: body
+      }).then(function (res2) {
+        if (res2.ok) return;
+        // Phone column abhi nahi bana (v2 SQL nahi chala) to phone ke baghair save karein.
+        if (res2.body && res2.body.code === "42703") {
+          delete body.phone;
+          return sb("khata_profiles?on_conflict=id", {
+            method: "POST",
+            prefer: "resolution=merge-duplicates,return=minimal",
+            body: body
+          }).then(function (res3) {
+            if (!res3.ok) throw new Error("profile save failed");
+          });
+        }
+        throw new Error("profile save failed");
+      });
     });
   }
 
@@ -405,6 +414,7 @@
   function renderAll() {
     renderSummary();
     renderMonthStats();
+    renderInsights();
     renderPeople();
     renderPersonSelect();
     renderTxnFilterOptions();
@@ -477,6 +487,29 @@
     el.innerHTML = "Is mahine (<strong>" + esc(monthName(now + "-01")) + "</strong>): diye <strong>" + esc(fmtRs(given)) + "</strong> · liye <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " record";
   }
 
+  function renderInsights() {
+    var el = $("insightStats");
+    var me = myId();
+    var mine = txns.filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
+    if (!mine.length) { el.hidden = true; return; }
+    var biggest = mine[0], total = 0;
+    var counts = {};
+    mine.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      total += a;
+      if (a > (Number(biggest.amount) || 0)) biggest = t;
+      var other = t.payer_id === me ? t.receiver_id : t.payer_id;
+      counts[other] = (counts[other] || 0) + 1;
+    });
+    var topId = null, topN = 0;
+    Object.keys(counts).forEach(function (id) { if (counts[id] > topN) { topN = counts[id]; topId = id; } });
+    var avg = Math.round(total / mine.length * 100) / 100;
+    el.hidden = false;
+    el.innerHTML = "Sab se bara khana: <strong>" + esc(fmtRs(biggest.amount)) + "</strong> (" + esc(biggest.note || "Khana") + ", " + esc(fmtDate(biggest.txn_date)) + ") · " +
+      "Sab se zyada len-den: <strong>" + esc(profileName(topId)) + "</strong> (" + topN + " dafa) · " +
+      "Average khana: <strong>" + esc(fmtRs(avg)) + "</strong>";
+  }
+
   function fillMyPhone() {
     var me = null;
     profiles.forEach(function (p) { if (p.id === myId()) me = p; });
@@ -485,21 +518,34 @@
     if (input && document.activeElement !== input) input.value = myPhone;
   }
 
+  function finishPhoneSave(phone) {
+    myPhone = phone;
+    profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
+    setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya gaya.", true);
+  }
   function savePhone() {
     var phone = $("myPhone").value.trim();
     if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (misal: 0300 1234567).", false); return; }
     sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
       method: "PATCH",
-      prefer: "return=minimal",
+      prefer: "return=representation",
       body: { phone: phone || null }
     }).then(function (res) {
       if (!res.ok) {
         if (res.body && res.body.code === "42703") { setPhoneMsg("Phone column abhi database me nahi — pehle easy-khata-v2.sql chalana hai.", false); return; }
         setPhoneMsg("Number save nahi hua — dobara koshish karein.", false); return;
       }
-      myPhone = phone;
-      profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
-      setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya gaya.", true);
+      if (res.body && res.body.length) { finishPhoneSave(phone); return; }
+      // Profile row maujood nahi — PATCH khamoshi se kuch nahi karta, is liye upsert se banayein.
+      var meta = (session.user && session.user.user_metadata) || {};
+      sb("khata_profiles?on_conflict=id", {
+        method: "POST",
+        prefer: "resolution=merge-duplicates,return=minimal",
+        body: { id: myId(), name: meta.full_name || myName(), email: (session.user && session.user.email) || "", phone: phone || null }
+      }).then(function (res2) {
+        if (!res2.ok) { setPhoneMsg("Number save nahi hua — dobara koshish karein.", false); return; }
+        finishPhoneSave(phone);
+      }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
     }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function setPhoneMsg(text, ok) {
@@ -588,6 +634,30 @@
       setPeopleMsg("Is dost ka WhatsApp number nahi hai — yaad-dihani ka text copy ho gaya hai, khud bhej dein.", true);
     });
   }
+  function settlePerson(id) {
+    var p = findPerson(id);
+    if (!p) return;
+    var s = personStats(id);
+    if (!s.net) return;
+    var amt = Math.abs(s.net);
+    var who = s.net > 0 ? (p.name || p.email) + " mujhe " + fmtRs(amt) + " dega" : "main " + (p.name || p.email) + " ko " + fmtRs(amt) + " dunga";
+    if (!window.confirm("Hisab barabar karein?\n\n" + who + " — " + fmtRs(amt) + " ka settlement record ban jaye ga.")) return;
+    var me = myId();
+    var body = {
+      payer_id: s.net > 0 ? id : me,
+      receiver_id: s.net > 0 ? me : id,
+      amount: amt,
+      note: "Hisab barabar — settlement",
+      txn_date: todayLocal(),
+      created_by: me
+    };
+    sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
+      .then(function (res) {
+        if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara koshish karein.", false); return; }
+        setPeopleMsg("Hisab barabar ho gaya!", true);
+        loadAll();
+      }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
   function shareAll() {
     var given = 0, taken = 0;
     txns.forEach(function (t) {
@@ -634,7 +704,8 @@
         '<div class="p-detail">Diye ' + fmtRs(p.given) + ' · Liye ' + fmtRs(p.taken) + '</div></div>' +
         '<div class="p-actions"><span class="p-net ' + cls + '">' + esc(netText) + '</span>' +
         '<span><button class="btn-mini" type="button" data-share="' + esc(id) + '">Share</button> ' +
-        '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Yaad dilayein</button></span></div></div>';
+        '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Yaad dilayein</button>' +
+        (net !== 0 ? ' <button class="btn-mini" type="button" data-settle="' + esc(id) + '">Hisab barabar karein</button>' : '') + '</span></div></div>';
     });
     $("peopleList").innerHTML = html;
   }
@@ -663,15 +734,38 @@
     if (prev) sel.value = prev;
   }
 
-  function renderTxns() {
-    var me = myId();
+  function filteredTxns() {
     var q = txnSearchText.trim().toLowerCase();
-    var list = txns.filter(function (t) {
+    return txns.filter(function (t) {
       if (txnFilterPerson && t.payer_id !== txnFilterPerson && t.receiver_id !== txnFilterPerson) return false;
+      if (txnFromDate && String(t.txn_date || "") < txnFromDate) return false;
+      if (txnToDate && String(t.txn_date || "") > txnToDate) return false;
       if (!q) return true;
       var hay = (profileName(t.payer_id) + " " + profileName(t.receiver_id) + " " + (t.note || "") + " " + String(t.amount) + " " + fmtDate(t.txn_date)).toLowerCase();
       return hay.indexOf(q) !== -1;
     });
+  }
+  function csvCell(v) { return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
+  function exportCsv() {
+    var list = filteredTxns();
+    if (!list.length) { setTxnMsg("Download ke liye koi record nahi hai.", false); return; }
+    var rows = [["Tareekh", "Dene wala", "Lene wala", "Raqam (Rs)", "Khana / Note"]];
+    list.forEach(function (t) {
+      rows.push([fmtDate(t.txn_date), profileName(t.payer_id), profileName(t.receiver_id), Number(t.amount) || 0, t.note || "Khana"]);
+    });
+    var csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+    var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "easy-khata-" + todayLocal() + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    setTxnMsg("CSV download ho gayi (" + list.length + " record).", true);
+  }
+  function renderTxns() {
+    var me = myId();
+    var list = filteredTxns();
     if (!txns.length) {
       $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi hai — pehla record upar se likhein.</p>';
       return;
@@ -703,6 +797,7 @@
 
   /* ---------- add / edit / delete ---------- */
   function resetTxnForm() {
+    setSplitMode(false);
     editingId = null;
     $("txnFormTitle").textContent = "Naya record likhein";
     $("txnForm").querySelector('button[type="submit"]').textContent = "Record save karein";
@@ -716,6 +811,7 @@
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t || t.created_by !== myId()) return;
+    setSplitMode(false);
     var me = myId();
     var other = t.payer_id === me ? t.receiver_id : t.payer_id;
     var dir = t.payer_id === me ? "given" : "taken";
@@ -731,6 +827,66 @@
     $("cancelEditBtn").hidden = false;
     $("txnForm").scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  /* ---------- group split (barabar bantein) ---------- */
+  function renderSplitList() {
+    var me = myId();
+    var html = "";
+    profiles.forEach(function (p) {
+      if (p.id === me) return;
+      html += '<label><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</label>';
+    });
+    $("splitList").innerHTML = html || '<p class="empty">Abhi koi aur user nahi hai.</p>';
+    updateSplitHint();
+  }
+  function selectedSplitIds() {
+    var ids = [];
+    var boxes = document.querySelectorAll("#splitList input[data-split-person]:checked");
+    for (var i = 0; i < boxes.length; i++) ids.push(boxes[i].getAttribute("data-split-person"));
+    return ids;
+  }
+  function updateSplitHint() {
+    var total = parseFloat($("txnAmount").value) || 0;
+    var ids = selectedSplitIds();
+    if (!ids.length) { $("splitHint").textContent = "Pehle dost chunein, phir raqam likhein."; return; }
+    if (!total || total <= 0) { $("splitHint").textContent = ids.length + " dost chune — ab kul raqam likhein."; return; }
+    var share = Math.floor(total / ids.length * 100) / 100;
+    $("splitHint").textContent = "Har bande ka hissa: " + fmtRs(share) + " (" + ids.length + " dost · kul " + fmtRs(total) + ")";
+  }
+  function setSplitMode(on) {
+    splitMode = on;
+    $("txnSplit").checked = on;
+    $("txnPersonRow").hidden = on;
+    $("txnDirRow").hidden = on;
+    $("splitBox").hidden = !on;
+    if (on) renderSplitList();
+  }
+  function addSplitTxns(amount, note, date, btn) {
+    var ids = selectedSplitIds();
+    if (!ids.length) { setTxnMsg("Barabar bantne ke liye kam az kam aik dost chunein.", false); return; }
+    var me = myId();
+    var share = Math.floor(amount / ids.length * 100) / 100;
+    if (share <= 0) { setTxnMsg("Raqam itni kam hai ke hissa nahi ban raha.", false); return; }
+    btn.disabled = true;
+    var done = 0, failed = 0, i = 0;
+    function next() {
+      if (i >= ids.length) {
+        btn.disabled = false;
+        if (failed) setTxnMsg(done + " record save hue, " + failed + " nahi hue — dobara check karein.", false);
+        else { setTxnMsg(ids.length + " record save ho gaye (barabar bant gaye)!", true); resetTxnForm(); }
+        loadAll();
+        return;
+      }
+      var id = ids[i++];
+      var amt = (i === ids.length) ? Math.round((amount - share * (ids.length - 1)) * 100) / 100 : share;
+      sb("khata_transactions", { method: "POST", prefer: "return=representation", body: {
+        payer_id: me, receiver_id: id, amount: amt,
+        note: (note || "Khana") + " (barabar)", txn_date: date, created_by: me
+      } }).then(function (res) { if (res.ok) done++; else failed++; next(); })
+      .catch(function () { failed++; next(); });
+    }
+    next();
+  }
+
   function addTxn(e) {
     e.preventDefault();
     if (!dbReady) { setTxnMsg("Database setup baqi hai.", false); return; }
@@ -739,9 +895,13 @@
     var amount = parseFloat($("txnAmount").value);
     var note = $("txnNote").value.trim();
     var date = $("txnDate").value;
-    if (!person) { setTxnMsg("Pehle koi dost select karein (us ka account hona zaroori hai).", false); return; }
+    if (!splitMode && !person) { setTxnMsg("Pehle koi dost select karein (us ka account hona zaroori hai).", false); return; }
     if (!amount || amount <= 0) { setTxnMsg("Sahi raqam likhein.", false); return; }
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
+    if (splitMode && !editingId) {
+      addSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]'));
+      return;
+    }
     var me = myId();
     var body = {
       payer_id: dir === "given" ? me : person,
@@ -808,7 +968,20 @@
   $("savePhoneBtn").addEventListener("click", savePhone);
   $("txnSearch").addEventListener("input", function (e) { txnSearchText = e.target.value; renderTxns(); });
   $("txnFilterPerson").addEventListener("change", function (e) { txnFilterPerson = e.target.value; renderTxns(); });
+  $("txnFrom").addEventListener("change", function (e) { txnFromDate = e.target.value; renderTxns(); });
+  $("txnTo").addEventListener("change", function (e) { txnToDate = e.target.value; renderTxns(); });
+  $("clearFilterBtn").addEventListener("click", function () {
+    txnSearchText = ""; txnFilterPerson = ""; txnFromDate = ""; txnToDate = "";
+    $("txnSearch").value = ""; $("txnFilterPerson").value = ""; $("txnFrom").value = ""; $("txnTo").value = "";
+    renderTxns();
+  });
+  $("exportCsvBtn").addEventListener("click", exportCsv);
+  $("txnSplit").addEventListener("change", function (e) { setSplitMode(e.target.checked); });
+  $("txnAmount").addEventListener("input", function () { if (splitMode) updateSplitHint(); });
+  $("splitList").addEventListener("change", function () { updateSplitHint(); });
   $("peopleList").addEventListener("click", function (e) {
+    var st = e.target.closest ? e.target.closest("[data-settle]") : null;
+    if (st) { settlePerson(st.getAttribute("data-settle")); return; }
     var s = e.target.closest ? e.target.closest("[data-share]") : null;
     if (s) { sharePerson(s.getAttribute("data-share")); return; }
     var r = e.target.closest ? e.target.closest("[data-remind]") : null;
