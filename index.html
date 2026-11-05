@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Easy Khata — Khana ka Len Den</title>
 <meta name="description" content="Easy Khata — doston ke sath khane ka len den ka hisab. Kis ne kitne diye, kis se kitne liye, har bande ka hisab aik jagah.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14532d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,6 +22,8 @@
     </div>
   </div>
   <div class="top-actions">
+    <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
+    <button id="installBtn" class="btn btn-ghost" type="button" hidden>Install karein</button>
     <span id="userChip" class="user-chip" hidden></span>
     <button id="logoutBtn" class="btn btn-ghost" hidden>Logout</button>
   </div>
@@ -128,6 +135,6 @@
 </footer>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

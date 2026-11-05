@@ -177,3 +177,5 @@ body {
   .sum-card.net { grid-column: 1 / -1; }
   .brand p { display: none; }
 }
+
+.offline-badge { background: #f59e0b; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }

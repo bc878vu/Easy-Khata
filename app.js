@@ -412,6 +412,38 @@
     if (b) deleteTxn(b.getAttribute("data-del"));
   });
 
+  /* ---------- PWA: install + offline ---------- */
+  var deferredInstall = null;
+  function renderOffline() {
+    var b = $("offlineBadge");
+    if (b) b.hidden = navigator.onLine;
+  }
+  window.addEventListener("online", renderOffline);
+  window.addEventListener("offline", renderOffline);
+  renderOffline();
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredInstall = e;
+    var b = $("installBtn");
+    if (b) b.hidden = false;
+  });
+  window.addEventListener("appinstalled", function () {
+    deferredInstall = null;
+    var b = $("installBtn");
+    if (b) b.hidden = true;
+  });
+  var installBtn = $("installBtn");
+  if (installBtn) installBtn.addEventListener("click", function () {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(function () { deferredInstall = null; installBtn.hidden = true; }).catch(function () {});
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+
   if (!API || !ANON) {
     $("setupBox").hidden = false;
     $("authBox").hidden = true;
