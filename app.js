@@ -715,15 +715,30 @@
     var c = null;
     myContacts.forEach(function (x) { if (x.id === id) c = x; });
     if (!c) return;
-    var s = personStats(id);
-    if (s.given || s.taken) { setPeopleMsg("Is contact ke record hain — pehle un ko delete karein, phir contact hatayein.", false); return; }
-    askConfirm("Contact hata dein?", "'" + (c.name || "") + "' ko contacts se hata dein?", "Hata dein", function () {
-    sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
-      .then(function (res) {
-        if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
-        myContacts = myContacts.filter(function (x) { return x.id !== id; });
-        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
-      }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+    // Apna manual contact — record hon to bhi delete ho sakta hai (user ask 2026-11-05).
+    // Record hon to pehle wo delete hote hain (sirf mere banaye hue), phir contact.
+    var count = 0;
+    txns.forEach(function (t) { if (t.payer_id === id || t.receiver_id === id) count++; });
+    var text = count > 0
+      ? "'" + (c.name || "") + "' ko contacts se hata dein? Is ke " + count + " record bhi delete ho jayenge — ye wapas nahi aaye ga."
+      : "'" + (c.name || "") + "' ko contacts se hata dein?";
+    askConfirm("Contact hata dein?", text, "Hata dein", function () {
+      var deleteRow = function () {
+        sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
+          .then(function (res) {
+            if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
+            myContacts = myContacts.filter(function (x) { return x.id !== id; });
+            renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+            setPeopleMsg("Contact hata diya gaya.", true);
+          }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+      };
+      if (count === 0) { deleteRow(); return; }
+      sb("khata_transactions?created_by=eq." + encodeURIComponent(myId()) + "&or=(payer_id.eq." + encodeURIComponent(id) + ",receiver_id.eq." + encodeURIComponent(id) + ")", { method: "DELETE" })
+        .then(function (res) {
+          if (!res.ok) { setPeopleMsg("Record delete nahi hue — dobara koshish karein.", false); return; }
+          refreshTxns();
+          deleteRow();
+        }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
     });
   }
   function pickContact() {
@@ -1344,7 +1359,7 @@
         '<span><button class="btn-mini" type="button" data-share="' + esc(id) + '">Share</button> ' +
         '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Yaad dilayein</button>' +
         (net !== 0 ? ' <button class="btn-mini" type="button" data-settle="' + esc(id) + '">Hisab barabar karein</button>' : '') +
-        (p.manual && p.given === 0 && p.taken === 0 ? ' <button class="btn-mini" type="button" data-del-contact="' + esc(id) + '">Hata dein</button>' : '') + '</span></div></div>';
+        (p.manual ? ' <button class="btn-mini" type="button" data-del-contact="' + esc(id) + '">Hata dein</button>' : '') + '</span></div></div>';
     });
     $("peopleList").innerHTML = html;
   }
