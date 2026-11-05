@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <header class="topbar">
@@ -23,11 +23,55 @@
   </div>
   <div class="top-actions">
     <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
-    <button id="themeBtn" class="icon-btn" type="button" title="Dark / Light">🌙</button>
-    <span id="userChip" class="user-chip" hidden></span>
-    <button id="logoutBtn" class="btn btn-ghost" hidden>Logout</button>
+    <button id="avatarBtn" class="avatar-btn" type="button" title="Profile" hidden>?</button>
+    <button id="menuBtn" class="icon-btn" type="button" title="Menu" hidden>☰</button>
   </div>
 </header>
+
+<div id="drawerOverlay" class="drawer-overlay" hidden></div>
+<aside id="drawer" class="drawer" hidden aria-label="Menu">
+  <div class="drawer-head">
+    <div class="drawer-profile">
+      <span id="drawerAvatar" class="avatar-btn big">?</span>
+      <div>
+        <strong id="drawerName"></strong>
+        <span id="drawerEmail" class="muted"></span>
+      </div>
+    </div>
+    <button id="drawerCloseBtn" class="icon-btn dark" type="button" title="Band karein">✕</button>
+  </div>
+  <nav class="drawer-nav">
+    <button id="navKhataBtn" class="drawer-item" type="button">📒 Mera Khata</button>
+    <button id="navAdminBtn" class="drawer-item" type="button" hidden>🛡️ Admin Panel</button>
+  </nav>
+  <div class="drawer-section">
+    <h3>Settings</h3>
+    <button id="themeBtn" class="drawer-item" type="button"><span id="themeIcon">🌙</span> Dark mode</button>
+    <div class="field" style="margin-top:12px">
+      <label for="myPhone">Mera WhatsApp number</label>
+      <input id="myPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
+      <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Number save karein</button>
+      <p id="phoneMsg" class="msg" role="status"></p>
+    </div>
+    <button id="changePassBtn" class="drawer-item" type="button">🔑 Password badlein</button>
+    <div id="changePassBox" hidden>
+      <div class="field">
+        <label for="newPass1">Naya password</label>
+        <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
+      </div>
+      <div class="field">
+        <label for="newPass2">Naya password dobara</label>
+        <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
+      </div>
+      <button id="savePassBtn" class="btn btn-primary" type="button">Password save karein</button>
+      <p id="passMsg" class="msg" role="status"></p>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button id="logoutBtn" class="btn btn-block btn-logout" type="button">Logout</button>
+    <p class="muted" style="text-align:center;margin:10px 0 0">Easy Khata — apna hisab, saaf hisab.</p>
+  </div>
+</aside>
 
 <main class="wrap">
 
@@ -166,17 +210,6 @@
     </div>
 
     <div class="card">
-      <h2>Mera WhatsApp number</h2>
-      <p class="muted">Dost aap ko WhatsApp par hisab yaad dila sakein — number sirf login users ko nazar aata hai.</p>
-      <div class="field">
-        <label for="myPhone">Phone / WhatsApp number</label>
-        <input id="myPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
-      </div>
-      <button id="savePhoneBtn" class="btn btn-primary" type="button">Number save karein</button>
-      <p id="phoneMsg" class="msg" role="status"></p>
-    </div>
-
-    <div class="card">
       <div class="list-head">
         <h2>Saara khata</h2>
         <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
@@ -193,15 +226,19 @@
       <div id="txnList" class="txns"></div>
     </div>
 
-    <div id="adminBox" class="card" hidden>
-      <h2>Admin Panel — Users</h2>
+  </section>
+
+  <section id="adminView" hidden>
+    <div class="card">
+      <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
+      <h2 style="margin-top:10px">Admin Panel — Users</h2>
       <p class="muted">Sirf admin (Asad) dekh sakta hai. User delete karne se us ka account, profile aur tamam record delete ho jate hain.</p>
       <p id="adminStats" class="muted"></p>
       <p id="adminMsg" class="msg" role="status"></p>
       <div id="adminUserList" class="people"></div>
     </div>
-
   </section>
+
 </main>
 
 <footer class="foot">
@@ -209,6 +246,6 @@
 </footer>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

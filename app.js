@@ -157,10 +157,12 @@
     setAuthMsg("");
   }
   function showAuth() {
+    closeDrawer();
     $("authBox").hidden = false;
     $("appBox").hidden = true;
-    $("userChip").hidden = true;
-    $("logoutBtn").hidden = true;
+    $("adminView").hidden = true;
+    $("avatarBtn").hidden = true;
+    $("menuBtn").hidden = true;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
     $("resetBox").hidden = true;
@@ -168,11 +170,38 @@
   }
   function showApp() {
     $("authBox").hidden = true;
+    $("adminView").hidden = true;
     $("appBox").hidden = false;
-    $("userChip").hidden = false;
-    $("logoutBtn").hidden = false;
-    $("userChip").textContent = myName();
+    var initial = (myName() || "?").trim().charAt(0).toUpperCase() || "?";
+    $("avatarBtn").textContent = initial;
+    $("drawerAvatar").textContent = initial;
+    $("drawerName").textContent = myName();
+    $("drawerEmail").textContent = (session.user && session.user.email) || "";
+    $("avatarBtn").hidden = false;
+    $("menuBtn").hidden = false;
     $("txnDate").value = todayLocal();
+  }
+  function showAppView() {
+    closeDrawer();
+    showApp();
+  }
+  function showAdminView() {
+    if (!isAdmin()) return;
+    closeDrawer();
+    $("authBox").hidden = true;
+    $("appBox").hidden = true;
+    $("adminView").hidden = false;
+    renderAdmin();
+    window.scrollTo(0, 0);
+  }
+  function openDrawer() {
+    renderAdmin();
+    $("drawer").hidden = false;
+    $("drawerOverlay").hidden = false;
+  }
+  function closeDrawer() {
+    $("drawer").hidden = true;
+    $("drawerOverlay").hidden = true;
   }
 
   function authErrorText(res) {
@@ -297,6 +326,39 @@
         setForgotMsg("Internet ya server se rabta nahi ho raha.", false);
       });
   }
+  function updatePassword(pw) {
+    return fetch(API + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw })
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
+        .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
+    });
+  }
+  function setPassMsg(text, ok) {
+    var el = $("passMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function doChangePass() {
+    var p1 = $("newPass1").value;
+    var p2 = $("newPass2").value;
+    if (!p1 || p1.length < 6) { setPassMsg("Password kam az kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setPassMsg("Dono password aik jaise likhein.", false); return; }
+    var btn = $("savePassBtn");
+    btn.disabled = true;
+    updatePassword(p1).then(function (res) {
+      btn.disabled = false;
+      if (!res.ok) { setPassMsg(authErrorText(res), false); return; }
+      $("newPass1").value = "";
+      $("newPass2").value = "";
+      setPassMsg("Password badal gaya!", true);
+    }).catch(function () {
+      btn.disabled = false;
+      setPassMsg("Internet ya server se rabta nahi ho raha.", false);
+    });
+  }
   function doReset() {
     var p1 = $("resetPassword").value;
     var p2 = $("resetPassword2").value;
@@ -304,14 +366,7 @@
     if (p1 !== p2) { setResetMsg("Dono password aik jaise likhein.", false); return; }
     var btn = $("resetBtn");
     btn.disabled = true;
-    fetch(API + "/auth/v1/user", {
-      method: "PUT",
-      headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
-      body: JSON.stringify({ password: p1 })
-    }).then(function (r) {
-      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
-        .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
-    }).then(function (res) {
+    updatePassword(p1).then(function (res) {
       btn.disabled = false;
       if (!res.ok) { setResetMsg(authErrorText(res), false); return; }
       $("resetPassword").value = "";
@@ -430,9 +485,8 @@
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
   function renderAdmin() {
-    var box = $("adminBox");
-    if (!isAdmin()) { box.hidden = true; return; }
-    box.hidden = false;
+    if (!isAdmin()) { $("navAdminBtn").hidden = true; return; }
+    $("navAdminBtn").hidden = false;
     var me = myId();
     $("adminStats").textContent = "Total users: " + profiles.length + " · Total records: " + txns.length;
     if (!profiles.length) {
@@ -961,6 +1015,15 @@
   $("resetBtn").addEventListener("click", doReset);
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
   $("logoutBtn").addEventListener("click", function () { saveSession(null); showAuth(); });
+  $("menuBtn").addEventListener("click", openDrawer);
+  $("avatarBtn").addEventListener("click", openDrawer);
+  $("drawerCloseBtn").addEventListener("click", closeDrawer);
+  $("drawerOverlay").addEventListener("click", closeDrawer);
+  $("navKhataBtn").addEventListener("click", showAppView);
+  $("navAdminBtn").addEventListener("click", showAdminView);
+  $("adminBackBtn").addEventListener("click", showAppView);
+  $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
+  $("savePassBtn").addEventListener("click", doChangePass);
   $("txnForm").addEventListener("submit", addTxn);
   $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
@@ -1015,7 +1078,8 @@
   /* ---------- theme ---------- */
   function applyTheme(mode) {
     document.documentElement.setAttribute("data-theme", mode);
-    $("themeBtn").textContent = mode === "dark" ? "☀️" : "🌙";
+    var ic = $("themeIcon");
+    if (ic) ic.textContent = mode === "dark" ? "☀️" : "🌙";
     try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
   }
   $("themeBtn").addEventListener("click", function () {
