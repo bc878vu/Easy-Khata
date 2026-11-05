@@ -320,7 +320,17 @@
       : authCall("/token?grant_type=password", { email: email, password: password });
     p.then(function (res) {
       btn.disabled = false;
-      if (!res.ok && !(res.body && res.body.access_token)) { setAuthMsg(authErrorText(res), false); return; }
+      if (!res.ok && !(res.body && res.body.access_token)) {
+        setAuthMsg(authErrorText(res), false);
+        // Email pehle se registered ho to seedha login mode par le jayein —
+        // user ko dobara signup dabane ki zaroorat na pare.
+        var raw = res.body && (res.body.msg || res.body.message || "");
+        if (/already registered|already exists/i.test(raw)) {
+          authMode = "login";
+          renderAuthMode();
+        }
+        return;
+      }
       afterAuth(res);
     }).catch(function () {
       btn.disabled = false;
