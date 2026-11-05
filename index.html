@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 <header class="topbar">
@@ -152,12 +152,28 @@
   <!-- Main app -->
   <section id="appBox" hidden>
 
-    <div id="pushBanner" class="push-banner" hidden>
-      <div><strong>🔔 Notifications on karein</strong><br><span class="muted">App band ho to bhi record ki khabar mile gi.</span></div>
-      <div class="row">
-        <button id="pushEnableBtn" class="btn btn-primary" type="button">On karein</button>
-        <button id="pushDismissBtn" class="btn btn-neutral" type="button">Abhi nahi</button>
+    <div class="summary">
+      <div class="sum-card given">
+        <span class="sum-label">Maine diye</span>
+        <strong id="sumGiven">Rs 0</strong>
+        <span id="sumGivenCount" class="sum-sub"></span>
       </div>
+      <div class="sum-card taken">
+        <span class="sum-label">Maine liye</span>
+        <strong id="sumTaken">Rs 0</strong>
+        <span id="sumTakenCount" class="sum-sub"></span>
+      </div>
+      <div class="sum-card net">
+        <span class="sum-label">Mera net hisab</span>
+        <strong id="sumNet">Rs 0</strong>
+        <span id="sumNetSub" class="sum-sub"></span>
+      </div>
+    </div>
+
+    <div id="monthStats" class="month-stats" hidden></div>
+    <div id="insightStats" class="month-stats" hidden></div>
+    <div class="actions-row">
+      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
     </div>
 
     <div class="card accent" id="txnFormCard">
@@ -208,30 +224,6 @@
         <button class="btn btn-primary btn-block" type="submit">Record save karein</button>
         <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Edit cancel karein</button>
       </form>
-    </div>
-
-    <div class="summary">
-      <div class="sum-card given">
-        <span class="sum-label">Maine diye</span>
-        <strong id="sumGiven">Rs 0</strong>
-        <span id="sumGivenCount" class="sum-sub"></span>
-      </div>
-      <div class="sum-card taken">
-        <span class="sum-label">Maine liye</span>
-        <strong id="sumTaken">Rs 0</strong>
-        <span id="sumTakenCount" class="sum-sub"></span>
-      </div>
-      <div class="sum-card net">
-        <span class="sum-label">Mera net hisab</span>
-        <strong id="sumNet">Rs 0</strong>
-        <span id="sumNetSub" class="sum-sub"></span>
-      </div>
-    </div>
-
-    <div id="monthStats" class="month-stats" hidden></div>
-    <div id="insightStats" class="month-stats" hidden></div>
-    <div class="actions-row">
-      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
     </div>
 
     <div class="card">
@@ -360,6 +352,6 @@
     </div>
   </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

@@ -195,7 +195,7 @@
     $("fabAdd").hidden = false;
     $("txnDate").value = todayLocal();
     loadNotifs();
-    refreshPushState();
+    refreshPushState().then(function () { maybeAskPushPermission(); });
     try {
       var view = new URLSearchParams(window.location.search).get("view");
       if (view === "notifs") {
@@ -242,7 +242,8 @@
     if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "Confirmation email bhejne me masla hai — thori der baad dobara koshish karein.";
     if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password kam az kam 6 harf ka ho.";
     if (/email/i.test(m) && /invalid/i.test(m)) return "Sahi email likhein.";
-    return m || ("Kuch ghalat hua — dobara koshish karein. (Code " + res.status + ")");
+    if (!m) { try { console.warn("EasyKhata auth error", res.status, res.body); } catch (e) {} }
+    return m || "Kuch ghalat hua — dobara koshish karein.";
   }
 
   function ensureProfile() {
@@ -280,13 +281,18 @@
 
   function afterAuth(res) {
     // Signup jis me email confirmation on ho: session nahi milta.
-    if (res.body && res.body.user && !res.body.access_token) {
-      setAuthMsg("Account ban gaya! Email me confirmation link aya hai — us par click kar ke phir login karein.", true);
-      authMode = "login";
-      renderAuthMode();
-      return;
-    }
-    if (!res.body || !res.body.access_token) {
+    // GoTrue confirmation-pending response bare user object hota hai (top-level id/email),
+    // {user: ...} wrapped NAHI — is liye dono shapes check karein, warna kamyab
+    // signup par bhi "Kuch ghalat hua" dikhta tha (2026-11-05, Yasir case).
+    var body = res.body || {};
+    if (!body.access_token) {
+      var pendingUser = body.user || (body.id && body.email ? body : null);
+      if (pendingUser) {
+        setAuthMsg("Account ban gaya! Email me confirmation link aya hai — us par click kar ke phir login karein.", true);
+        authMode = "login";
+        renderAuthMode();
+        return;
+      }
       setAuthMsg(authErrorText(res), false);
       return;
     }
@@ -762,20 +768,31 @@
       : "🔔 Notifications: Off";
   }
   function refreshPushState() {
-    if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); $("pushBanner").hidden = true; return Promise.resolve(pushState); }
+    if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState); }
     if (window.Notification && Notification.permission === "denied") {
-      pushState = "denied"; updatePushToggleLabel(); $("pushBanner").hidden = true; return Promise.resolve(pushState);
+      pushState = "denied"; updatePushToggleLabel(); return Promise.resolve(pushState);
     }
     return navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription();
     }).then(function (sub) {
       pushState = sub ? "on" : "off";
       updatePushToggleLabel();
-      var dismissed = false;
-      try { dismissed = window.localStorage.getItem("easykhata_push_dismissed") === "1"; } catch (e) {}
-      $("pushBanner").hidden = !(pushState === "off" && !dismissed);
       return pushState;
     }).catch(function () { return pushState; });
+  }
+  // App khulte hi Chrome ka apna notification permission popup aaye.
+  // In-app banner hata diya gaya (2026-11-05) — browser khud poochta hai.
+  // Har fresh open par aik dafa (session guard); Block karne par dobara nahi poochta.
+  function maybeAskPushPermission() {
+    if (!pushSupported) return;
+    if (!window.Notification || Notification.permission !== "default") return;
+    if (pushState !== "off") return;
+    try { if (window.sessionStorage.getItem("easykhata_push_asked") === "1") return; } catch (e) {}
+    try { window.sessionStorage.setItem("easykhata_push_asked", "1"); } catch (e) {}
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== "granted") { pushState = "denied"; updatePushToggleLabel(); return; }
+      enablePush();
+    }).catch(function () {});
   }
   function enablePush() {
     if (!pushSupported) return Promise.resolve(false);
@@ -784,23 +801,18 @@
       : Notification.requestPermission();
     return p.then(function (perm) {
       if (perm !== "granted") {
-        pushState = "denied"; updatePushToggleLabel(); $("pushBanner").hidden = true;
-        var span = document.querySelector("#pushBanner .muted");
-        if (span) span.textContent = "Permission nahi mili — browser settings se notifications on karein.";
+        pushState = "denied"; updatePushToggleLabel();
         return false;
       }
       return navigator.serviceWorker.ready.then(function (reg) {
         return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushVapidKey()) });
       }).then(function (sub) {
         return savePushSub(sub).then(function () {
-          pushState = "on"; updatePushToggleLabel(); $("pushBanner").hidden = true;
-          try { window.localStorage.removeItem("easykhata_push_dismissed"); } catch (e) {}
+          pushState = "on"; updatePushToggleLabel();
           return true;
         });
       });
     }).catch(function () {
-      var span2 = document.querySelector("#pushBanner .muted");
-      if (span2) span2.textContent = "Subscribe nahi ho saka — dobara koshish karein.";
       return false;
     });
   }
@@ -813,7 +825,6 @@
       return sub.unsubscribe().then(function () {
         return deletePushSub(sub).catch(function () {}).then(function () {
           pushState = "off"; updatePushToggleLabel();
-          try { window.localStorage.setItem("easykhata_push_dismissed", "1"); } catch (e) {}
           return true;
         });
       });
@@ -1672,11 +1683,6 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
-  $("pushEnableBtn").addEventListener("click", function () { enablePush(); });
-  $("pushDismissBtn").addEventListener("click", function () {
-    $("pushBanner").hidden = true;
-    try { window.localStorage.setItem("easykhata_push_dismissed", "1"); } catch (e) {}
-  });
   $("pushToggleBtn").addEventListener("click", function () {
     if (pushState === "on") disablePush();
     else enablePush();
@@ -1706,6 +1712,48 @@
     if (amt) setTimeout(function () { amt.focus({ preventScroll: true }); }, 400);
   });
 
+  /* ---------- app auto-update (naya version khud aa jaye) ---------- */
+  var hadControllerAtLoad = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  var updateReloaded = false;
+  function isFormDirty() {
+    try {
+      if (($("txnAmount").value || "").trim() !== "") return true;
+      if (($("txnNote").value || "").trim() !== "") return true;
+      if (editingId) return true;
+      if (!$("addContactBox").hidden && ($("newContactName").value || "").trim() !== "") return true;
+    } catch (e) {}
+    return false;
+  }
+  function activateWaitingWorker(reg) {
+    if (reg && reg.waiting) {
+      try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
+    }
+  }
+  function checkForAppUpdate() {
+    if (!("serviceWorker" in navigator)) return Promise.resolve(false);
+    return navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg) return false;
+      activateWaitingWorker(reg);
+      return reg.update().then(function () { activateWaitingWorker(reg); return true; }).catch(function () { return false; });
+    }).catch(function () { return false; });
+  }
+  function wireAppUpdate() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      // Pehli dafa install par reload nahi — sirf purane version se naye par.
+      if (!hadControllerAtLoad) return;
+      if (updateReloaded) return;
+      if (isFormDirty()) return; // form bhara hai to agle open par naya version aa jaye ga
+      updateReloaded = true;
+      window.location.reload();
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) checkForAppUpdate();
+    });
+    setInterval(function () { checkForAppUpdate(); }, 30 * 60 * 1000);
+    checkForAppUpdate();
+  }
+
   /* ---------- PWA: offline ---------- */
   function renderOffline() {
     var b = $("offlineBadge");
@@ -1718,6 +1766,7 @@
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("sw.js").catch(function () {});
     });
+    wireAppUpdate();
   }
 
   /* ---------- theme ---------- */
