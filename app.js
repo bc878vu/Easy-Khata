@@ -195,6 +195,14 @@
     $("fabAdd").hidden = false;
     $("txnDate").value = todayLocal();
     loadNotifs();
+    refreshPushState();
+    try {
+      var view = new URLSearchParams(window.location.search).get("view");
+      if (view === "notifs") {
+        window.history.replaceState(null, "", window.location.pathname);
+        showNotifView();
+      }
+    } catch (e) {}
     if (notifTimer) clearInterval(notifTimer);
     notifTimer = setInterval(function () { if (session) loadNotifs(); }, 30000);
   }
@@ -723,6 +731,108 @@
       }).catch(function () {});
   }
 
+  /* ---------- push notifications (app band ho to bhi) ---------- */
+  var pushSupported = ("Notification" in window) && ("serviceWorker" in navigator) && ("PushManager" in window);
+  var pushState = "unknown";
+  function pushVapidKey() { return (window.EASY_KHATA_CONFIG && window.EASY_KHATA_CONFIG.VAPID_PUBLIC_KEY) || ""; }
+  function urlBase64ToUint8Array(base64) {
+    var padding = "=".repeat((4 - base64.length % 4) % 4);
+    var b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+    var raw = window.atob(b64);
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function savePushSub(sub) {
+    var k = sub.toJSON();
+    return sb("khata_push_subs?on_conflict=endpoint", {
+      method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+      body: { user_id: myId(), endpoint: sub.endpoint, p256dh: k.keys.p256dh, auth: k.keys.auth }
+    });
+  }
+  function deletePushSub(sub) {
+    return sb("khata_push_subs?endpoint=eq." + encodeURIComponent(sub.endpoint), { method: "DELETE" });
+  }
+  function updatePushToggleLabel() {
+    var b = $("pushToggleBtn");
+    if (!b) return;
+    b.textContent = pushState === "on" ? "🔔 Notifications: On"
+      : pushState === "denied" ? "🔔 Notifications: Blocked"
+      : pushState === "unsupported" ? "🔔 Notifications: Is browser me nahi"
+      : "🔔 Notifications: Off";
+  }
+  function refreshPushState() {
+    if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); $("pushBanner").hidden = true; return Promise.resolve(pushState); }
+    if (window.Notification && Notification.permission === "denied") {
+      pushState = "denied"; updatePushToggleLabel(); $("pushBanner").hidden = true; return Promise.resolve(pushState);
+    }
+    return navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (sub) {
+      pushState = sub ? "on" : "off";
+      updatePushToggleLabel();
+      var dismissed = false;
+      try { dismissed = window.localStorage.getItem("easykhata_push_dismissed") === "1"; } catch (e) {}
+      $("pushBanner").hidden = !(pushState === "off" && !dismissed);
+      return pushState;
+    }).catch(function () { return pushState; });
+  }
+  function enablePush() {
+    if (!pushSupported) return Promise.resolve(false);
+    var p = (window.Notification && Notification.permission === "granted")
+      ? Promise.resolve("granted")
+      : Notification.requestPermission();
+    return p.then(function (perm) {
+      if (perm !== "granted") {
+        pushState = "denied"; updatePushToggleLabel(); $("pushBanner").hidden = true;
+        var span = document.querySelector("#pushBanner .muted");
+        if (span) span.textContent = "Permission nahi mili — browser settings se notifications on karein.";
+        return false;
+      }
+      return navigator.serviceWorker.ready.then(function (reg) {
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushVapidKey()) });
+      }).then(function (sub) {
+        return savePushSub(sub).then(function () {
+          pushState = "on"; updatePushToggleLabel(); $("pushBanner").hidden = true;
+          try { window.localStorage.removeItem("easykhata_push_dismissed"); } catch (e) {}
+          return true;
+        });
+      });
+    }).catch(function () {
+      var span2 = document.querySelector("#pushBanner .muted");
+      if (span2) span2.textContent = "Subscribe nahi ho saka — dobara koshish karein.";
+      return false;
+    });
+  }
+  function disablePush() {
+    if (!pushSupported) return Promise.resolve(false);
+    return navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (sub) {
+      if (!sub) { pushState = "off"; updatePushToggleLabel(); return true; }
+      return sub.unsubscribe().then(function () {
+        return deletePushSub(sub).catch(function () {}).then(function () {
+          pushState = "off"; updatePushToggleLabel();
+          try { window.localStorage.setItem("easykhata_push_dismissed", "1"); } catch (e) {}
+          return true;
+        });
+      });
+    }).catch(function () { return false; });
+  }
+  function triggerPush(recipientId, title, text) {
+    // Fire-and-forget: server function recipient ko push bhejta hai.
+    // Save flow kabhi is par nahi rukta.
+    if (!recipientId || recipientId === myId() || !session || !session.access_token) return;
+    var real = false;
+    profiles.forEach(function (p) { if (p.id === recipientId) real = true; });
+    if (!real) return; // manual contact ka account hi nahi
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+      body: JSON.stringify({ recipientId: recipientId, title: title, body: text })
+    }).catch(function () {});
+  }
+
   /* ---------- admin panel ---------- */
   function setAdminMsg(text, ok) {
     var el = $("adminMsg");
@@ -927,6 +1037,7 @@
         var created = res.body && res.body[0];
         if (created) {
           sendNotif(u.id, "admin", created);
+          triggerPush(u.id, "Admin ne record likha", notifBodyFor(created, u.id));
           txns.unshift(created);
         }
         $("adminSetAmount").value = "";
@@ -1165,7 +1276,7 @@
       .then(function (res) {
         if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara koshish karein.", false); return; }
         var created = res.body && res.body[0];
-        if (created) sendNotif(id, "settle", created);
+        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisab barabar ho gaya", notifBodyFor(created, id)); }
         setPeopleMsg("Hisab barabar ho gaya!", true);
         loadAll();
       }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
@@ -1411,7 +1522,7 @@
         payer_id: me, receiver_id: id, amount: amt,
         note: (note || "Khana") + " (barabar)", txn_date: date, created_by: me
       } }).then(function (res) {
-        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) sendNotif(id, "record", created); }
+        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record likha", notifBodyFor(created, id)); } }
         else failed++;
         next();
       })
@@ -1466,7 +1577,7 @@
         btn.disabled = false;
         if (!res.ok) { setTxnMsg("Record save nahi hua — dobara koshish karein.", false); return; }
         var created = res.body && res.body[0];
-        if (created) sendNotif(person, "record", created);
+        if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record likha", notifBodyFor(created, person)); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
         setTxnMsg("Record save ho gaya!", true);
@@ -1561,6 +1672,15 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
+  $("pushEnableBtn").addEventListener("click", function () { enablePush(); });
+  $("pushDismissBtn").addEventListener("click", function () {
+    $("pushBanner").hidden = true;
+    try { window.localStorage.setItem("easykhata_push_dismissed", "1"); } catch (e) {}
+  });
+  $("pushToggleBtn").addEventListener("click", function () {
+    if (pushState === "on") disablePush();
+    else enablePush();
+  });
   $("confirmOkBtn").addEventListener("click", function () { var cb = confirmCallback; closeConfirm(); if (cb) cb(); });
   $("confirmCancelBtn").addEventListener("click", closeConfirm);
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });

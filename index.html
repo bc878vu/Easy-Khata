@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <header class="topbar">
@@ -48,6 +48,7 @@
   <div class="drawer-section">
     <h3>Settings</h3>
     <button id="themeBtn" class="drawer-item" type="button"><span id="themeIcon">🌙</span> Dark mode</button>
+    <button id="pushToggleBtn" class="drawer-item" type="button">🔔 Notifications: Off</button>
     <div class="field" style="margin-top:12px">
       <label for="myPhone">Mera WhatsApp number</label>
       <input id="myPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
@@ -151,36 +152,12 @@
   <!-- Main app -->
   <section id="appBox" hidden>
 
-    <div class="summary">
-      <div class="sum-card given">
-        <span class="sum-label">Maine diye</span>
-        <strong id="sumGiven">Rs 0</strong>
-        <span id="sumGivenCount" class="sum-sub"></span>
+    <div id="pushBanner" class="push-banner" hidden>
+      <div><strong>🔔 Notifications on karein</strong><br><span class="muted">App band ho to bhi record ki khabar mile gi.</span></div>
+      <div class="row">
+        <button id="pushEnableBtn" class="btn btn-primary" type="button">On karein</button>
+        <button id="pushDismissBtn" class="btn btn-neutral" type="button">Abhi nahi</button>
       </div>
-      <div class="sum-card taken">
-        <span class="sum-label">Maine liye</span>
-        <strong id="sumTaken">Rs 0</strong>
-        <span id="sumTakenCount" class="sum-sub"></span>
-      </div>
-      <div class="sum-card net">
-        <span class="sum-label">Mera net hisab</span>
-        <strong id="sumNet">Rs 0</strong>
-        <span id="sumNetSub" class="sum-sub"></span>
-      </div>
-    </div>
-
-    <div id="monthStats" class="month-stats" hidden></div>
-    <div id="insightStats" class="month-stats" hidden></div>
-    <div class="actions-row">
-      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
-    </div>
-
-    <div class="cols">
-    <div class="card">
-      <h2>Har bande se hisab</h2>
-      <p class="muted">Har dost ke sath — aap ne use kitne diye, us se kitne liye.</p>
-      <p id="peopleMsg" class="msg" role="status"></p>
-      <div id="peopleList" class="people"></div>
     </div>
 
     <div class="card accent" id="txnFormCard">
@@ -232,7 +209,38 @@
         <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Edit cancel karein</button>
       </form>
     </div>
+
+    <div class="summary">
+      <div class="sum-card given">
+        <span class="sum-label">Maine diye</span>
+        <strong id="sumGiven">Rs 0</strong>
+        <span id="sumGivenCount" class="sum-sub"></span>
+      </div>
+      <div class="sum-card taken">
+        <span class="sum-label">Maine liye</span>
+        <strong id="sumTaken">Rs 0</strong>
+        <span id="sumTakenCount" class="sum-sub"></span>
+      </div>
+      <div class="sum-card net">
+        <span class="sum-label">Mera net hisab</span>
+        <strong id="sumNet">Rs 0</strong>
+        <span id="sumNetSub" class="sum-sub"></span>
+      </div>
     </div>
+
+    <div id="monthStats" class="month-stats" hidden></div>
+    <div id="insightStats" class="month-stats" hidden></div>
+    <div class="actions-row">
+      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
+    </div>
+
+    <div class="card">
+      <h2>Har bande se hisab</h2>
+      <p class="muted">Har dost ke sath — aap ne use kitne diye, us se kitne liye.</p>
+      <p id="peopleMsg" class="msg" role="status"></p>
+      <div id="peopleList" class="people"></div>
+    </div>
+
 
     <div class="card">
       <div class="list-head">
@@ -340,7 +348,7 @@
 
 <button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
 
-<script src="config.js?v=2"></script>
+<script src="config.js?v=3"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm karein?</h3>
@@ -352,6 +360,6 @@
     </div>
   </div>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
