@@ -133,9 +133,13 @@
   }
 
   function authErrorText(res) {
-    var m = (res.body && (res.body.msg || res.body.message || res.body.error_description)) || "";
+    // Server ki asal wajah dikhayein — generic line ne asal error chhupa liya tha (2026-11-05).
+    var m = (res.body && (res.body.msg || res.body.message || res.body.error_description || res.body.error)) || "";
     if (/invalid login/i.test(m)) return "Email ya password ghalat hai.";
     if (/already registered|already exists/i.test(m)) return "Is email par account pehle se hai — login karein.";
+    if (/email not confirmed/i.test(m)) return "Email confirm nahi hui — inbox me confirmation link check karein, phir login karein.";
+    if (/only request this after|too many requests|rate limit/i.test(m) || res.status === 429) return "Thori der ruk kar dobara koshish karein.";
+    if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "Confirmation email bhejne me masla hai — thori der baad dobara koshish karein.";
     if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password kam az kam 6 harf ka ho.";
     if (/email/i.test(m) && /invalid/i.test(m)) return "Sahi email likhein.";
     return m || "Kuch ghalat hua — dobara koshish karein.";
