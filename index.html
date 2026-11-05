@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 <header class="topbar">
@@ -23,6 +23,7 @@
   </div>
   <div class="top-actions">
     <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
+    <button id="notifBtn" class="icon-btn" type="button" title="Notifications" hidden>🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     <button id="avatarBtn" class="avatar-btn" type="button" title="Profile" hidden>?</button>
     <button id="menuBtn" class="icon-btn" type="button" title="Menu" hidden>☰</button>
   </div>
@@ -242,6 +243,16 @@
 
   </section>
 
+  <section id="notifView" hidden>
+    <div class="card">
+      <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
+      <h2 style="margin-top:10px">Notifications</h2>
+      <p class="muted">Jab koi aap ke sath record save kare, to yahan message aa jaye ga.</p>
+      <button id="markAllReadBtn" class="btn btn-soft" type="button">Sab ko parha hua karein</button>
+      <div id="notifList" class="notifs" style="margin-top:12px"></div>
+    </div>
+  </section>
+
   <section id="adminView" hidden>
     <div class="card">
       <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
@@ -293,6 +304,18 @@
         <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
         <p id="adminPassMsg" class="msg" role="status"></p>
       </div>
+      <h3 style="margin-top:16px">Amount set karein (admin)</h3>
+      <p class="muted">Is user ke liye record banayein — shuruati hisab ya correction. Record aap aur is user ke darmiyan bane ga, aur use notification bhi jaye gi.</p>
+      <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Misal: 500"></div>
+      <div class="field"><label>Direction</label>
+        <div class="seg">
+          <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
+          <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
+        </div>
+      </div>
+      <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Misal: Shuruati hisab"></div>
+      <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Amount set karein</button>
+      <p id="adminSetMsg" class="msg" role="status"></p>
       <h3 style="margin-top:16px">Is user ka khata</h3>
       <div id="adminUserTxns" class="txns"></div>
       <p id="adminUserMsg" class="msg" role="status"></p>
@@ -308,6 +331,6 @@
 <button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

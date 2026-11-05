@@ -161,6 +161,9 @@
   }
   function showAuth() {
     closeDrawer();
+    if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
+    $("notifBtn").hidden = true;
+    $("notifView").hidden = true;
     $("authBox").hidden = false;
     $("appBox").hidden = true;
     $("adminView").hidden = true;
@@ -185,8 +188,12 @@
     $("drawerEmail").textContent = (session.user && session.user.email) || "";
     $("avatarBtn").hidden = false;
     $("menuBtn").hidden = false;
+    $("notifBtn").hidden = false;
     $("fabAdd").hidden = false;
     $("txnDate").value = todayLocal();
+    loadNotifs();
+    if (notifTimer) clearInterval(notifTimer);
+    notifTimer = setInterval(function () { if (session) loadNotifs(); }, 30000);
   }
   function showAppView() {
     closeDrawer();
@@ -292,7 +299,7 @@
     var btn = $("authSubmitBtn");
     btn.disabled = true;
     var p = authMode === "signup"
-      ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "" } })
+      ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "", app: "easy-khata" } })
       : authCall("/token?grant_type=password", { email: email, password: password });
     p.then(function (res) {
       btn.disabled = false;
@@ -485,6 +492,7 @@
       if (!res.ok) throw new Error("txns load failed");
       txns = res.body || [];
       renderAll();
+      loadNotifs();
     }).catch(function () {
       setTxnMsg("Record load nahi ho sake — refresh karein.", false);
     });
@@ -500,6 +508,93 @@
     renderTxns();
     fillMyPhone();
     renderAdmin();
+  }
+
+  /* ---------- notifications ---------- */
+  var notifs = [];
+  var notifTimer = null;
+  function fmtNotifTime(ts) {
+    try {
+      var d = new Date(ts);
+      var dd = String(d.getDate()).padStart(2, "0");
+      var mm = String(d.getMonth() + 1).padStart(2, "0");
+      var hh = String(d.getHours()).padStart(2, "0");
+      var mi = String(d.getMinutes()).padStart(2, "0");
+      return dd + "-" + mm + "-" + d.getFullYear() + " " + hh + ":" + mi;
+    } catch (e) { return fmtDate(ts); }
+  }
+  function notifBodyFor(t, recipientId) {
+    var actor = myName();
+    var other = t.payer_id === recipientId ? profileName(t.receiver_id) : profileName(t.payer_id);
+    var a = fmtRs(t.amount);
+    var note = t.note || "Khana";
+    var date = fmtDate(t.txn_date);
+    if (t.payer_id === recipientId) return "Aap ne " + other + " ko " + a + " diye — " + note + " · " + date;
+    return actor + " ne aap ko " + a + " diye — " + note + " · " + date;
+  }
+  function sendNotif(userId, kind, txn) {
+    if (!userId || userId === myId() || !txn) return;
+    var title = kind === "settle" ? "Hisab barabar ho gaya"
+      : kind === "admin" ? "Admin ne record likha"
+      : myName() + " ne record likha";
+    sb("khata_notifications", { method: "POST", body: {
+      user_id: userId, actor_id: myId(), txn_id: txn.id || null, kind: kind,
+      title: title, body: notifBodyFor(txn, userId)
+    } }).catch(function () {});
+  }
+  function loadNotifs() {
+    if (!session || !session.access_token) return;
+    sb("khata_notifications?select=*&user_id=eq." + encodeURIComponent(myId()) + "&order=created_at.desc&limit=50")
+      .then(function (res) {
+        if (!res.ok) return;
+        notifs = Array.isArray(res.body) ? res.body : [];
+        renderNotifBadge();
+        if (!$("notifView").hidden) renderNotifList();
+      }).catch(function () {});
+  }
+  function unreadNotifCount() {
+    var n = 0;
+    notifs.forEach(function (x) { if (!x.is_read) n++; });
+    return n;
+  }
+  function renderNotifBadge() {
+    var n = unreadNotifCount();
+    var b = $("notifBadge");
+    b.textContent = n > 99 ? "99+" : String(n);
+    b.hidden = n === 0;
+  }
+  function renderNotifList() {
+    if (!notifs.length) {
+      $("notifList").innerHTML = '<p class="empty">Abhi koi notification nahi hai.</p>';
+      return;
+    }
+    var html = "";
+    notifs.forEach(function (x) {
+      html += '<div class="notif' + (x.is_read ? "" : " unread") + '" data-notif="' + esc(x.id) + '">' +
+        '<div class="notif-title">' + esc(x.title || "") + '</div>' +
+        '<div class="notif-body">' + esc(x.body || "") + '</div>' +
+        '<div class="notif-time">' + esc(fmtNotifTime(x.created_at)) + '</div></div>';
+    });
+    $("notifList").innerHTML = html;
+  }
+  function markNotifRead(id) {
+    sb("khata_notifications?id=eq." + encodeURIComponent(id), { method: "PATCH", body: { is_read: true } })
+      .then(function () { loadNotifs(); }).catch(function () {});
+  }
+  function markAllNotifRead() {
+    sb("khata_notifications?user_id=eq." + encodeURIComponent(myId()) + "&is_read=eq.false", { method: "PATCH", body: { is_read: true } })
+      .then(function () { loadNotifs(); }).catch(function () {});
+  }
+  function showNotifView() {
+    closeDrawer();
+    $("authBox").hidden = true;
+    $("appBox").hidden = true;
+    $("adminView").hidden = true;
+    $("adminUserView").hidden = true;
+    $("fabAdd").hidden = true;
+    $("notifView").hidden = false;
+    loadNotifs();
+    window.scrollTo(0, 0);
   }
 
   /* ---------- admin panel ---------- */
@@ -679,12 +774,50 @@
       }).catch(function () { setAdminUserMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
 
+  function setAdminSetMsg(text, ok) {
+    var el = $("adminSetMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function saveAdminSet() {
+    if (!isAdmin() || !adminCurrentUser) return;
+    var amount = parseFloat($("adminSetAmount").value);
+    if (!amount || amount <= 0) { setAdminSetMsg("Sahi raqam likhein.", false); return; }
+    var dir = (document.querySelector('input[name="adminSetDir"]:checked') || {}).value || "take";
+    var note = $("adminSetNote").value.trim() || "Admin ne amount set ki";
+    var me = myId();
+    var u = adminCurrentUser;
+    var body = {
+      payer_id: dir === "take" ? u.id : me,
+      receiver_id: dir === "take" ? me : u.id,
+      amount: amount, note: note, txn_date: todayLocal(), created_by: me
+    };
+    var btn = $("adminSetSaveBtn");
+    btn.disabled = true;
+    sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { setAdminSetMsg("Amount set nahi hui — dobara koshish karein.", false); return; }
+        var created = res.body && res.body[0];
+        if (created) {
+          sendNotif(u.id, "admin", created);
+          txns.unshift(created);
+        }
+        $("adminSetAmount").value = "";
+        $("adminSetNote").value = "";
+        setAdminSetMsg("Amount set ho gayi!", true);
+        openAdminUser(u.id);
+        loadAll();
+      }).catch(function () { btn.disabled = false; setAdminSetMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+
   function renderMonthStats() {
     var el = $("monthStats");
     var now = todayLocal().slice(0, 7);
     var given = 0, taken = 0, count = 0;
     txns.forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
+      if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
       var a = Number(t.amount) || 0;
       count++;
       if (t.payer_id === myId()) given += a;
@@ -778,7 +911,7 @@
     $("sumGivenCount").textContent = gc ? gc + " dafa diye" : "Abhi kuch nahi";
     $("sumTaken").textContent = fmtRs(taken);
     $("sumTakenCount").textContent = tc ? tc + " dafa liye" : "Abhi kuch nahi";
-    var net = taken - given;
+    var net = given - taken; // +: mujhe lene hain, -: mujhe dene hain
     if (net > 0) {
       $("sumNet").textContent = fmtRs(net);
       $("sumNetSub").textContent = "Mujhe lene hain";
@@ -798,7 +931,7 @@
       if (t.payer_id === myId() && t.receiver_id === id) given += a;
       if (t.receiver_id === myId() && t.payer_id === id) taken += a;
     });
-    return { given: given, taken: taken, net: taken - given };
+    return { given: given, taken: taken, net: given - taken }; // +: us se lene hain, -: use dene hain
   }
   function personShareText(p) {
     var s = personStats(p.id);
@@ -862,6 +995,8 @@
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara koshish karein.", false); return; }
+        var created = res.body && res.body[0];
+        if (created) sendNotif(id, "settle", created);
         setPeopleMsg("Hisab barabar ho gaya!", true);
         loadAll();
       }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
@@ -873,7 +1008,7 @@
       if (t.payer_id === myId()) given += a;
       if (t.receiver_id === myId()) taken += a;
     });
-    var net = taken - given;
+    var net = given - taken; // +: mujhe lene hain, -: mujhe dene hain
     var netLine = net > 0 ? "Net: mujhe " + fmtRs(net) + " lene hain."
       : net < 0 ? "Net: mujhe " + fmtRs(-net) + " dene hain." : "Net: hisab barabar hai.";
     var text = "Easy Khata — " + myName() + " ka khana hisab:\n" +
@@ -904,7 +1039,7 @@
     var html = "";
     ids.forEach(function (id) {
       var p = map[id];
-      var net = p.taken - p.given; // +: us se lene hain, -: use dene hain
+      var net = p.given - p.taken; // +: us se lene hain, -: use dene hain
       var cls = net > 0 ? "pos" : net < 0 ? "neg" : "zero";
       var netText = net > 0 ? fmtRs(net) + " lene hain"
         : net < 0 ? fmtRs(-net) + " dene hain" : "Barabar";
@@ -1057,8 +1192,9 @@
     var ids = selectedSplitIds();
     if (!ids.length) { $("splitHint").textContent = "Pehle dost chunein, phir raqam likhein."; return; }
     if (!total || total <= 0) { $("splitHint").textContent = ids.length + " dost chune — ab kul raqam likhein."; return; }
-    var share = Math.floor(total / ids.length * 100) / 100;
-    $("splitHint").textContent = "Har bande ka hissa: " + fmtRs(share) + " (" + ids.length + " dost · kul " + fmtRs(total) + ")";
+    var people = ids.length + 1; // dost + aap — aap ka hissa bhi ginna hai
+    var share = Math.floor(total / people * 100) / 100;
+    $("splitHint").textContent = "Har bande ka hissa: " + fmtRs(share) + " (" + ids.length + " dost + aap · kul " + fmtRs(total) + " · aap ka hissa " + fmtRs(share) + ")";
   }
   function setSplitMode(on) {
     splitMode = on;
@@ -1072,7 +1208,8 @@
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Barabar bantne ke liye kam az kam aik dost chunein.", false); return; }
     var me = myId();
-    var share = Math.floor(amount / ids.length * 100) / 100;
+    var people = ids.length + 1; // dost + aap — kul raqam sab par barabar, aap ka hissa bhi
+    var share = Math.floor(amount / people * 100) / 100;
     if (share <= 0) { setTxnMsg("Raqam itni kam hai ke hissa nahi ban raha.", false); return; }
     btn.disabled = true;
     var done = 0, failed = 0, i = 0;
@@ -1085,11 +1222,15 @@
         return;
       }
       var id = ids[i++];
-      var amt = (i === ids.length) ? Math.round((amount - share * (ids.length - 1)) * 100) / 100 : share;
+      var amt = (i === ids.length) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
       sb("khata_transactions", { method: "POST", prefer: "return=representation", body: {
         payer_id: me, receiver_id: id, amount: amt,
         note: (note || "Khana") + " (barabar)", txn_date: date, created_by: me
-      } }).then(function (res) { if (res.ok) done++; else failed++; next(); })
+      } }).then(function (res) {
+        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) sendNotif(id, "record", created); }
+        else failed++;
+        next();
+      })
       .catch(function () { failed++; next(); });
     }
     next();
@@ -1140,6 +1281,8 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) { setTxnMsg("Record save nahi hua — dobara koshish karein.", false); return; }
+        var created = res.body && res.body[0];
+        if (created) sendNotif(person, "record", created);
         $("txnAmount").value = "";
         $("txnNote").value = "";
         setTxnMsg("Record save ho gaya!", true);
@@ -1230,6 +1373,14 @@
   $("adminPassSaveBtn").addEventListener("click", saveAdminPass);
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
+  $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
+  $("notifBtn").addEventListener("click", showNotifView);
+  $("notifBackBtn").addEventListener("click", showAppView);
+  $("markAllReadBtn").addEventListener("click", markAllNotifRead);
+  $("notifList").addEventListener("click", function (e) {
+    var row = e.target.closest ? e.target.closest("[data-notif]") : null;
+    if (row) markNotifRead(row.getAttribute("data-notif"));
+  });
   $("fabAdd").addEventListener("click", function () {
     var card = $("txnFormCard");
     if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
