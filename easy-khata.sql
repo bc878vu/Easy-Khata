@@ -28,6 +28,9 @@ create index if not exists khata_transactions_payer_idx on public.khata_transact
 create index if not exists khata_transactions_receiver_idx on public.khata_transactions (receiver_id);
 create index if not exists khata_transactions_date_idx on public.khata_transactions (txn_date desc);
 
+-- Purani table ho (v1 wali) to phone column add kar dein; naye setup me pehle se hai.
+alter table public.khata_profiles add column if not exists phone text;
+
 alter table public.khata_profiles enable row level security;
 alter table public.khata_transactions enable row level security;
 

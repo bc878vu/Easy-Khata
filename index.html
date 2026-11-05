@@ -38,6 +38,7 @@
 
   <!-- Auth -->
   <section id="authBox" class="card auth" hidden>
+    <div id="authForm">
     <div class="tabs">
       <button id="tabLogin" class="tab active" type="button">Login</button>
       <button id="tabSignup" class="tab" type="button">Naya Account</button>
@@ -62,6 +63,30 @@
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
     <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain. Phone number WhatsApp reminders ke liye hai — baad me bhi add kar sakte hain.</p>
+    <p class="muted"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></p>
+    </div>
+    <div id="forgotBox" hidden>
+      <div class="field">
+        <label for="forgotEmail">Email</label>
+        <input id="forgotEmail" type="email" placeholder="apna@email.com" autocomplete="email">
+      </div>
+      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Reset link bhejein</button>
+      <p id="forgotMsg" class="msg" role="status"></p>
+      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Wapas login par</button></p>
+    </div>
+    <div id="resetBox" hidden>
+      <p class="muted">Naya password likhein.</p>
+      <div class="field">
+        <label for="resetPassword">Naya password</label>
+        <input id="resetPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="resetPassword2">Naya password dobara</label>
+        <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
+      </div>
+      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Password badlein</button>
+      <p id="resetMsg" class="msg" role="status"></p>
+    </div>
   </section>
 
   <!-- Main app -->
@@ -171,6 +196,6 @@
 </footer>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

@@ -279,3 +279,5 @@ body {
 }
 
 .offline-badge { background: #f59e0b; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+
+.linklike{background:none;border:0;color:var(--green);text-decoration:underline;cursor:pointer;font:inherit;padding:0}

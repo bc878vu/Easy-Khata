@@ -158,6 +158,9 @@
     $("appBox").hidden = true;
     $("userChip").hidden = true;
     $("logoutBtn").hidden = true;
+    $("authForm").hidden = false;
+    $("forgotBox").hidden = true;
+    $("resetBox").hidden = true;
     renderAuthMode();
   }
   function showApp() {
@@ -171,7 +174,8 @@
 
   function authErrorText(res) {
     // Server ki asal wajah dikhayein — generic line ne asal error chhupa liya tha (2026-11-05).
-    var m = (res.body && (res.body.msg || res.body.message || res.body.error_description || res.body.error)) || "";
+    var raw = res.body && (res.body.msg || res.body.message || res.body.error_description || res.body.error);
+    var m = typeof raw === "string" ? raw : "";
     if (/invalid login/i.test(m)) return "Email ya password ghalat hai.";
     if (/already registered|already exists/i.test(m)) return "Is email par account pehle se hai — login karein.";
     if (/email not confirmed/i.test(m)) return "Email confirm nahi hui — inbox me confirmation link check karein, phir login karein.";
@@ -179,7 +183,7 @@
     if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "Confirmation email bhejne me masla hai — thori der baad dobara koshish karein.";
     if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password kam az kam 6 harf ka ho.";
     if (/email/i.test(m) && /invalid/i.test(m)) return "Sahi email likhein.";
-    return m || "Kuch ghalat hua — dobara koshish karein.";
+    return m || ("Kuch ghalat hua — dobara koshish karein. (Code " + res.status + ")");
   }
 
   function ensureProfile() {
@@ -251,6 +255,85 @@
       btn.disabled = false;
       setAuthMsg("Internet ya server se rabta nahi ho raha.", false);
     });
+  }
+
+  /* ---------- password bhool gaye / reset ---------- */
+  function setForgotMsg(text, ok) {
+    var el = $("forgotMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function setResetMsg(text, ok) {
+    var el = $("resetMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function showForgot(show) {
+    $("authForm").hidden = show;
+    $("forgotBox").hidden = !show;
+    if (show) { $("resetBox").hidden = true; setForgotMsg(""); }
+  }
+  function doForgot() {
+    var email = $("forgotEmail").value.trim();
+    if (!email) { setForgotMsg("Email likhein.", false); return; }
+    var btn = $("forgotSendBtn");
+    btn.disabled = true;
+    authCall("/recover", { email: email, redirect_to: window.location.origin + "/" })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { setForgotMsg(authErrorText(res), false); return; }
+        setForgotMsg("Reset link bhej diya — email inbox check karein (spam/junk bhi dekhein).", true);
+      }).catch(function () {
+        btn.disabled = false;
+        setForgotMsg("Internet ya server se rabta nahi ho raha.", false);
+      });
+  }
+  function doReset() {
+    var p1 = $("resetPassword").value;
+    var p2 = $("resetPassword2").value;
+    if (!p1 || p1.length < 6) { setResetMsg("Password kam az kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setResetMsg("Dono password aik jaise likhein.", false); return; }
+    var btn = $("resetBtn");
+    btn.disabled = true;
+    fetch(API + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
+      body: JSON.stringify({ password: p1 })
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
+        .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
+    }).then(function (res) {
+      btn.disabled = false;
+      if (!res.ok) { setResetMsg(authErrorText(res), false); return; }
+      $("resetPassword").value = "";
+      $("resetPassword2").value = "";
+      saveSession(null);
+      showAuth();
+      setAuthMsg("Password badal gaya — ab naye password se login karein.", true);
+    }).catch(function () {
+      btn.disabled = false;
+      setResetMsg("Internet ya server se rabta nahi ho raha.", false);
+    });
+  }
+  // Email ke reset/confirm link se app khule to us session ko pakrein.
+  function handleAuthHash() {
+    var h = window.location.hash || "";
+    if (h.indexOf("access_token=") === -1) return false;
+    var params = {};
+    h.slice(1).split("&").forEach(function (kv) {
+      var p = kv.split("=");
+      params[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || "");
+    });
+    if (!params.access_token) return false;
+    saveSession({ access_token: params.access_token, refresh_token: params.refresh_token || "", user: null, token_type: params.token_type || "bearer", expires_in: Number(params.expires_in || 3600) });
+    try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) {}
+    if (params.type === "recovery") {
+      showAuth();
+      $("resetBox").hidden = false;
+      return true;
+    }
+    authValidate();
+    return true;
   }
 
   function authValidate() {
@@ -712,6 +795,10 @@
   $("tabLogin").addEventListener("click", function () { authMode = "login"; renderAuthMode(); });
   $("tabSignup").addEventListener("click", function () { authMode = "signup"; renderAuthMode(); });
   $("authSubmitBtn").addEventListener("click", doAuth);
+  $("forgotLink").addEventListener("click", function () { showForgot(true); });
+  $("forgotBackBtn").addEventListener("click", function () { showForgot(false); });
+  $("forgotSendBtn").addEventListener("click", doForgot);
+  $("resetBtn").addEventListener("click", doReset);
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
   $("logoutBtn").addEventListener("click", function () { saveSession(null); showAuth(); });
   $("txnForm").addEventListener("submit", addTxn);
@@ -772,5 +859,5 @@
     $("authBox").hidden = true;
     return;
   }
-  authValidate();
+  if (!handleAuthHash()) authValidate();
 })();
