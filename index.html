@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <header class="topbar">
@@ -69,7 +69,6 @@
   </div>
   <div class="drawer-foot">
     <button id="logoutBtn" class="btn btn-block btn-logout" type="button">Logout</button>
-    <p class="muted" style="text-align:center;margin:10px 0 0">Easy Khata — apna hisab, saaf hisab.</p>
   </div>
 </aside>
 
@@ -168,7 +167,7 @@
       <div id="peopleList" class="people"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="txnFormCard">
       <h2 id="txnFormTitle">Naya record likhein</h2>
       <form id="txnForm">
         <div class="field" id="txnPersonRow">
@@ -192,7 +191,7 @@
         </div>
         <div class="field">
           <label for="txnAmount">Raqam (Rs)</label>
-          <input id="txnAmount" type="number" min="1" step="any" placeholder="Misal: 500" required>
+          <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Misal: 500" required>
         </div>
         <div class="field">
           <label for="txnNote">Kis cheez ke? (khana, chai, lunch...)</label>
@@ -218,8 +217,8 @@
       <div class="toolbar">
         <input id="txnSearch" type="search" placeholder="Search — naam, khana ya raqam...">
         <select id="txnFilterPerson"><option value="">Sab log</option></select>
-        <input id="txnFrom" type="date" title="Se (tareekh)">
-        <input id="txnTo" type="date" title="Tak (tareekh)">
+        <label class="date-wrap"><span>Se</span><input id="txnFrom" type="date" title="Se (tareekh)"></label>
+        <label class="date-wrap"><span>Tak</span><input id="txnTo" type="date" title="Tak (tareekh)"></label>
         <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
         <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
       </div>
@@ -232,10 +231,46 @@
     <div class="card">
       <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas Khata par</button>
       <h2 style="margin-top:10px">Admin Panel — Users</h2>
-      <p class="muted">Sirf admin (Asad) dekh sakta hai. User delete karne se us ka account, profile aur tamam record delete ho jate hain.</p>
+      <p class="muted">Sirf admin (Asad) dekh sakta hai. User par click karein — us ka poora hisab, edit, password, block aur delete sab yahin se.</p>
       <p id="adminStats" class="muted"></p>
       <p id="adminMsg" class="msg" role="status"></p>
       <div id="adminUserList" class="people"></div>
+    </div>
+  </section>
+
+  <section id="adminUserView" hidden>
+    <div class="card">
+      <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas Users par</button>
+      <h2 id="adminUserTitle" style="margin-top:10px"></h2>
+      <p id="adminUserBadges"></p>
+      <dl class="kv">
+        <dt>Email</dt><dd id="adminUserEmail"></dd>
+        <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
+        <dt>Joined</dt><dd id="adminUserJoined"></dd>
+        <dt>User ID</dt><dd id="adminUserId"></dd>
+      </dl>
+      <div id="adminUserSummary" class="summary"></div>
+      <div class="detail-actions">
+        <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit karein</button>
+        <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Password badlein</button>
+        <button id="adminBlockBtn" class="btn btn-danger" type="button">Block karein</button>
+        <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
+      </div>
+      <div id="adminEditBox" hidden>
+        <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
+        <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Misal: 0300 1234567"></div>
+        <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
+        <p id="adminEditMsg" class="msg" role="status"></p>
+      </div>
+      <div id="adminPassBox" hidden>
+        <div class="field"><label for="adminNewPass1">Naya password</label><input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf"></div>
+        <div class="field"><label for="adminNewPass2">Naya password dobara</label><input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein"></div>
+        <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
+        <p id="adminPassMsg" class="msg" role="status"></p>
+      </div>
+      <h3 style="margin-top:16px">Is user ka khata</h3>
+      <div id="adminUserTxns" class="txns"></div>
+      <p id="adminUserMsg" class="msg" role="status"></p>
     </div>
   </section>
 
@@ -245,7 +280,9 @@
   <p>Easy Khata — apna hisab, saaf hisab.</p>
 </footer>
 
+<button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
+
 <script src="config.js?v=2"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

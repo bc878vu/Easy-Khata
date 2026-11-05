@@ -119,6 +119,8 @@
   /* ---------- state ---------- */
   var profiles = [];   // {id, name, email, phone}
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
+  var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
+  var adminCurrentUser = null;
   var dbReady = false;
   var authMode = "login";
   var editingId = null;
@@ -161,8 +163,10 @@
     $("authBox").hidden = false;
     $("appBox").hidden = true;
     $("adminView").hidden = true;
+    $("adminUserView").hidden = true;
     $("avatarBtn").hidden = true;
     $("menuBtn").hidden = true;
+    $("fabAdd").hidden = true;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
     $("resetBox").hidden = true;
@@ -171,6 +175,7 @@
   function showApp() {
     $("authBox").hidden = true;
     $("adminView").hidden = true;
+    $("adminUserView").hidden = true;
     $("appBox").hidden = false;
     var initial = (myName() || "?").trim().charAt(0).toUpperCase() || "?";
     $("avatarBtn").textContent = initial;
@@ -179,6 +184,7 @@
     $("drawerEmail").textContent = (session.user && session.user.email) || "";
     $("avatarBtn").hidden = false;
     $("menuBtn").hidden = false;
+    $("fabAdd").hidden = false;
     $("txnDate").value = todayLocal();
   }
   function showAppView() {
@@ -190,6 +196,8 @@
     closeDrawer();
     $("authBox").hidden = true;
     $("appBox").hidden = true;
+    $("adminUserView").hidden = true;
+    $("fabAdd").hidden = true;
     $("adminView").hidden = false;
     renderAdmin();
     window.scrollTo(0, 0);
@@ -485,44 +493,174 @@
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
   function renderAdmin() {
+    // Sirf admin: list server-side RPC se aati hai (admin-only, DB me check hota hai).
     if (!isAdmin()) { $("navAdminBtn").hidden = true; return; }
     $("navAdminBtn").hidden = false;
-    var me = myId();
-    $("adminStats").textContent = "Total users: " + profiles.length + " · Total records: " + txns.length;
-    if (!profiles.length) {
-      $("adminUserList").innerHTML = '<p class="empty">Abhi koi user nahi hai.</p>';
-      return;
-    }
-    var html = "";
-    profiles.forEach(function (p) {
-      var count = 0;
-      txns.forEach(function (t) {
-        if (t.payer_id === p.id || t.receiver_id === p.id || t.created_by === p.id) count++;
-      });
-      var del = p.id === me
-        ? '<span class="p-net zero">Admin (aap)</span>'
-        : '<button class="btn-danger" type="button" data-admin-del="' + esc(p.id) + '">Delete user</button>';
-      html += '<div class="person"><div><div class="p-name">' + esc(p.name || p.email) + '</div>' +
-        '<div class="p-detail">' + esc(p.email || "") + (p.phone ? ' · ' + esc(p.phone) : '') + '</div>' +
-        '<div class="p-detail">' + count + ' record · Joined ' + esc(fmtDate(p.created_at)) + '</div></div>' +
-        '<div class="p-actions">' + del + '</div></div>';
-    });
-    $("adminUserList").innerHTML = html;
+    sb("rpc/admin_list_users", { method: "POST", body: {} })
+      .then(function (res) {
+        if (!res.ok) { setAdminMsg("Users load nahi hue — dobara koshish karein.", false); return; }
+        adminUsers = Array.isArray(res.body) ? res.body : [];
+        var total = 0;
+        adminUsers.forEach(function (u) { total += Number(u.records) || 0; });
+        $("adminStats").textContent = "Total users: " + adminUsers.length + " · Total records: " + total;
+        if (!adminUsers.length) {
+          $("adminUserList").innerHTML = '<p class="empty">Abhi koi user nahi hai.</p>';
+          return;
+        }
+        var me = myId();
+        var html = "";
+        adminUsers.forEach(function (u) {
+          var badge = u.id === me
+            ? '<span class="badge-admin">Admin (aap)</span>'
+            : (u.blocked ? ' <span class="badge-blocked">Blocked</span>' : '');
+          var del = u.id === me ? "" : '<button class="btn-danger" type="button" data-admin-del="' + esc(u.id) + '">Delete user</button>';
+          html += '<div class="person admin-user" data-admin-open="' + esc(u.id) + '"><div><div class="p-name">' + esc(u.name || u.email) + badge + '</div>' +
+            '<div class="p-detail">' + esc(u.email || "") + (u.phone ? ' · ' + esc(u.phone) : '') + '</div>' +
+            '<div class="p-detail">' + (Number(u.records) || 0) + ' record · Joined ' + esc(fmtDate(u.created_at)) + '</div></div>' +
+            '<div class="p-actions">' + del + '</div></div>';
+        });
+        $("adminUserList").innerHTML = html;
+      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function deleteUser(id) {
-    var p = findPerson(id);
+    var p = null;
+    adminUsers.forEach(function (x) { if (x.id === id) p = x; });
+    if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
     if (!window.confirm("'" + (p.name || p.email) + "' ko delete kar dein?\n\nUs ka account, profile aur tamam record delete ho jayein ge. Ye wapas nahi ho sakta.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
-        if (!res.ok) {
-          if (res.status === 404) { setAdminMsg("Admin delete ke liye easy-khata-v3.sql chalana hai (BEWX SQL Editor).", false); return; }
-          setAdminMsg("User delete nahi hua — dobara koshish karein.", false);
-          return;
-        }
+        if (!res.ok) { setAdminMsg("User delete nahi hua — dobara koshish karein.", false); return; }
         setAdminMsg("User delete ho gaya.", true);
+        if (adminCurrentUser && adminCurrentUser.id === id) {
+          adminCurrentUser = null;
+          $("adminUserView").hidden = true;
+          $("adminView").hidden = false;
+        }
         loadAll();
       }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function setAdminUserMsg(text, ok) {
+    var el = $("adminUserMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function setAdminEditMsg(text, ok) {
+    var el = $("adminEditMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function setAdminPassMsg(text, ok) {
+    var el = $("adminPassMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function openAdminUser(id) {
+    if (!isAdmin()) return;
+    var u = null;
+    adminUsers.forEach(function (x) { if (x.id === id) u = x; });
+    if (!u) return;
+    adminCurrentUser = u;
+    $("adminUserTitle").textContent = u.name || u.email;
+    $("adminUserBadges").innerHTML = (u.id === myId() ? '<span class="badge-admin">Admin (aap)</span> ' : '') +
+      (u.blocked ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
+    $("adminUserEmail").textContent = u.email || "—";
+    $("adminUserPhone").textContent = u.phone || "—";
+    $("adminUserJoined").textContent = fmtDate(u.created_at);
+    $("adminUserId").textContent = u.id;
+    $("adminEditName").value = u.name || "";
+    $("adminEditPhone").value = u.phone || "";
+    $("adminEditBox").hidden = true;
+    $("adminPassBox").hidden = true;
+    $("adminNewPass1").value = "";
+    $("adminNewPass2").value = "";
+    setAdminEditMsg("");
+    setAdminPassMsg("");
+    setAdminUserMsg("");
+    $("adminBlockBtn").textContent = u.blocked ? "Unblock karein" : "Block karein";
+    var mine = txns.filter(function (t) { return t.payer_id === u.id || t.receiver_id === u.id; });
+    var given = 0, taken = 0;
+    mine.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === u.id) given += a;
+      if (t.receiver_id === u.id) taken += a;
+    });
+    $("adminUserSummary").innerHTML =
+      '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
+      '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
+      '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
+    if (!mine.length) {
+      $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi hai.</p>';
+    } else {
+      var html = "";
+      mine.forEach(function (t) {
+        var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
+        var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
+        html += '<div class="txn"><div><div class="t-main">' + esc(dir) + '</div>' +
+          '<div class="t-sub">' + esc(t.note || "Khana") + ' · ' + esc(fmtDate(t.txn_date)) + '</div></div>' +
+          '<div class="t-right"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span></div></div>';
+      });
+      $("adminUserTxns").innerHTML = html;
+    }
+    $("adminView").hidden = true;
+    $("adminUserView").hidden = false;
+    $("fabAdd").hidden = true;
+    window.scrollTo(0, 0);
+  }
+  function saveAdminEdit() {
+    if (!isAdmin() || !adminCurrentUser) return;
+    var name = $("adminEditName").value.trim();
+    var phone = $("adminEditPhone").value.trim();
+    if (!name) { setAdminEditMsg("Naam khaali nahi ho sakta.", false); return; }
+    var btn = $("adminEditSaveBtn");
+    btn.disabled = true;
+    sb("rpc/admin_update_user", { method: "POST", body: { p_target: adminCurrentUser.id, p_name: name, p_phone: phone } })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { setAdminEditMsg("Update nahi hua — dobara koshish karein.", false); return; }
+        adminCurrentUser.name = name;
+        adminCurrentUser.phone = phone || null;
+        $("adminUserTitle").textContent = name;
+        $("adminUserPhone").textContent = phone || "—";
+        setAdminEditMsg("User update ho gaya.", true);
+        loadAll();
+      }).catch(function () { btn.disabled = false; setAdminEditMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function saveAdminPass() {
+    if (!isAdmin() || !adminCurrentUser) return;
+    var p1 = $("adminNewPass1").value;
+    var p2 = $("adminNewPass2").value;
+    if (!p1 || p1.length < 6) { setAdminPassMsg("Password kam az kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setAdminPassMsg("Dono password aik jaise likhein.", false); return; }
+    var btn = $("adminPassSaveBtn");
+    btn.disabled = true;
+    sb("rpc/admin_set_user_password", { method: "POST", body: { p_target: adminCurrentUser.id, p_password: p1 } })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { setAdminPassMsg("Password change nahi hua — dobara koshish karein.", false); return; }
+        $("adminNewPass1").value = "";
+        $("adminNewPass2").value = "";
+        setAdminPassMsg("Password badal gaya — user naye password se login kar sakega.", true);
+      }).catch(function () { btn.disabled = false; setAdminPassMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function toggleAdminBlock() {
+    if (!isAdmin() || !adminCurrentUser) return;
+    var u = adminCurrentUser;
+    if (u.id === myId()) { setAdminUserMsg("Apne aap ko block nahi kar sakte.", false); return; }
+    var blocking = !u.blocked;
+    if (!window.confirm(blocking
+      ? ("'" + (u.name || u.email) + "' ko BLOCK kar dein?\n\nWo dobara login nahi kar sakega (us ka data mehfooz rahe ga).")
+      : ("'" + (u.name || u.email) + "' ko UNBLOCK kar dein?"))) return;
+    sb("rpc/admin_set_user_blocked", { method: "POST", body: { p_target: u.id, p_blocked: blocking } })
+      .then(function (res) {
+        if (!res.ok) { setAdminUserMsg("Block update nahi hua — dobara koshish karein.", false); return; }
+        u.blocked = blocking;
+        $("adminBlockBtn").textContent = blocking ? "Unblock karein" : "Block karein";
+        $("adminUserBadges").innerHTML = (u.id === myId() ? '<span class="badge-admin">Admin (aap)</span> ' : '') +
+          (blocking ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
+        setAdminUserMsg(blocking ? "User block ho gaya — dobara login nahi kar sakega." : "User unblock ho gaya.", true);
+        loadAll();
+      }).catch(function () { setAdminUserMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
 
   function renderMonthStats() {
@@ -1058,7 +1196,22 @@
   });
   $("adminUserList").addEventListener("click", function (e) {
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
-    if (d) deleteUser(d.getAttribute("data-admin-del"));
+    if (d) { deleteUser(d.getAttribute("data-admin-del")); return; }
+    var o = e.target.closest ? e.target.closest("[data-admin-open]") : null;
+    if (o) openAdminUser(o.getAttribute("data-admin-open"));
+  });
+  $("adminUserBackBtn").addEventListener("click", function () { $("adminUserView").hidden = true; $("adminView").hidden = false; renderAdmin(); });
+  $("adminEditToggleBtn").addEventListener("click", function () { var b = $("adminEditBox"); b.hidden = !b.hidden; });
+  $("adminPassToggleBtn").addEventListener("click", function () { var b = $("adminPassBox"); b.hidden = !b.hidden; });
+  $("adminEditSaveBtn").addEventListener("click", saveAdminEdit);
+  $("adminPassSaveBtn").addEventListener("click", saveAdminPass);
+  $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
+  $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
+  $("fabAdd").addEventListener("click", function () {
+    var card = $("txnFormCard");
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    var amt = $("txnAmount");
+    if (amt) setTimeout(function () { amt.focus({ preventScroll: true }); }, 400);
   });
 
   /* ---------- PWA: offline ---------- */
