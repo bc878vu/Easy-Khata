@@ -347,3 +347,5 @@ body{padding-bottom:56px}
 .notif-title{font-weight:700;font-size:14px}
 .notif-body{font-size:14px;margin-top:2px}
 .notif-time{font-size:12px;color:var(--muted);margin-top:4px}
+
+.tag-manual{font-size:11px;background:var(--line);border-radius:999px;padding:1px 7px;color:var(--muted);margin-left:6px;vertical-align:middle}

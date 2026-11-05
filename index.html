@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 <header class="topbar">
@@ -190,6 +190,16 @@
           <label for="txnPerson">Kis ke sath?</label>
           <select id="txnPerson"></select>
         </div>
+        <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Contact add karein (jo app par nahi)</button></div>
+        <div id="addContactBox" hidden>
+          <div class="field"><label for="newContactName">Naam</label><input id="newContactName" type="text" maxlength="80" placeholder="Misal: Maha Chaudhary"></div>
+          <div class="field"><label for="newContactPhone">Phone number (optional — isi number se baad me us ka account link ho jaye ga)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Misal: 0300 1234567"></div>
+          <div class="row">
+            <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Contact list se chunein</button>
+            <button id="saveContactBtn" class="btn btn-primary" type="button">Contact save karein</button>
+          </div>
+          <p id="contactMsg" class="msg" role="status"></p>
+        </div>
         <div class="field" id="txnDirRow">
           <label>Len den ki kisam</label>
           <div class="seg">
@@ -331,6 +341,6 @@
 <button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

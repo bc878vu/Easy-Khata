@@ -135,7 +135,10 @@
     for (var i = 0; i < profiles.length; i++) {
       if (profiles[i].id === id) return profiles[i].name || profiles[i].email || "Namalum";
     }
-    return id === myId() ? myName() : "Namalum";
+    for (var j = 0; j < myContacts.length; j++) {
+      if (myContacts[j].id === id) return myContacts[j].name || "Namalum";
+    }
+    return id === myId() ? myName() : "Private contact";
   }
 
   /* ---------- auth UI ---------- */
@@ -493,6 +496,7 @@
       txns = res.body || [];
       renderAll();
       loadNotifs();
+      loadContacts();
     }).catch(function () {
       setTxnMsg("Record load nahi ho sake — refresh karein.", false);
     });
@@ -534,6 +538,9 @@
   }
   function sendNotif(userId, kind, txn) {
     if (!userId || userId === myId() || !txn) return;
+    var real = false;
+    profiles.forEach(function (p) { if (p.id === userId) real = true; });
+    if (!real) return; // manual contact ka account hi nahi — use notification nahi ja sakti
     var title = kind === "settle" ? "Hisab barabar ho gaya"
       : kind === "admin" ? "Admin ne record likha"
       : myName() + " ne record likha";
@@ -595,6 +602,124 @@
     $("notifView").hidden = false;
     loadNotifs();
     window.scrollTo(0, 0);
+  }
+
+  /* ---------- manual contacts ---------- */
+  var myContacts = [];
+  function loadContacts() {
+    if (!session || !session.access_token) return Promise.resolve(0);
+    return sb("khata_contacts?select=*&owner_id=eq." + encodeURIComponent(myId()) + "&order=created_at.asc")
+      .then(function (res) {
+        if (!res.ok) return 0;
+        myContacts = (Array.isArray(res.body) ? res.body : []).map(function (c) { c.manual = true; return c; });
+        renderPeople();
+        renderPersonSelect();
+        renderTxnFilterOptions();
+        return maybeLinkContacts();
+      }).catch(function () { return 0; });
+  }
+  function contactPhoneMatch(a, b) {
+    var na = normPhone(a), nb = normPhone(b);
+    return !!(na && nb && na === nb);
+  }
+  function maybeLinkContacts() {
+    // Har apne manual contact ke liye: kya is number par koi real profile ban gaya?
+    var jobs = [];
+    myContacts.forEach(function (c) {
+      if (!c.phone) return;
+      var target = null;
+      profiles.forEach(function (p) {
+        if (p.id !== myId() && contactPhoneMatch(c.phone, p.phone)) target = p;
+      });
+      if (!target) return;
+      jobs.push(linkContactToProfile(c, target));
+    });
+    if (!jobs.length) return Promise.resolve(0);
+    return Promise.all(jobs).then(function (results) {
+      var merged = 0;
+      results.forEach(function (r) { if (r) merged++; });
+      if (merged) refreshTxns();
+      return merged;
+    });
+  }
+  function linkContactToProfile(c, target) {
+    var me = myId();
+    return sb("khata_transactions?payer_id=eq." + encodeURIComponent(c.id) + "&created_by=eq." + encodeURIComponent(me),
+      { method: "PATCH", body: { payer_id: target.id } })
+      .then(function () {
+        return sb("khata_transactions?receiver_id=eq." + encodeURIComponent(c.id) + "&created_by=eq." + encodeURIComponent(me),
+          { method: "PATCH", body: { receiver_id: target.id } });
+      }).then(function () {
+        return sb("khata_contacts?id=eq." + encodeURIComponent(c.id), { method: "DELETE" });
+      }).then(function () {
+        myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
+        return true;
+      }).catch(function () { return false; });
+  }
+  function refreshTxns() {
+    sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500")
+      .then(function (res) {
+        if (!res.ok) return;
+        txns = res.body || [];
+        renderAll();
+      }).catch(function () {});
+  }
+  function setContactMsg(text, ok) {
+    var el = $("contactMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function addContact() {
+    var name = $("newContactName").value.trim();
+    var phoneRaw = $("newContactPhone").value.trim();
+    if (!name) { setContactMsg("Contact ka naam likhein.", false); return; }
+    var phone = phoneRaw ? normPhone(phoneRaw) : "";
+    if (phoneRaw && !phone) { setContactMsg("Sahi phone number likhein (misal: 0300 1234567).", false); return; }
+    var dupProfile = null;
+    profiles.forEach(function (p) { if (phone && contactPhoneMatch(phone, p.phone)) dupProfile = p; });
+    if (dupProfile) { setContactMsg("Ye number pehle se app par hai (" + (dupProfile.name || dupProfile.email) + ") — us ko seedha select karein.", false); return; }
+    var dupContact = null;
+    myContacts.forEach(function (c) { if (phone && contactPhoneMatch(phone, c.phone)) dupContact = c; });
+    if (dupContact) { setContactMsg("Ye number pehle se aap ke contacts me hai (" + (dupContact.name || "") + ").", false); return; }
+    var btn = $("saveContactBtn");
+    btn.disabled = true;
+    sb("khata_contacts", { method: "POST", prefer: "return=representation", body: {
+      owner_id: myId(), name: name, phone: phone || null
+    } }).then(function (res) {
+      btn.disabled = false;
+      if (!res.ok) { setContactMsg("Contact save nahi hua — dobara koshish karein.", false); return; }
+      var created = res.body && res.body[0];
+      if (created) { created.manual = true; myContacts.push(created); }
+      $("newContactName").value = "";
+      $("newContactPhone").value = "";
+      setContactMsg("Contact add ho gaya!", true);
+      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      if (created) $("txnPerson").value = created.id;
+    }).catch(function () { btn.disabled = false; setContactMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function deleteContact(id) {
+    var c = null;
+    myContacts.forEach(function (x) { if (x.id === id) c = x; });
+    if (!c) return;
+    var s = personStats(id);
+    if (s.given || s.taken) { setPeopleMsg("Is contact ke record hain — pehle un ko delete karein, phir contact hatayein.", false); return; }
+    if (!window.confirm("'" + (c.name || "") + "' ko contacts se hata dein?")) return;
+    sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
+      .then(function (res) {
+        if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
+        myContacts = myContacts.filter(function (x) { return x.id !== id; });
+        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function pickContact() {
+    if (!navigator.contacts || !navigator.contacts.select) return;
+    navigator.contacts.select(["name", "tel"], { multiple: false })
+      .then(function (list) {
+        if (!list || !list.length) return;
+        var c = list[0];
+        if (c.name && c.name.length) $("newContactName").value = c.name[0] || "";
+        if (c.tel && c.tel.length) $("newContactPhone").value = c.tel[0] || "";
+      }).catch(function () {});
   }
 
   /* ---------- admin panel ---------- */
@@ -956,6 +1081,7 @@
   function findPerson(id) {
     var found = null;
     profiles.forEach(function (p) { if (p.id === id) found = p; });
+    if (!found) myContacts.forEach(function (c) { if (c.id === id) found = c; });
     return found;
   }
   function sharePerson(id) {
@@ -1024,7 +1150,10 @@
     var me = myId();
     var map = {};
     profiles.forEach(function (p) {
-      if (p.id !== me) map[p.id] = { name: p.name || p.email, given: 0, taken: 0 };
+      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", given: 0, taken: 0 };
+    });
+    myContacts.forEach(function (c) {
+      map[c.id] = { name: c.name || "Namalum", phone: c.phone || "", given: 0, taken: 0, manual: true };
     });
     txns.forEach(function (t) {
       var a = Number(t.amount) || 0;
@@ -1043,12 +1172,13 @@
       var cls = net > 0 ? "pos" : net < 0 ? "neg" : "zero";
       var netText = net > 0 ? fmtRs(net) + " lene hain"
         : net < 0 ? fmtRs(-net) + " dene hain" : "Barabar";
-      html += '<div class="person"><div><div class="p-name">' + esc(p.name) + '</div>' +
+      html += '<div class="person"><div><div class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</div>' +
         '<div class="p-detail">Diye ' + fmtRs(p.given) + ' · Liye ' + fmtRs(p.taken) + '</div></div>' +
         '<div class="p-actions"><span class="p-net ' + cls + '">' + esc(netText) + '</span>' +
         '<span><button class="btn-mini" type="button" data-share="' + esc(id) + '">Share</button> ' +
         '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Yaad dilayein</button>' +
-        (net !== 0 ? ' <button class="btn-mini" type="button" data-settle="' + esc(id) + '">Hisab barabar karein</button>' : '') + '</span></div></div>';
+        (net !== 0 ? ' <button class="btn-mini" type="button" data-settle="' + esc(id) + '">Hisab barabar karein</button>' : '') +
+        (p.manual && p.given === 0 && p.taken === 0 ? ' <button class="btn-mini" type="button" data-del-contact="' + esc(id) + '">Hata dein</button>' : '') + '</span></div></div>';
     });
     $("peopleList").innerHTML = html;
   }
@@ -1058,10 +1188,17 @@
     var sel = $("txnPerson");
     var prev = sel.value;
     var html = "";
+    var real = "";
     profiles.forEach(function (p) {
       if (p.id === me) return;
-      html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
+      real += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
+    if (real) html += '<optgroup label="App users">' + real + '</optgroup>';
+    var manual = "";
+    myContacts.forEach(function (c) {
+      manual += '<option value="' + esc(c.id) + '">' + esc(c.name || "Namalum") + '</option>';
+    });
+    if (manual) html += '<optgroup label="Mere contacts (manual)">' + manual + '</optgroup>';
     sel.innerHTML = html || '<option value="">(koi aur user nahi)</option>';
     if (prev) sel.value = prev;
   }
@@ -1072,6 +1209,9 @@
     var html = '<option value="">Sab log</option>';
     profiles.forEach(function (p) {
       html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
+    });
+    myContacts.forEach(function (c) {
+      html += '<option value="' + esc(c.id) + '">' + esc(c.name || "Namalum") + ' (manual)</option>';
     });
     sel.innerHTML = html;
     if (prev) sel.value = prev;
@@ -1352,7 +1492,9 @@
     var s = e.target.closest ? e.target.closest("[data-share]") : null;
     if (s) { sharePerson(s.getAttribute("data-share")); return; }
     var r = e.target.closest ? e.target.closest("[data-remind]") : null;
-    if (r) remindPerson(r.getAttribute("data-remind"));
+    if (r) { remindPerson(r.getAttribute("data-remind")); return; }
+    var d = e.target.closest ? e.target.closest("[data-del-contact]") : null;
+    if (d) deleteContact(d.getAttribute("data-del-contact"));
   });
   $("txnList").addEventListener("click", function (e) {
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
@@ -1374,6 +1516,14 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
+  $("saveContactBtn").addEventListener("click", addContact);
+  $("pickContactBtn").addEventListener("click", pickContact);
+  $("addContactToggleBtn").addEventListener("click", function () {
+    var b = $("addContactBox");
+    b.hidden = !b.hidden;
+    if (!b.hidden) $("newContactName").focus();
+  });
+  if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
   $("notifBtn").addEventListener("click", showNotifView);
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
