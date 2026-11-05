@@ -18,9 +18,11 @@ PostgREST), Vercel par hosted. Diesel Converter wali proven pattern.
 ## Setup
 
 1. Supabase SQL Editor me `easy-khata.sql` chalayein (tables + RLS).
-   Project: EduNexus Supabase (`cprpndovdfnkvekewstv`).
+   Project: AI CV Maker wala Supabase (`bewxefxjbvbumajflhfw`) — EduNexus
+   wale project me nahi.
 2. `config.js` me `SUPABASE_URL` aur `SUPABASE_ANON_KEY` pehle se set hain
-   (publishable key — security RLS se hai, service key kabhi nahi dalni).
+   (AI CV Maker / Diesel wala bewx project; publishable key — security RLS
+   se hai, service key kabhi nahi dalni).
 3. Vercel project is repo se linked hai — har push par auto-deploy.
 
 ## Files

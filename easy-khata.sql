@@ -1,5 +1,6 @@
 -- Easy Khata — Supabase SQL
--- Project: EduNexus (cprpndovdfnkvekewstv) — SQL Editor me chalayein.
+-- Project: AI CV Maker wala Supabase project (bewxefxjbvbumajflhfw) — SQL Editor me chalayein.
+-- EduNexus wale project me NAHI chalana — app bewx se connected hai.
 -- Tables: khata_profiles (users) + khata_transactions (len den).
 -- Auth: Supabase GoTrue (email + password, self-signup) — app khud use karta hai.
 
