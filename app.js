@@ -703,13 +703,14 @@
     if (!c) return;
     var s = personStats(id);
     if (s.given || s.taken) { setPeopleMsg("Is contact ke record hain — pehle un ko delete karein, phir contact hatayein.", false); return; }
-    if (!window.confirm("'" + (c.name || "") + "' ko contacts se hata dein?")) return;
+    askConfirm("Contact hata dein?", "'" + (c.name || "") + "' ko contacts se hata dein?", "Hata dein", function () {
     sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
       .then(function (res) {
         if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
         myContacts = myContacts.filter(function (x) { return x.id !== id; });
         renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+    });
   }
   function pickContact() {
     if (!navigator.contacts || !navigator.contacts.select) return;
@@ -1089,16 +1090,58 @@
     if (!p) return;
     shareText(personShareText(p));
   }
+  var confirmCallback = null;
+  function askConfirm(title, text, okLabel, cb) {
+    $("confirmTitle").textContent = title;
+    $("confirmText").textContent = text;
+    $("confirmOkBtn").textContent = okLabel || "Confirm karein";
+    confirmCallback = cb;
+    $("confirmOverlay").hidden = false;
+  }
+  function closeConfirm() {
+    $("confirmOverlay").hidden = true;
+    confirmCallback = null;
+  }
+  function openWaLink(url) {
+    // window.open PWA me aksar kuch nahi karta — asal link dabana zyada reliable hai.
+    var a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 500);
+  }
+  function sendRemindNotif(id, text) {
+    // Pehle se aik unread yaad-dihani ho to dobara na bhejein (spam rokne ke liye).
+    sb("khata_notifications?select=id&user_id=eq." + encodeURIComponent(id) + "&actor_id=eq." + encodeURIComponent(myId()) + "&kind=eq.remind&is_read=eq.false&limit=1")
+      .then(function (res) {
+        if (res.ok && res.body && res.body.length) return;
+        return sb("khata_notifications", { method: "POST", body: {
+          user_id: id, actor_id: myId(), txn_id: null, kind: "remind",
+          title: myName() + " ne yaad dilaya", body: text
+        } });
+      }).catch(function () {});
+  }
   function remindPerson(id) {
     var p = findPerson(id);
     if (!p) return;
     var text = personRemindText(p);
+    var s = personStats(id);
+    var real = false;
+    profiles.forEach(function (x) { if (x.id === id) real = true; });
     if (p.phone && normPhone(p.phone)) {
-      window.open(waLink(p.phone, text), "_blank");
+      copyText(text).catch(function () {});
+      openWaLink(waLink(p.phone, text));
+      setPeopleMsg("WhatsApp khul raha hai — agar na khule to text copy hai, WhatsApp me paste kar dein.", true);
+      if (real && s.net) sendRemindNotif(id, text);
       return;
     }
     copyText(text).then(function () {
       setPeopleMsg("Is dost ka WhatsApp number nahi hai — yaad-dihani ka text copy ho gaya hai, khud bhej dein.", true);
+      if (real && s.net) sendRemindNotif(id, text);
+    }).catch(function () {
+      setPeopleMsg("Copy nahi ho saka — number save karein ya text khud likh kar bhej dein.", false);
     });
   }
   function settlePerson(id) {
@@ -1108,7 +1151,7 @@
     if (!s.net) return;
     var amt = Math.abs(s.net);
     var who = s.net > 0 ? (p.name || p.email) + " mujhe " + fmtRs(amt) + " dega" : "main " + (p.name || p.email) + " ko " + fmtRs(amt) + " dunga";
-    if (!window.confirm("Hisab barabar karein?\n\n" + who + " — " + fmtRs(amt) + " ka settlement record ban jaye ga.")) return;
+    askConfirm("Hisab barabar karein?", who + " — " + fmtRs(amt) + " ka settlement record ban jaye ga.", "Confirm karein", function () {
     var me = myId();
     var body = {
       payer_id: s.net > 0 ? id : me,
@@ -1126,6 +1169,7 @@
         setPeopleMsg("Hisab barabar ho gaya!", true);
         loadAll();
       }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+    });
   }
   function shareAll() {
     var given = 0, taken = 0;
@@ -1434,12 +1478,13 @@
   }
 
   function deleteTxn(id) {
-    if (!window.confirm("Ye record delete kar dein?")) return;
+    askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jaye ga.", "Delete karein", function () {
     sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
       .then(function (res) {
         if (!res.ok) { setTxnMsg("Delete nahi hua.", false); return; }
         loadAll();
       }).catch(function () { setTxnMsg("Delete nahi hua.", false); });
+    });
   }
 
   /* ---------- wire up ---------- */
@@ -1516,6 +1561,9 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
+  $("confirmOkBtn").addEventListener("click", function () { var cb = confirmCallback; closeConfirm(); if (cb) cb(); });
+  $("confirmCancelBtn").addEventListener("click", closeConfirm);
+  $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
   $("saveContactBtn").addEventListener("click", addContact);
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {

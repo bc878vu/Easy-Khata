@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 <header class="topbar">
@@ -341,6 +341,17 @@
 <button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=16"></script>
+  <div id="confirmOverlay" class="confirm-overlay" hidden>
+    <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h3 id="confirmTitle">Confirm karein?</h3>
+      <p id="confirmText" class="muted"></p>
+      <div class="row">
+        <button id="confirmCancelBtn" class="btn btn-neutral" type="button">Cancel</button>
+        <button id="confirmOkBtn" class="btn btn-primary" type="button">Confirm karein</button>
+      </div>
+    </div>
+  </div>
+
+<script src="app.js?v=17"></script>
 </body>
 </html>

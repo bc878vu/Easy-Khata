@@ -382,3 +382,11 @@ body{padding-bottom:56px}
 .notif-time{font-size:12px;color:var(--muted);margin-top:4px}
 
 .tag-manual{font-size:11px;background:var(--line);border-radius:999px;padding:1px 7px;color:var(--muted);margin-left:6px;vertical-align:middle}
+
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px}
+.confirm-card{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:20px;max-width:420px;width:100%;box-shadow:var(--shadow-lg)}
+.confirm-card h3{margin:0 0 6px;font-size:18px;letter-spacing:-.3px}
+.confirm-card p{margin:0}
+.confirm-card .row{display:flex;gap:8px;margin-top:18px}
+.confirm-card .row .btn{flex:1}
+.btn-neutral{background:var(--tab-bg);color:var(--ink);border:1px solid var(--line)}
