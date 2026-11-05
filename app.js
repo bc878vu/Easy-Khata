@@ -29,6 +29,34 @@
     if (p.length !== 3) return iso;
     return p[2] + "-" + p[1] + "-" + p[0];
   }
+  function monthName(iso) {
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var p = String(iso || "").slice(0, 7).split("-");
+    if (p.length < 2) return "";
+    return months[Number(p[1]) - 1] + " " + p[0];
+  }
+  /* Pakistan number ko WhatsApp format me: 03001234567 -> 923001234567 */
+  function normPhone(raw) {
+    var d = String(raw || "").replace(/\D/g, "");
+    if (d.indexOf("92") === 0 && d.length === 12) return d;
+    if (d.charAt(0) === "0" && d.length === 11) return "92" + d.slice(1);
+    if (d.length === 10 && d.charAt(0) === "3") return "92" + d;
+    return "";
+  }
+  function waLink(phone, text) {
+    return "https://wa.me/" + normPhone(phone) + "?text=" + encodeURIComponent(text);
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); resolve(); } catch (e) { reject(e); }
+      document.body.removeChild(ta);
+    });
+  }
 
   /* ---------- session ---------- */
   var session = null;
@@ -85,10 +113,14 @@
   }
 
   /* ---------- state ---------- */
-  var profiles = [];   // {id, name, email}
+  var profiles = [];   // {id, name, email, phone}
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
   var dbReady = false;
   var authMode = "login";
+  var editingId = null;
+  var txnSearchText = "";
+  var txnFilterPerson = "";
+  var myPhone = "";
 
   function profileName(id) {
     for (var i = 0; i < profiles.length; i++) {
@@ -112,6 +144,7 @@
     $("tabLogin").className = "tab" + (authMode === "login" ? " active" : "");
     $("tabSignup").className = "tab" + (authMode === "signup" ? " active" : "");
     $("signupNameRow").hidden = authMode !== "signup";
+    $("signupPhoneRow").hidden = authMode !== "signup";
     $("authSubmitBtn").textContent = authMode === "signup" ? "Account banayein" : "Login karein";
     $("authPassword").setAttribute("autocomplete", authMode === "signup" ? "new-password" : "current-password");
     setAuthMsg("");
@@ -147,11 +180,13 @@
 
   function ensureProfile() {
     var u = session.user;
-    var name = (u.user_metadata && u.user_metadata.full_name) || "";
+    var meta = u.user_metadata || {};
+    var name = meta.full_name || "";
+    var phone = meta.phone || "";
     return sb("khata_profiles?on_conflict=id", {
       method: "POST",
       prefer: "resolution=merge-duplicates,return=minimal",
-      body: { id: u.id, name: name, email: u.email || "" }
+      body: { id: u.id, name: name, email: u.email || "", phone: phone || null }
     }).then(function (res) {
       if (!res.ok) throw new Error("profile save failed");
     });
@@ -181,13 +216,15 @@
     var email = $("authEmail").value.trim();
     var password = $("authPassword").value;
     var name = $("authName").value.trim();
+    var phone = $("authPhone").value.trim();
     if (!email || !password) { setAuthMsg("Email aur password zaroori hain.", false); return; }
     if (authMode === "signup" && !name) { setAuthMsg("Apna naam likhein.", false); return; }
+    if (authMode === "signup" && phone && !normPhone(phone)) { setAuthMsg("Sahi phone number likhein (misal: 0300 1234567).", false); return; }
     if (password.length < 6) { setAuthMsg("Password kam az kam 6 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
     btn.disabled = true;
     var p = authMode === "signup"
-      ? authCall("/signup", { email: email, password: password, data: { full_name: name } })
+      ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "" } })
       : authCall("/token?grant_type=password", { email: email, password: password });
     p.then(function (res) {
       btn.disabled = false;
@@ -232,7 +269,7 @@
 
   function loadAll() {
     setTxnMsg("");
-    sb("khata_profiles?select=id,name,email&order=name.asc").then(function (res) {
+    sb("khata_profiles?select=id,name,email,phone&order=name.asc").then(function (res) {
       if (!res.ok) {
         if (tableMissing(res)) {
           dbReady = false;
@@ -259,9 +296,61 @@
 
   function renderAll() {
     renderSummary();
+    renderMonthStats();
     renderPeople();
     renderPersonSelect();
+    renderTxnFilterOptions();
     renderTxns();
+    fillMyPhone();
+  }
+
+  function renderMonthStats() {
+    var el = $("monthStats");
+    var now = todayLocal().slice(0, 7);
+    var given = 0, taken = 0, count = 0;
+    txns.forEach(function (t) {
+      if (String(t.txn_date || "").slice(0, 7) !== now) return;
+      var a = Number(t.amount) || 0;
+      count++;
+      if (t.payer_id === myId()) given += a;
+      if (t.receiver_id === myId()) taken += a;
+    });
+    if (!txns.length) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = "Is mahine (<strong>" + esc(monthName(now + "-01")) + "</strong>): diye <strong>" + esc(fmtRs(given)) + "</strong> · liye <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " record";
+  }
+
+  function fillMyPhone() {
+    var me = null;
+    profiles.forEach(function (p) { if (p.id === myId()) me = p; });
+    myPhone = (me && me.phone) || "";
+    var input = $("myPhone");
+    if (input && document.activeElement !== input) input.value = myPhone;
+  }
+
+  function savePhone() {
+    var phone = $("myPhone").value.trim();
+    if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (misal: 0300 1234567).", false); return; }
+    sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: { phone: phone || null }
+    }).then(function (res) {
+      if (!res.ok) { setPhoneMsg("Number save nahi hua — dobara koshish karein.", false); return; }
+      myPhone = phone;
+      profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
+      setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya gaya.", true);
+    }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function setPhoneMsg(text, ok) {
+    var el = $("phoneMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function setPeopleMsg(text, ok) {
+    var el = $("peopleMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
 
   function renderSummary() {
@@ -286,6 +375,76 @@
       $("sumNet").textContent = "Rs 0";
       $("sumNetSub").textContent = "Hisab barabar hai";
     }
+  }
+
+  function personStats(id) {
+    var given = 0, taken = 0;
+    txns.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === myId() && t.receiver_id === id) given += a;
+      if (t.receiver_id === myId() && t.payer_id === id) taken += a;
+    });
+    return { given: given, taken: taken, net: taken - given };
+  }
+  function personShareText(p) {
+    var s = personStats(p.id);
+    var netLine = s.net > 0 ? "Net: mujhe " + fmtRs(s.net) + " lene hain."
+      : s.net < 0 ? "Net: mujhe " + fmtRs(-s.net) + " dene hain." : "Net: hisab barabar hai.";
+    return "Easy Khata — " + myName() + " aur " + (p.name || p.email) + " ka hisab:\n" +
+      "• Maine diye: " + fmtRs(s.given) + "\n" +
+      "• Maine liye: " + fmtRs(s.taken) + "\n" +
+      "• " + netLine + "\n" +
+      "App: https://easy-khata-asad2327s-projects.vercel.app";
+  }
+  function personRemindText(p) {
+    var s = personStats(p.id);
+    if (s.net > 0) return "Salam " + (p.name || "") + "! Easy Khata ke mutabiq mujhe aap se " + fmtRs(s.net) + " lene hain (khana ka hisab). Zara check kar lein, shukriya! — " + myName();
+    if (s.net < 0) return "Salam " + (p.name || "") + "! Easy Khata ke mutabiq mujhe aap ko " + fmtRs(-s.net) + " dene hain (khana ka hisab). Main jald bhej dunga, shukriya! — " + myName();
+    return "Salam " + (p.name || "") + "! Easy Khata ke mutabiq hamara khana ka hisab barabar hai. — " + myName();
+  }
+  function shareText(text) {
+    if (navigator.share) return navigator.share({ text: text }).catch(function () {});
+    return copyText(text).then(function () { setPeopleMsg("Text copy ho gaya — WhatsApp ya kisi bhi app me paste kar dein.", true); });
+  }
+  function findPerson(id) {
+    var found = null;
+    profiles.forEach(function (p) { if (p.id === id) found = p; });
+    return found;
+  }
+  function sharePerson(id) {
+    var p = findPerson(id);
+    if (!p) return;
+    shareText(personShareText(p));
+  }
+  function remindPerson(id) {
+    var p = findPerson(id);
+    if (!p) return;
+    var text = personRemindText(p);
+    if (p.phone && normPhone(p.phone)) {
+      window.open(waLink(p.phone, text), "_blank");
+      return;
+    }
+    copyText(text).then(function () {
+      setPeopleMsg("Is dost ka WhatsApp number nahi hai — yaad-dihani ka text copy ho gaya hai, khud bhej dein.", true);
+    });
+  }
+  function shareAll() {
+    var given = 0, taken = 0;
+    txns.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === myId()) given += a;
+      if (t.receiver_id === myId()) taken += a;
+    });
+    var net = taken - given;
+    var netLine = net > 0 ? "Net: mujhe " + fmtRs(net) + " lene hain."
+      : net < 0 ? "Net: mujhe " + fmtRs(-net) + " dene hain." : "Net: hisab barabar hai.";
+    var text = "Easy Khata — " + myName() + " ka khana hisab:\n" +
+      "• Maine diye: " + fmtRs(given) + "\n" +
+      "• Maine liye: " + fmtRs(taken) + "\n" +
+      "• " + netLine + "\n" +
+      "App: https://easy-khata-asad2327s-projects.vercel.app";
+    if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
+    copyText(text).then(function () { setTxnMsg("Hisab copy ho gaya — kisi bhi app me paste kar dein.", true); });
   }
 
   function renderPeople() {
@@ -313,7 +472,9 @@
         : net < 0 ? fmtRs(-net) + " dene hain" : "Barabar";
       html += '<div class="person"><div><div class="p-name">' + esc(p.name) + '</div>' +
         '<div class="p-detail">Diye ' + fmtRs(p.given) + ' · Liye ' + fmtRs(p.taken) + '</div></div>' +
-        '<span class="p-net ' + cls + '">' + esc(netText) + '</span></div>';
+        '<div class="p-actions"><span class="p-net ' + cls + '">' + esc(netText) + '</span>' +
+        '<span><button class="btn-mini" type="button" data-share="' + esc(id) + '">Share</button> ' +
+        '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Yaad dilayein</button></span></div></div>';
     });
     $("peopleList").innerHTML = html;
   }
@@ -331,29 +492,83 @@
     if (prev) sel.value = prev;
   }
 
+  function renderTxnFilterOptions() {
+    var sel = $("txnFilterPerson");
+    var prev = sel.value;
+    var html = '<option value="">Sab log</option>';
+    profiles.forEach(function (p) {
+      html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
+    });
+    sel.innerHTML = html;
+    if (prev) sel.value = prev;
+  }
+
   function renderTxns() {
     var me = myId();
+    var q = txnSearchText.trim().toLowerCase();
+    var list = txns.filter(function (t) {
+      if (txnFilterPerson && t.payer_id !== txnFilterPerson && t.receiver_id !== txnFilterPerson) return false;
+      if (!q) return true;
+      var hay = (profileName(t.payer_id) + " " + profileName(t.receiver_id) + " " + (t.note || "") + " " + String(t.amount) + " " + fmtDate(t.txn_date)).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
     if (!txns.length) {
       $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi hai — pehla record upar se likhein.</p>';
       return;
     }
+    if (!list.length) {
+      $("txnList").innerHTML = '<p class="empty">Is search/filter ka koi record nahi mila.</p>';
+      return;
+    }
     var html = "";
-    txns.forEach(function (t) {
+    list.forEach(function (t) {
       var a = Number(t.amount) || 0;
       var iGave = t.payer_id === me;
       var iTook = t.receiver_id === me;
       var amtCls = iGave ? "given" : iTook ? "taken" : "";
       var sign = iGave ? "− " : iTook ? "+ " : "";
-      var del = t.created_by === me
-        ? '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button>' : "";
+      var btns = "";
+      if (t.created_by === me) {
+        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
+          '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      }
       html += '<div class="txn"><div><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
         '<div class="t-sub">' + esc(t.note || "Khana") + ' · ' + esc(fmtDate(t.txn_date)) + '</div></div>' +
-        '<div class="t-right"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + del + '</div></div>';
+        '<div class="t-right"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
     });
     $("txnList").innerHTML = html;
   }
 
-  /* ---------- add / delete ---------- */
+  /* ---------- add / edit / delete ---------- */
+  function resetTxnForm() {
+    editingId = null;
+    $("txnFormTitle").textContent = "Naya record likhein";
+    $("txnForm").querySelector('button[type="submit"]').textContent = "Record save karein";
+    $("cancelEditBtn").hidden = true;
+    $("txnAmount").value = "";
+    $("txnNote").value = "";
+    $("txnDate").value = todayLocal();
+    setTxnMsg("");
+  }
+  function startEditTxn(id) {
+    var t = null;
+    txns.forEach(function (x) { if (x.id === id) t = x; });
+    if (!t || t.created_by !== myId()) return;
+    var me = myId();
+    var other = t.payer_id === me ? t.receiver_id : t.payer_id;
+    var dir = t.payer_id === me ? "given" : "taken";
+    editingId = id;
+    $("txnPerson").value = other;
+    var radio = document.querySelector('input[name="txnDir"][value="' + dir + '"]');
+    if (radio) radio.checked = true;
+    $("txnAmount").value = t.amount;
+    $("txnNote").value = t.note || "";
+    $("txnDate").value = String(t.txn_date || "").slice(0, 10);
+    $("txnFormTitle").textContent = "Record edit karein";
+    $("txnForm").querySelector('button[type="submit"]').textContent = "Edit save karein";
+    $("cancelEditBtn").hidden = false;
+    $("txnForm").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
   function addTxn(e) {
     e.preventDefault();
     if (!dbReady) { setTxnMsg("Database setup baqi hai.", false); return; }
@@ -376,6 +591,21 @@
     };
     var btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
+    if (editingId) {
+      var editId = editingId;
+      sb("khata_transactions?id=eq." + encodeURIComponent(editId), { method: "PATCH", prefer: "return=minimal", body: body })
+        .then(function (res) {
+          btn.disabled = false;
+          if (!res.ok) { setTxnMsg("Edit save nahi hua — dobara koshish karein.", false); return; }
+          resetTxnForm();
+          setTxnMsg("Record edit ho gaya!", true);
+          loadAll();
+        }).catch(function () {
+          btn.disabled = false;
+          setTxnMsg("Internet ya server se rabta nahi ho raha.", false);
+        });
+      return;
+    }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         btn.disabled = false;
@@ -406,8 +636,21 @@
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
   $("logoutBtn").addEventListener("click", function () { saveSession(null); showAuth(); });
   $("txnForm").addEventListener("submit", addTxn);
+  $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
+  $("shareAllBtn").addEventListener("click", shareAll);
+  $("savePhoneBtn").addEventListener("click", savePhone);
+  $("txnSearch").addEventListener("input", function (e) { txnSearchText = e.target.value; renderTxns(); });
+  $("txnFilterPerson").addEventListener("change", function (e) { txnFilterPerson = e.target.value; renderTxns(); });
+  $("peopleList").addEventListener("click", function (e) {
+    var s = e.target.closest ? e.target.closest("[data-share]") : null;
+    if (s) { sharePerson(s.getAttribute("data-share")); return; }
+    var r = e.target.closest ? e.target.closest("[data-remind]") : null;
+    if (r) remindPerson(r.getAttribute("data-remind"));
+  });
   $("txnList").addEventListener("click", function (e) {
+    var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
+    if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
     if (b) deleteTxn(b.getAttribute("data-del"));
   });
@@ -443,6 +686,21 @@
       navigator.serviceWorker.register("sw.js").catch(function () {});
     });
   }
+
+  /* ---------- theme ---------- */
+  function applyTheme(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    $("themeBtn").textContent = mode === "dark" ? "☀️" : "🌙";
+    try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
+  }
+  $("themeBtn").addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme") || "light";
+    applyTheme(cur === "dark" ? "light" : "dark");
+  });
+  try {
+    var savedTheme = window.localStorage.getItem("easykhata_theme");
+    if (savedTheme === "dark" || savedTheme === "light") applyTheme(savedTheme);
+  } catch (e) {}
 
   if (!API || !ANON) {
     $("setupBox").hidden = false;

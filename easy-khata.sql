@@ -8,6 +8,7 @@ create table if not exists public.khata_profiles (
   id uuid primary key,
   name text not null,
   email text not null,
+  phone text,
   created_at timestamptz not null default now()
 );
 

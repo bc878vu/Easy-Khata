@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -23,6 +23,7 @@
   </div>
   <div class="top-actions">
     <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
+    <button id="themeBtn" class="icon-btn" type="button" title="Dark / Light">🌙</button>
     <button id="installBtn" class="btn btn-ghost" type="button" hidden>Install karein</button>
     <span id="userChip" class="user-chip" hidden></span>
     <button id="logoutBtn" class="btn btn-ghost" hidden>Logout</button>
@@ -47,6 +48,10 @@
       <label for="authName">Apna naam</label>
       <input id="authName" type="text" placeholder="Misal: Asad" autocomplete="name">
     </div>
+    <div id="signupPhoneRow" class="field" hidden>
+      <label for="authPhone">Phone / WhatsApp number</label>
+      <input id="authPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
+    </div>
     <div class="field">
       <label for="authEmail">Email</label>
       <input id="authEmail" type="email" placeholder="apna@email.com" autocomplete="email">
@@ -57,7 +62,7 @@
     </div>
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
-    <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain.</p>
+    <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain. Phone number WhatsApp reminders ke liye hai — baad me bhi add kar sakte hain.</p>
   </section>
 
   <!-- Main app -->
@@ -81,14 +86,21 @@
       </div>
     </div>
 
+    <div id="monthStats" class="month-stats" hidden></div>
+    <div class="actions-row">
+      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Mera hisab share karein</button>
+    </div>
+
+    <div class="cols">
     <div class="card">
       <h2>Har bande se hisab</h2>
       <p class="muted">Har dost ke sath — aap ne use kitne diye, us se kitne liye.</p>
+      <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
     </div>
 
     <div class="card">
-      <h2>Naya record likhein</h2>
+      <h2 id="txnFormTitle">Naya record likhein</h2>
       <form id="txnForm">
         <div class="field">
           <label for="txnPerson">Kis ke sath?</label>
@@ -115,7 +127,20 @@
         </div>
         <p id="txnMsg" class="msg" role="status"></p>
         <button class="btn btn-primary btn-block" type="submit">Record save karein</button>
+        <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Edit cancel karein</button>
       </form>
+    </div>
+    </div>
+
+    <div class="card">
+      <h2>Mera WhatsApp number</h2>
+      <p class="muted">Dost aap ko WhatsApp par hisab yaad dila sakein — number sirf login users ko nazar aata hai.</p>
+      <div class="field">
+        <label for="myPhone">Phone / WhatsApp number</label>
+        <input id="myPhone" type="tel" placeholder="Misal: 0300 1234567" autocomplete="tel">
+      </div>
+      <button id="savePhoneBtn" class="btn btn-primary" type="button">Number save karein</button>
+      <p id="phoneMsg" class="msg" role="status"></p>
     </div>
 
     <div class="card">
@@ -124,6 +149,10 @@
         <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
       </div>
       <p class="muted">Sab doston ke tamam record — naya pehle.</p>
+      <div class="toolbar">
+        <input id="txnSearch" type="search" placeholder="Search — naam, khana ya raqam...">
+        <select id="txnFilterPerson"><option value="">Sab log</option></select>
+      </div>
       <div id="txnList" class="txns"></div>
     </div>
 
@@ -135,6 +164,6 @@
 </footer>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
