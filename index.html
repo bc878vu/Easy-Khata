@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Khata — Khana ka Len Den</title>
+<meta name="description" content="Easy Khata — doston ke sath khane ka len den ka hisab. Kis ne kitne diye, kis se kitne liye, har bande ka hisab aik jagah.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">📒</span>
+    <div>
+      <h1>Easy Khata</h1>
+      <p>Khana ka len den — saaf hisab</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span id="userChip" class="user-chip" hidden></span>
+    <button id="logoutBtn" class="btn btn-ghost" hidden>Logout</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div id="setupBox" class="card setup" hidden>
+    <h2>Database setup baqi hai</h2>
+    <p>App tayyar hai, lekin Supabase me tables abhi nahi bane. Repo ke <code>easy-khata.sql</code> file ko Supabase SQL Editor me chala dein, phir page refresh karein.</p>
+  </div>
+
+  <!-- Auth -->
+  <section id="authBox" class="card auth" hidden>
+    <div class="tabs">
+      <button id="tabLogin" class="tab active" type="button">Login</button>
+      <button id="tabSignup" class="tab" type="button">Naya Account</button>
+    </div>
+
+    <div id="signupNameRow" class="field" hidden>
+      <label for="authName">Apna naam</label>
+      <input id="authName" type="text" placeholder="Misal: Asad" autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="email" placeholder="apna@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="authPassword">Password</label>
+      <input id="authPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="current-password">
+    </div>
+    <p id="authMsg" class="msg" role="status"></p>
+    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
+    <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain.</p>
+  </section>
+
+  <!-- Main app -->
+  <section id="appBox" hidden>
+
+    <div class="summary">
+      <div class="sum-card given">
+        <span class="sum-label">Maine diye</span>
+        <strong id="sumGiven">Rs 0</strong>
+        <span id="sumGivenCount" class="sum-sub"></span>
+      </div>
+      <div class="sum-card taken">
+        <span class="sum-label">Maine liye</span>
+        <strong id="sumTaken">Rs 0</strong>
+        <span id="sumTakenCount" class="sum-sub"></span>
+      </div>
+      <div class="sum-card net">
+        <span class="sum-label">Mera net hisab</span>
+        <strong id="sumNet">Rs 0</strong>
+        <span id="sumNetSub" class="sum-sub"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Har bande se hisab</h2>
+      <p class="muted">Har dost ke sath — aap ne use kitne diye, us se kitne liye.</p>
+      <div id="peopleList" class="people"></div>
+    </div>
+
+    <div class="card">
+      <h2>Naya record likhein</h2>
+      <form id="txnForm">
+        <div class="field">
+          <label for="txnPerson">Kis ke sath?</label>
+          <select id="txnPerson"></select>
+        </div>
+        <div class="field">
+          <label>Len den ki kisam</label>
+          <div class="seg">
+            <label class="seg-opt"><input type="radio" name="txnDir" value="given" checked> Maine diye</label>
+            <label class="seg-opt"><input type="radio" name="txnDir" value="taken"> Maine liye</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="txnAmount">Raqam (Rs)</label>
+          <input id="txnAmount" type="number" min="1" step="any" placeholder="Misal: 500" required>
+        </div>
+        <div class="field">
+          <label for="txnNote">Kis cheez ke? (khana, chai, lunch...)</label>
+          <input id="txnNote" type="text" placeholder="Misal: Lunch — biryani" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="txnDate">Tareekh</label>
+          <input id="txnDate" type="date" required>
+        </div>
+        <p id="txnMsg" class="msg" role="status"></p>
+        <button class="btn btn-primary btn-block" type="submit">Record save karein</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="list-head">
+        <h2>Saara khata</h2>
+        <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
+      </div>
+      <p class="muted">Sab doston ke tamam record — naya pehle.</p>
+      <div id="txnList" class="txns"></div>
+    </div>
+
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Easy Khata — apna hisab, saaf hisab.</p>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
