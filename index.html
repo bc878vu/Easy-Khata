@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <header class="topbar">
@@ -57,11 +57,17 @@
     <div id="changePassBox" hidden>
       <div class="field">
         <label for="newPass1">Naya password</label>
-        <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
+        <div class="pw-wrap">
+          <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
+          <button id="changeEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+        </div>
       </div>
       <div class="field">
         <label for="newPass2">Naya password dobara</label>
-        <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
+        <div class="pw-wrap">
+          <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
+          <button id="changeEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+        </div>
       </div>
       <button id="savePassBtn" class="btn btn-primary" type="button">Password save karein</button>
       <p id="passMsg" class="msg" role="status"></p>
@@ -101,12 +107,15 @@
     </div>
     <div class="field">
       <label for="authPassword">Password</label>
-      <input id="authPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="current-password">
+      <div class="pw-wrap">
+        <input id="authPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="current-password">
+        <button id="authEye" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+      </div>
+      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
     </div>
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
     <p class="hint">Account bante hi aap ka naam khate me aa jaye ga — phir dost aap ko len den me chun sakte hain. Phone number WhatsApp reminders ke liye hai — baad me bhi add kar sakte hain.</p>
-    <p class="muted"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></p>
     </div>
     <div id="forgotBox" hidden>
       <div class="field">
@@ -121,11 +130,17 @@
       <p class="muted">Naya password likhein.</p>
       <div class="field">
         <label for="resetPassword">Naya password</label>
-        <input id="resetPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input id="resetPassword" type="password" placeholder="Kam az kam 6 harf" autocomplete="new-password">
+          <button id="resetEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+        </div>
       </div>
       <div class="field">
         <label for="resetPassword2">Naya password dobara</label>
-        <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
+          <button id="resetEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+        </div>
       </div>
       <button id="resetBtn" class="btn btn-primary btn-block" type="button">Password badlein</button>
       <p id="resetMsg" class="msg" role="status"></p>
@@ -263,8 +278,18 @@
         <p id="adminEditMsg" class="msg" role="status"></p>
       </div>
       <div id="adminPassBox" hidden>
-        <div class="field"><label for="adminNewPass1">Naya password</label><input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf"></div>
-        <div class="field"><label for="adminNewPass2">Naya password dobara</label><input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein"></div>
+        <div class="field"><label for="adminNewPass1">Naya password</label>
+          <div class="pw-wrap">
+            <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam az kam 6 harf">
+            <button id="adminEye1" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          </div>
+        </div>
+        <div class="field"><label for="adminNewPass2">Naya password dobara</label>
+          <div class="pw-wrap">
+            <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
+            <button id="adminEye2" class="pw-eye" type="button" title="Password dekhein" aria-label="Password dekhein">👁️</button>
+          </div>
+        </div>
         <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
         <p id="adminPassMsg" class="msg" role="status"></p>
       </div>
@@ -283,6 +308,6 @@
 <button id="fabAdd" class="fab" type="button" title="Naya record" hidden>+</button>
 
 <script src="config.js?v=2"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

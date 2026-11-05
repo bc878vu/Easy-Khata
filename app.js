@@ -154,6 +154,7 @@
     $("tabSignup").className = "tab" + (authMode === "signup" ? " active" : "");
     $("signupNameRow").hidden = authMode !== "signup";
     $("signupPhoneRow").hidden = authMode !== "signup";
+    $("forgotRow").hidden = authMode !== "login";
     $("authSubmitBtn").textContent = authMode === "signup" ? "Account banayein" : "Login karein";
     $("authPassword").setAttribute("autocomplete", authMode === "signup" ? "new-password" : "current-password");
     setAuthMsg("");
@@ -317,7 +318,22 @@
   function showForgot(show) {
     $("authForm").hidden = show;
     $("forgotBox").hidden = !show;
-    if (show) { $("resetBox").hidden = true; setForgotMsg(""); }
+    if (show) {
+      $("resetBox").hidden = true;
+      setForgotMsg("");
+      var em = $("authEmail").value.trim();
+      if (em) $("forgotEmail").value = em;
+    }
+  }
+  function wireEye(btnId, inputId) {
+    var b = $(btnId), inp = $(inputId);
+    if (!b || !inp) return;
+    b.addEventListener("click", function () {
+      var show = inp.type === "password";
+      inp.type = show ? "text" : "password";
+      b.textContent = show ? "🙈" : "👁️";
+      b.setAttribute("title", show ? "Password chhupayein" : "Password dekhein");
+    });
   }
   function doForgot() {
     var email = $("forgotEmail").value.trim();
@@ -1148,6 +1164,13 @@
   $("tabSignup").addEventListener("click", function () { authMode = "signup"; renderAuthMode(); });
   $("authSubmitBtn").addEventListener("click", doAuth);
   $("forgotLink").addEventListener("click", function () { showForgot(true); });
+  wireEye("authEye", "authPassword");
+  wireEye("resetEye1", "resetPassword");
+  wireEye("resetEye2", "resetPassword2");
+  wireEye("changeEye1", "newPass1");
+  wireEye("changeEye2", "newPass2");
+  wireEye("adminEye1", "adminNewPass1");
+  wireEye("adminEye2", "adminNewPass2");
   $("forgotBackBtn").addEventListener("click", function () { showForgot(false); });
   $("forgotSendBtn").addEventListener("click", doForgot);
   $("resetBtn").addEventListener("click", doReset);

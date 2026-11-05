@@ -333,3 +333,8 @@ body{padding-bottom:56px}
 .detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .detail-actions .btn{flex:1 1 140px}
 @media (max-width:520px){.detail-actions .btn{flex:1 1 100%}}
+
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:44px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:18px;cursor:pointer;padding:6px;line-height:1}
+.forgot-row{display:flex;justify-content:flex-end;margin-top:4px}
