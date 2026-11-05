@@ -183,12 +183,25 @@
     var meta = u.user_metadata || {};
     var name = meta.full_name || "";
     var phone = meta.phone || "";
+    var body = { id: u.id, name: name, email: u.email || "", phone: phone || null };
     return sb("khata_profiles?on_conflict=id", {
       method: "POST",
       prefer: "resolution=merge-duplicates,return=minimal",
-      body: { id: u.id, name: name, email: u.email || "", phone: phone || null }
+      body: body
     }).then(function (res) {
-      if (!res.ok) throw new Error("profile save failed");
+      if (res.ok) return;
+      // Phone column abhi nahi bana (v2 SQL nahi chala) to phone ke baghair save karein.
+      if (res.body && res.body.code === "42703") {
+        delete body.phone;
+        return sb("khata_profiles?on_conflict=id", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: body
+        }).then(function (res2) {
+          if (!res2.ok) throw new Error("profile save failed");
+        });
+      }
+      throw new Error("profile save failed");
     });
   }
 
@@ -267,9 +280,17 @@
     return code === "PGRST205" || code === "42P01";
   }
 
+  function profilesQuery(withPhone) {
+    return sb("khata_profiles?select=id,name,email" + (withPhone ? ",phone" : "") + "&order=name.asc");
+  }
+
   function loadAll() {
     setTxnMsg("");
-    sb("khata_profiles?select=id,name,email,phone&order=name.asc").then(function (res) {
+    profilesQuery(true).then(function (res) {
+      // Phone column abhi nahi bana (v2 SQL nahi chala) to phone ke baghair load karein.
+      if (!res.ok && res.body && res.body.code === "42703") return profilesQuery(false);
+      return res;
+    }).then(function (res) {
       if (!res.ok) {
         if (tableMissing(res)) {
           dbReady = false;
@@ -336,7 +357,10 @@
       prefer: "return=minimal",
       body: { phone: phone || null }
     }).then(function (res) {
-      if (!res.ok) { setPhoneMsg("Number save nahi hua — dobara koshish karein.", false); return; }
+      if (!res.ok) {
+        if (res.body && res.body.code === "42703") { setPhoneMsg("Phone column abhi database me nahi — pehle easy-khata-v2.sql chalana hai.", false); return; }
+        setPhoneMsg("Number save nahi hua — dobara koshish karein.", false); return;
+      }
       myPhone = phone;
       profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
       setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya gaya.", true);
