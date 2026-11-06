@@ -18,9 +18,10 @@
   --red-soft:#fee2e2;
   --accent:#1d4ed8;
   --accent-soft:#dbeafe;
-  /* developer-credit gradient (light theme: blue -> violet) */
-  --credit-1:#1d4ed8;
+  /* developer-credit gradient (light theme: blue -> violet -> pink) */
+  --credit-1:#2563eb;
   --credit-2:#7c3aed;
+  --credit-3:#db2777;
   /* Button backgrounds: gehre rang taa ke safed text dono themes mein saaf dikhe.
      (var(--accent)/var(--green)/var(--red) dark theme mein halke hain — safed
      text un par dhundla parta hai.) */
@@ -49,9 +50,10 @@
   --red-soft:#450a0a;
   --accent:#60a5fa;
   --accent-soft:#1e3a5f;
-  /* developer-credit gradient (dark theme: light blue -> light violet) */
+  /* developer-credit gradient (dark theme: light blue -> light violet -> light pink) */
   --credit-1:#60a5fa;
   --credit-2:#a78bfa;
+  --credit-3:#f472b6;
   --accent-btn:#1d4ed8;
   --btn-red-bg:#b91c1c;
   --btn-green-bg:#15803d;
@@ -437,10 +439,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .menu-note{padding:12px 16px;font-size:.85rem;color:var(--muted);border-bottom:1px solid var(--line);background:var(--tab-bg)}
 .menu-note p{margin:0}
 /* developer credit — only "Developed by Asad", nothing else; sits low on the
-   Account screen (red-line position), gradient text, fully responsive. */
-.version{text-align:center;color:var(--accent);font-size:.95rem;font-weight:700;letter-spacing:.02em;margin:60px 0 4px}
+   Account screen (red-line position), colourful 3D gradient + drop shadow,
+   modern professional, fully responsive. */
+.version{text-align:center;color:var(--accent);font-size:1.05rem;font-weight:800;letter-spacing:.03em;margin:110px 0 4px;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
-  .version{background:linear-gradient(90deg,var(--credit-1),var(--credit-2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .version{background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
 }
 
 /* ---------- notifications / admin ---------- */
