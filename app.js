@@ -8,6 +8,8 @@
   var ANON = cfg.SUPABASE_ANON_KEY;
   var SESSION_KEY = "easykhata_auth";
   var ADMIN_EMAIL = cfg.ADMIN_EMAIL || "";
+  var APP_URL = "https://easy-khata-asad2327s-projects.vercel.app";
+  var APP_SHORT_URL = "https://is.gd/4IoxbU"; // short link for shared messages (verified: redirects to APP_URL)
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) {
@@ -29,6 +31,13 @@
     var p = String(iso).slice(0, 10).split("-");
     if (p.length !== 3) return iso;
     return p[2] + "-" + p[1] + "-" + p[0];
+  }
+  function fmtDateLong(iso) {
+    if (!iso) return "";
+    var p = String(iso).slice(0, 10).split("-");
+    if (p.length !== 3) return iso;
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return Number(p[2]) + " " + months[Number(p[1]) - 1] + " " + p[0];
   }
   function monthName(iso) {
     var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1206,21 +1215,60 @@
     });
     return { given: given, taken: taken, net: given - taken }; // +: they owe me, -: I owe them
   }
+  function latestTxnWith(id) {
+    // Most recent record between me and this person (by date, then by creation time).
+    var me = myId(), best = null;
+    txns.forEach(function (t) {
+      var mine = (t.payer_id === me && t.receiver_id === id) || (t.receiver_id === me && t.payer_id === id);
+      if (!mine) return;
+      if (!best) { best = t; return; }
+      var d = String(t.txn_date || ""), bd = String(best.txn_date || "");
+      if (d > bd || (d === bd && String(t.created_at || "") > String(best.created_at || ""))) best = t;
+    });
+    return best;
+  }
+  function latestTxn() {
+    // Most recent record involving me (any person).
+    var me = myId(), best = null;
+    txns.forEach(function (t) {
+      var mine = t.payer_id === me || t.receiver_id === me;
+      if (!mine) return;
+      if (!best) { best = t; return; }
+      var d = String(t.txn_date || ""), bd = String(best.txn_date || "");
+      if (d > bd || (d === bd && String(t.created_at || "") > String(best.created_at || ""))) best = t;
+    });
+    return best;
+  }
+  function latestLine(t) {
+    // One line carrying the note written in the box (khana / cash / anything),
+    // so it is shared with the balance. "" when there is no record.
+    if (!t) return "";
+    var dir = t.payer_id === myId() ? "I gave " : "I took ";
+    return "Latest: " + (t.note || "Food") + " · " + dir + fmtRs(t.amount) + " · " + fmtDateLong(t.txn_date);
+  }
   function personShareText(p) {
     var s = personStats(p.id);
-    var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " owed to me."
-      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " I owe." : "Net: settled up.";
-    return "Easy Khata — balance between " + myName() + " and " + (p.name || p.email) + ":\n" +
-      "• I gave: " + fmtRs(s.given) + "\n" +
-      "• I took: " + fmtRs(s.taken) + "\n" +
-      "• " + netLine + "\n" +
-      "App: https://easy-khata-asad2327s-projects.vercel.app";
+    var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " — you owe me."
+      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I owe you." : "Net: settled up.";
+    var latest = latestLine(latestTxnWith(p.id));
+    return "Easy Khata — Food Balance\n" +
+      myName() + " & " + (p.name || p.email) + "\n\n" +
+      "Debit (I gave): " + fmtRs(s.given) + "\n" +
+      "Credit (I took): " + fmtRs(s.taken) + "\n" +
+      netLine + "\n" +
+      (latest ? "\n" + latest + "\n" : "") +
+      "\nEasy Khata: " + APP_SHORT_URL;
   }
   function personRemindText(p) {
     var s = personStats(p.id);
-    if (s.net > 0) return "Hi " + (p.name || "") + "! According to Easy Khata, you owe me " + fmtRs(s.net) + " (food balance). Please check, thank you! — " + myName();
-    if (s.net < 0) return "Hi " + (p.name || "") + "! According to Easy Khata, I owe you " + fmtRs(-s.net) + " (food balance). I will send it soon, thank you! — " + myName();
-    return "Hi " + (p.name || "") + "! According to Easy Khata, our food balance is settled. — " + myName();
+    var latest = latestLine(latestTxnWith(p.id));
+    var dc = "Debit (I gave): " + fmtRs(s.given) + " · Credit (I took): " + fmtRs(s.taken) + ".";
+    var head = "Hi " + (p.name || "") + ",\n\n";
+    var body, tail = "";
+    if (s.net > 0) { body = "As per Easy Khata, you owe me " + fmtRs(s.net) + " (food balance).\n" + dc; tail = "\n\nPlease check when you get a chance. Thank you!"; }
+    else if (s.net < 0) { body = "As per Easy Khata, I owe you " + fmtRs(-s.net) + " (food balance).\n" + dc; tail = "\n\nI will send it soon. Thank you!"; }
+    else { body = "As per Easy Khata, our food balance is settled.\n" + dc; }
+    return head + body + (latest ? "\n\n" + latest : "") + tail + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
   }
   function shareText(text) {
     if (navigator.share) return navigator.share({ text: text }).catch(function () {});
@@ -1326,13 +1374,16 @@
       if (t.receiver_id === myId()) taken += a;
     });
     var net = given - taken; // +: I am owed, -: I owe
-    var netLine = net > 0 ? "Net: " + fmtRs(net) + " owed to me."
-      : net < 0 ? "Net: " + fmtRs(-net) + " I owe." : "Net: settled up.";
-    var text = "Easy Khata — " + myName() + "'s food balance:\n" +
-      "• I gave: " + fmtRs(given) + "\n" +
-      "• I took: " + fmtRs(taken) + "\n" +
-      "• " + netLine + "\n" +
-      "App: https://easy-khata-asad2327s-projects.vercel.app";
+    var netLine = net > 0 ? "Net: " + fmtRs(net) + " — owed to me."
+      : net < 0 ? "Net: " + fmtRs(-net) + " — I owe." : "Net: settled up.";
+    var latest = latestLine(latestTxn());
+    var text = "Easy Khata — My Food Balance\n" +
+      myName() + "\n\n" +
+      "Debit (I gave): " + fmtRs(given) + "\n" +
+      "Credit (I took): " + fmtRs(taken) + "\n" +
+      netLine + "\n" +
+      (latest ? "\n" + latest + "\n" : "") +
+      "\nEasy Khata: " + APP_SHORT_URL;
     if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
     copyText(text).then(function () { setTxnMsg("Balance copied — paste it in any app.", true); });
   }
