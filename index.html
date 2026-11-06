@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 
@@ -127,7 +127,10 @@
     <div class="app-user">
       <span id="headerAvatar" class="avatar">?</span>
       <div class="app-user-text">
-        <strong id="headerName">Easy Khata</strong>
+        <span class="header-name-row">
+          <strong id="headerName">Easy Khata</strong>
+          <span id="guestBadge" class="guest-badge" hidden>👤 Guest</span>
+        </span>
         <span class="app-sub">Food money ledger</span>
       </div>
     </div>
@@ -135,6 +138,7 @@
       <span id="liveUpdating" class="live-updating" hidden>Updating…</span>
       <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
       <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein">🌙</button>
+      <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden>🔑 Login</button>
       <button id="notifBtn" class="icon-btn" type="button" title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     </div>
   </header>
@@ -143,8 +147,6 @@
 
     <!-- Khata (main) -->
     <section id="khataView">
-      <!-- v24: guest-mode notice — user ko saaf pata ho ke hisaab sirf is device par hai. -->
-      <p id="guestNotice" class="guest-notice" hidden>👤 Guest mode — Ye hisaab sirf is phone/browser par save hai. Account banane par cloud par save hoga.</p>
       <p class="total-label">TOTAL BALANCE</p>
       <div class="total-cards">
         <div class="total-card receive">
@@ -497,6 +499,6 @@
     </div>
   </div>
 
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

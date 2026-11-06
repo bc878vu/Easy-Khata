@@ -215,13 +215,9 @@
     showApp();
     renderAll();
   }
-  // Reload par: agar guest hisaab maujood hai aur koi login session nahi,
-  // to seedha guest mode mein wapas — user ka hisaab wahin milta hai.
-  function enterGuestIfSaved() {
-    if (!guestHasData()) return false;
-    enterGuestMode();
-    return true;
-  }
+  // v24.1: reload par bhi seedha guest mode (saved hisaab ho ya naya) —
+  // enterGuestMode() saved store ho to wahi load karta hai, warna naya
+  // guest id banata hai. Login screen sirf navbar icon se khulti hai.
   function newUuid() {
     try {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -431,7 +427,6 @@
     $("authBox").hidden = false;
     $("fabAdd").hidden = true;
     $("notifBtn").hidden = false;
-    $("guestNotice").hidden = true;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
     $("resetBox").hidden = true;
@@ -441,9 +436,8 @@
     hideSplash();
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
-    // v24: guest mode mein notification bell nahi (koi push/notifs nahi)
-    // aur device-only notice dikhta hai.
-    $("guestNotice").hidden = !guestMode;
+    // v24: guest mode mein notification bell nahi (koi push/notifs nahi).
+    // v24.1: bada banner hata diya — header mein chhota Guest badge dikhta hai (renderAccount).
     $("notifBtn").hidden = guestMode;
     renderAccount();
     showView("khata");
@@ -716,10 +710,10 @@
 
   function authValidate() {
     if (!session || !session.access_token) {
-      // v24: koi login session nahi aur guest hisaab maujood hai to seedha
-      // guest mode mein wapas — warna login screen.
-      if (enterGuestIfSaved()) return;
-      showAuth();
+      // v24.1: koi login session nahi to app seedha guest dashboard kholta
+      // hai — login screen pehle nahi dikhti. Login/Sign-up navbar ke
+      // login icon se khulta hai.
+      enterGuestMode();
       return;
     }
     fetch(API + "/auth/v1/user", {
@@ -741,7 +735,9 @@
       maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
     }).catch(function () {
       saveSession(null);
-      showAuth();
+      // v24.1: session expire/invalid bhi guest dashboard par le jata hai
+      // (login screen nahi) — dobara login navbar ke Login icon se hota hai.
+      enterGuestMode();
     });
   }
 
@@ -2366,6 +2362,12 @@
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
     setAvatarEl($("headerAvatar"), me && me.avatar_url, initial);
     $("headerName").textContent = name || "Easy Khata";
+    // v24.1: header mein chhota Guest badge + navbar Login icon —
+    // dono sirf guest mode mein dikhte hain.
+    var gbd = $("guestBadge");
+    if (gbd) gbd.hidden = !guestMode;
+    var lb = $("loginIconBtn");
+    if (lb) lb.hidden = !guestMode;
     setAvatarEl($("acctAvatar"), me && me.avatar_url, initial);
     $("acctName").textContent = name || "—";
     var phoneTxt = myPhone || "Number nahi diya";
@@ -3183,6 +3185,9 @@
   // icon (themeHeaderBtn) se badalta hai; applyTheme dono ko sync karta tha,
   // themeIcon ka null guard pehle se hai.
   $("themeHeaderBtn").addEventListener("click", toggleTheme);
+  // v24.1: guest mode mein navbar login icon — tap par login/sign-up page khulta hai.
+  var loginIconBtn = $("loginIconBtn");
+  if (loginIconBtn) loginIconBtn.addEventListener("click", function () { showAuth(); });
   try {
     var savedTheme = window.localStorage.getItem("easykhata_theme");
     if (savedTheme === "dark" || savedTheme === "light") applyTheme(savedTheme);

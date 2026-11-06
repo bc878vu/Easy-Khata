@@ -119,6 +119,14 @@ p{margin:0 0 10px}
 .app-user-text{display:flex;flex-direction:column;line-height:1.25;min-width:0}
 .app-user-text strong{font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .app-sub{color:var(--muted);font-size:.75rem}
+/* v24.1: header mein chhota Guest badge — naam ke saath, header ka hissa
+   lage (koi banner nahi). Theme-safe: accent-soft + accent, dono themes mein. */
+.header-name-row{display:flex;align-items:center;gap:6px;min-width:0}
+.header-name-row strong{min-width:0}
+.guest-badge{flex:none;font-size:.68rem;font-weight:700;letter-spacing:.02em;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent);border-radius:999px;padding:2px 7px;line-height:1.4;white-space:nowrap}
+/* v24.1: navbar Login button — sirf guest mode mein dikhta hai (theme
+   toggle ke saath). Chhota pill, header ka hissa. */
+.login-btn{flex:none;font-size:.78rem;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent);border-radius:999px;padding:6px 10px;line-height:1.2;white-space:nowrap;cursor:pointer}
 .header-actions{display:flex;align-items:center;gap:8px}
 .avatar{
   width:40px;height:40px;flex:0 0 40px;border-radius:50%;
@@ -186,11 +194,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .msg.err{color:var(--red)}
 .msg.ok{color:var(--green)}
 .hint{font-size:.82rem;color:var(--muted)}
-/* v24: guest mode — login screen divider + device-only notice. Theme-safe:
+/* v24: guest mode — login screen divider. (v24.1: bada Khata-screen banner
+   hata diya — uski jagah header mein chhota Guest badge hai.) Theme-safe:
    accent-soft background + accent text, dono themes mein readable. */
 .guest-divider{display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:.85rem}
 .guest-divider::before,.guest-divider::after{content:"";flex:1;height:1px;background:var(--line)}
-.guest-notice{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:.92rem;font-weight:600}
 .linklike{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:.9rem;text-decoration:underline}
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:44px}
