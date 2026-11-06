@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=22">
+<link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
 
@@ -277,13 +277,40 @@
         </div>
         <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit">✎</button>
       </div>
+      <!-- v23: poora profile edit — photo, naam, username, phone, password.
+           Pencil dabate hi khulta hai; "Profile save karein" sab kuch aik
+           saath save karta hai (photo, naam, username, phone). Password alag
+           box mein badalta hai (pehle se tha). Email sirf dikhta hai — badalna
+           ho to confirmation wala flow chahiye, is liye v23 mein display-only. -->
       <div id="acctPhoneBox" class="card" hidden>
+        <h3 style="margin-top:0">Profile edit karein</h3>
+        <div class="profile-pic-row">
+          <span id="profilePicPreview" class="avatar big">?</span>
+          <div class="profile-pic-actions">
+            <label class="btn btn-soft" for="profilePicInput" style="cursor:pointer">📷 Photo badlein</label>
+            <input id="profilePicInput" type="file" accept="image/*" hidden>
+            <button id="removePicBtn" class="btn btn-ghost" type="button" hidden>Photo hatayein</button>
+            <p class="muted" style="margin:4px 0 0">Photo 512px tak chhoti kar ke save hogi.</p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="myNameInput">Mera naam</label>
+          <input id="myNameInput" type="text" maxlength="80" placeholder="Example: Asad Amanat Ali" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="myUsername">Username (optional — dosray aap ko is se pehchanenge)</label>
+          <input id="myUsername" type="text" maxlength="30" placeholder="Example: asad_ali" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="myEmailView">Email (badla nahi ja sakta)</label>
+          <input id="myEmailView" type="email" readonly>
+        </div>
         <div class="field">
           <label for="myPhone">Mera WhatsApp number</label>
           <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
-          <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Save karein</button>
-          <p id="phoneMsg" class="msg" role="status"></p>
         </div>
+        <button id="savePhoneBtn" class="btn btn-primary" type="button">Profile save karein</button>
+        <p id="phoneMsg" class="msg" role="status"></p>
         <button id="changePassBtn" class="btn btn-soft" type="button">🔑 Password badlein</button>
         <div id="changePassBox" hidden>
           <div class="field">
@@ -426,7 +453,13 @@
 <button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
+<!-- Firebase (v23): Cloud Messaging for closed-app push notifications.
+     Compat builds — plain script tags, no bundler. If the CDN fails the app
+     still works: app.js guards every Firebase call and falls back to the
+     VAPID web-push path. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
@@ -438,6 +471,6 @@
     </div>
   </div>
 
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>

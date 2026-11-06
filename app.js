@@ -1244,11 +1244,107 @@
       new Promise(function (resolve) { setTimeout(function () { resolve(null); }, timeoutMs || 4000); })
     ]);
   }
+  // v23: Firebase Cloud Messaging (FCM) — closed-app popup ke liye.
+  // Config config.js mein hai (public-by-design). Jab tak config ya SDK na
+  // ho, ye branch bilkul inert hai aur VAPID path chalta hai.
+  function fcmConfig() {
+    var f = cfg.FIREBASE;
+    if (!f || !f.apiKey || !f.projectId || !f.messagingSenderId || !f.appId) return null;
+    return f;
+  }
+  function fcmSupported() {
+    return !!(fcmConfig() && cfg.FCM_VAPID_KEY && window.firebase && window.firebase.messaging &&
+      typeof window.firebase.messaging.isSupported === "function" && window.firebase.messaging.isSupported());
+  }
+  var fcmMsg = null;
+  function fcmMessaging() {
+    if (fcmMsg) return fcmMsg;
+    var app = (window.firebase.apps && window.firebase.apps.length)
+      ? window.firebase.app()
+      : window.firebase.initializeApp(fcmConfig());
+    fcmMsg = window.firebase.messaging(app);
+    return fcmMsg;
+  }
+  var fcmReg = null;
+  function fcmServiceWorker() {
+    if (fcmReg) return Promise.resolve(fcmReg);
+    return navigator.serviceWorker.register("firebase-messaging-sw.js", { scope: "/firebase-cloud-messaging-push-scope" })
+      .then(function (reg) { fcmReg = reg; return reg; });
+  }
+  function saveFcmToken(token) {
+    return sb("khata_push_subs?on_conflict=fcm_token", {
+      method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+      body: { user_id: myId(), fcm_token: token }
+    }).then(function (res) { if (!res.ok) throw new Error("save failed"); });
+  }
+  // FCM token ki maujoodgi check (self-heal: token milte hi DB mein save).
+  function fcmTokenState() {
+    var messaging;
+    try { messaging = fcmMessaging(); } catch (e) { return Promise.resolve("off"); }
+    return fcmServiceWorker().then(function (reg) {
+      return messaging.getToken({ vapidKey: cfg.FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+    }).then(function (token) {
+      if (!token) return "off";
+      pushState = "on"; updatePushToggleLabel();
+      saveFcmToken(token).catch(function () {});
+      return "on";
+    }).catch(function () { return "off"; });
+  }
+  function enablePushFcm() {
+    var p = (window.Notification && Notification.permission === "granted")
+      ? Promise.resolve("granted")
+      : Notification.requestPermission();
+    return p.then(function (perm) {
+      if (perm !== "granted") {
+        if (perm === "denied") { pushState = "denied"; updatePushToggleLabel(); }
+        return { ok: false, reason: perm === "denied" ? "permission-denied" : "permission-default" };
+      }
+      var messaging;
+      try { messaging = fcmMessaging(); } catch (e) {
+        return { ok: false, reason: "fcm-init-failed", detail: String((e && e.message) || e) };
+      }
+      return fcmServiceWorker().then(function (reg) {
+        return messaging.getToken({ vapidKey: cfg.FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+      }).then(function (token) {
+        if (!token) return { ok: false, reason: "fcm-token-failed" };
+        return saveFcmToken(token).then(function () {
+          pushState = "on"; updatePushToggleLabel();
+          return { ok: true };
+        }, function () { return { ok: false, reason: "save-failed" }; });
+      }).catch(function (e) {
+        return { ok: false, reason: "fcm-token-failed", detail: String((e && e.message) || e) };
+      });
+    }).catch(function () { return { ok: false, reason: "permission-default" }; });
+  }
+  // Har failure ki ASAL wajah — v22 ka generic "dobara khol kar try karein"
+  // chhupa deta tha ke kaunsa step fail hua (user ko 23:11 PKT wahi mila tha).
+  function pushReasonText(reason, detail) {
+    if (reason === "unsupported") return "Is browser mein notifications nahi chalti — Chrome use karein.";
+    if (reason === "permission-denied") return "Notifications block hain — Chrome ki site settings mein ja kar Easy Khata ke liye Notifications allow karein.";
+    if (reason === "permission-default") return "Chrome ne permission ka popup nahi dikhaya — aap ne pehle kai dafa mana kiya hoga, is liye Chrome ne prompt band kar diya hai. Chrome ke address bar mein lock 🔒 icon par tap karein → Site settings → Notifications → Allow karein, phir dobara try karein.";
+    if (reason === "sw-not-ready") return "Service worker ready nahi hua — app band kar ke dobara kholein, phir try karein.";
+    if (reason === "subscribe-failed") return "Subscription nahi bani" + (detail ? " (" + detail + ")" : "") + " — Chrome mein kholein (WhatsApp/Facebook ke andar wale browser se nahi), internet check karein, phir try karein.";
+    if (reason === "fcm-init-failed") return "Firebase start nahi hua" + (detail ? " (" + detail + ")" : "") + " — app refresh kar ke dobara try karein.";
+    if (reason === "fcm-token-failed") return "Firebase token nahi bana" + (detail ? " (" + detail + ")" : "") + " — internet check karein aur dobara try karein.";
+    if (reason === "save-failed") return "Internet ya server se rabta nahi ho raha — dobara try karein.";
+    return "Notifications on nahi hui — dobara try karein.";
+  }
   function refreshPushState() {
     if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState); }
     if (window.Notification && Notification.permission === "denied") {
       pushState = "denied"; updatePushToggleLabel(); return Promise.resolve(pushState);
     }
+    // FCM configured + permission granted: FCM token hi source of truth hai.
+    if (fcmSupported() && window.Notification && Notification.permission === "granted") {
+      return fcmTokenState().then(function (st) {
+        if (st === "on") return pushState;
+        // FCM token nahi mila — VAPID subscription bhi check kar lein.
+        return vapidPushState();
+      });
+    }
+    return vapidPushState();
+  }
+  function vapidPushState() {
     return swReady(4000).then(function (reg) {
       if (!reg) return null;
       return reg.pushManager.getSubscription();
@@ -1278,44 +1374,46 @@
       enablePush();
     }).catch(function () {});
   }
+  // v23: enablePush ab {ok, reason, detail} batata hai — kaunsa step fail
+  // hua, ye chhupaya nahi jata. FCM configured ho to FCM path, warna VAPID.
   function enablePush() {
-    if (!pushSupported) return Promise.resolve(false);
+    if (!pushSupported) return Promise.resolve({ ok: false, reason: "unsupported" });
+    if (fcmSupported()) return enablePushFcm();
     var p = (window.Notification && Notification.permission === "granted")
       ? Promise.resolve("granted")
       : Notification.requestPermission();
     return p.then(function (perm) {
       if (perm !== "granted") {
-        pushState = "denied"; updatePushToggleLabel();
-        return false;
+        if (perm === "denied") { pushState = "denied"; updatePushToggleLabel(); }
+        return { ok: false, reason: perm === "denied" ? "permission-denied" : "permission-default" };
       }
       return swReady(5000).then(function (reg) {
-        if (!reg) return false;
-        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushVapidKey()) });
-      }).then(function (sub) {
-        if (!sub) return false;
-        return savePushSub(sub).then(function () {
-          pushState = "on"; updatePushToggleLabel();
-          return true;
-        });
+        if (!reg) return { ok: false, reason: "sw-not-ready" };
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushVapidKey()) }).then(function (sub) {
+          if (!sub) return { ok: false, reason: "subscribe-failed" };
+          return savePushSub(sub).then(function () {
+            pushState = "on"; updatePushToggleLabel();
+            return { ok: true };
+          }, function () { return { ok: false, reason: "save-failed" }; });
+        }, function (e) { return { ok: false, reason: "subscribe-failed", detail: String((e && e.message) || e) }; });
       });
     }).catch(function () {
-      return false;
+      return { ok: false, reason: "permission-default" };
     });
   }
   // v22: Account menu ka "Notifications On karein" button — user gesture se
-  // chalti hai, is liye Chrome prompt dikhata hai. Saaf confirmation deti hai.
+  // chalti hai, is liye Chrome prompt dikhata hai. v23: asal wajah dikhata hai.
   function enablePushFromButton() {
-    if (!pushSupported) { setPushMsg("Is browser mein notifications nahi chalti — Chrome use karein.", false); return; }
+    if (!pushSupported) { setPushMsg(pushReasonText("unsupported"), false); return; }
     if (window.Notification && Notification.permission === "denied") {
-      setPushMsg("Notifications block hain — Chrome ki site settings mein ja kar Easy Khata ke liye Notifications allow karein.", false);
+      setPushMsg(pushReasonText("permission-denied"), false);
       return;
     }
     if (pushState === "on") { setPushMsg("Notifications pehle se on hain ✓", true); return; }
     setPushMsg("Notifications on ho rahi hain…", true);
-    enablePush().then(function (ok) {
-      if (ok) setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega.", true);
-      else if (window.Notification && Notification.permission === "denied") setPushMsg("Permission nahi mili — Chrome ki site settings se allow karein.", false);
-      else setPushMsg("Notifications on nahi hui — app dobara khol kar dobara try karein.", false);
+    enablePush().then(function (r) {
+      if (r.ok) setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega — app band ho to bhi.", true);
+      else setPushMsg(pushReasonText(r.reason, r.detail), false);
     });
   }
   function triggerPush(recipientId, title, text) {
@@ -1634,35 +1732,164 @@
     if (input && document.activeElement !== input) input.value = myPhone;
   }
 
-  function finishPhoneSave(phone) {
-    myPhone = phone;
-    profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
-    setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya.", true);
+  /* ---------- profile edit (v23: user apni profile khud A to Z badal sakta hai) ---------- */
+  var pendingAvatarFile = null;
+  var removeAvatar = false;
+  function myProfile() {
+    var me = null;
+    profiles.forEach(function (p) { if (p.id === myId()) me = p; });
+    return me;
   }
-  function savePhone() {
-    var phone = $("myPhone").value.trim();
-    if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
-    sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
-      method: "PATCH",
-      prefer: "return=representation",
-      body: { phone: phone || null }
-    }).then(function (res) {
-      if (!res.ok) {
-        if (res.body && res.body.code === "42703") { setPhoneMsg("Phone wala column abhi database mein nahi hai — pehle easy-khata-v2.sql run karein.", false); return; }
-        setPhoneMsg("Number save nahi hua — dobara try karein.", false); return;
-      }
-      if (res.body && res.body.length) { finishPhoneSave(phone); return; }
-      // No profile row exists — PATCH silently does nothing, so create it with an upsert.
-      var meta = (session.user && session.user.user_metadata) || {};
-      sb("khata_profiles?on_conflict=id", {
+  function avatarHtml(url, initial) {
+    if (url) return '<img src="' + esc(url) + '" alt="">';
+    return esc(initial || "?");
+  }
+  function setAvatarEl(el, url, initial) {
+    if (!el) return;
+    el.innerHTML = avatarHtml(url, initial);
+  }
+  // Auth user_metadata sync (GoTrue PUT /auth/v1/user, data = user_metadata).
+  function updateUserMeta(data) {
+    return fetch(API + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
+      body: JSON.stringify({ data: data })
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
+        .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
+    });
+  }
+  function fillProfileForm() {
+    var me = myProfile();
+    var meta = (session.user && session.user.user_metadata) || {};
+    var name = (me && me.name) || meta.full_name || myName() || "";
+    $("myNameInput").value = name;
+    $("myUsername").value = (me && me.username) || "";
+    $("myEmailView").value = (session.user && session.user.email) || "";
+    if ($("myPhone") && document.activeElement !== $("myPhone")) $("myPhone").value = myPhone || (me && me.phone) || "";
+    pendingAvatarFile = null; removeAvatar = false;
+    if ($("profilePicInput")) $("profilePicInput").value = "";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+    setAvatarEl($("profilePicPreview"), me && me.avatar_url, initial);
+    $("removePicBtn").hidden = !(me && me.avatar_url);
+    setPhoneMsg("");
+  }
+  function downscaleImage(file) {
+    // Phone photos 5MB+ hote hain — 512px JPEG (0.85) bana kar upload tez + sasta.
+    // Canvas na mile (purana browser) to original file hi upload hogi.
+    return new Promise(function (resolve) {
+      try {
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        img.onload = function () {
+          try {
+            var max = 512;
+            var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
+            var s = Math.min(1, max / Math.max(w, h));
+            var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+            var cv = document.createElement("canvas");
+            cv.width = cw; cv.height = ch;
+            var ctx = cv.getContext("2d");
+            if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
+            ctx.drawImage(img, 0, 0, cw, ch);
+            URL.revokeObjectURL(url);
+            if (cv.toBlob) cv.toBlob(function (b) { resolve(b || file); }, "image/jpeg", 0.85);
+            else resolve(file);
+          } catch (e) { try { URL.revokeObjectURL(url); } catch (e2) {} resolve(file); }
+        };
+        img.onerror = function () { try { URL.revokeObjectURL(url); } catch (e) {} resolve(file); };
+        img.src = url;
+      } catch (e) { resolve(file); }
+    });
+  }
+  function uploadAvatar(file) {
+    return downscaleImage(file).then(function (blob) {
+      var path = myId() + "/" + Date.now() + ".jpg";
+      return fetch(API + "/storage/v1/object/avatars/" + path, {
         method: "POST",
-        prefer: "resolution=merge-duplicates,return=minimal",
-        body: { id: myId(), name: meta.full_name || myName(), email: (session.user && session.user.email) || "", phone: phone || null }
-      }).then(function (res2) {
-        if (!res2.ok) { setPhoneMsg("Number save nahi hua — dobara try karein.", false); return; }
-        finishPhoneSave(phone);
-      }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
-    }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
+        headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "image/jpeg", "x-upsert": "true" },
+        body: blob
+      }).then(function (r) {
+        if (!r.ok) throw new Error("upload failed " + r.status);
+        return API + "/storage/v1/object/public/avatars/" + path;
+      });
+    });
+  }
+  function saveProfile() {
+    var name = $("myNameInput").value.trim();
+    var username = $("myUsername").value.trim();
+    var phone = $("myPhone").value.trim();
+    if (!name) { setPhoneMsg("Apna naam likhein.", false); return; }
+    if (name.length > 80) { setPhoneMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
+    if (username && !/^[A-Za-z0-9_.]{3,30}$/.test(username)) { setPhoneMsg("Username 3–30 harf ka ho — sirf harf, number, _ aur . chalenge.", false); return; }
+    if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
+    var btn = $("savePhoneBtn");
+    btn.disabled = true;
+    setPhoneMsg("Profile save ho rahi hai…", true);
+    var checkUsername = username
+      ? sb("khata_profiles?select=id&username=ilike." + encodeURIComponent(username.replace(/%/g, "\\%").replace(/_/g, "\\_")) + "&id=neq." + encodeURIComponent(myId()), {})
+        .then(function (res) {
+          if (res.ok && res.body && res.body.length) throw new Error("username-taken");
+        })
+      : Promise.resolve();
+    checkUsername.then(function () {
+      if (pendingAvatarFile) return uploadAvatar(pendingAvatarFile);
+      if (removeAvatar) return "__REMOVE__";
+      return null;
+    }).then(function (avatarUrl) {
+      var body = { name: name, phone: phone || null, username: username || null };
+      if (avatarUrl === "__REMOVE__") body.avatar_url = null;
+      else if (avatarUrl) body.avatar_url = avatarUrl;
+      return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
+        method: "PATCH",
+        prefer: "return=representation",
+        body: body
+      }).then(function (res) {
+        if (!res.ok) throw new Error("profile-save-failed");
+        if (res.body && res.body.length) return res.body[0];
+        // No profile row exists — PATCH silently does nothing, so create it.
+        var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
+        if (body.avatar_url) up.avatar_url = body.avatar_url;
+        return sb("khata_profiles?on_conflict=id", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: up
+        }).then(function (res2) {
+          if (!res2.ok) throw new Error("profile-save-failed");
+          return up;
+        });
+      }).then(function (saved) {
+        // Auth metadata bhi sync karein (header ka naam wahi se aata hai).
+        return updateUserMeta({ full_name: name, phone: phone || "" }).then(function () { return saved; }, function () { return saved; });
+      });
+    }).then(function (saved) {
+      btn.disabled = false;
+      var me = myProfile();
+      if (me) {
+        me.name = name; me.phone = phone || null; me.username = username || null;
+        if (saved && "avatar_url" in saved) me.avatar_url = saved.avatar_url;
+        else if (removeAvatar) me.avatar_url = null;
+      }
+      myPhone = phone;
+      if (session.user) {
+        session.user.user_metadata = session.user.user_metadata || {};
+        session.user.user_metadata.full_name = name;
+        session.user.user_metadata.phone = phone || "";
+        saveSession(session);
+      }
+      pendingAvatarFile = null; removeAvatar = false;
+      renderAccount(); renderPeople(); fillMyPhone();
+      var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+      setAvatarEl($("profilePicPreview"), me && me.avatar_url, initial);
+      $("removePicBtn").hidden = !(me && me.avatar_url);
+      setPhoneMsg("Profile save ho gaya! ✓", true);
+    }).catch(function (e) {
+      btn.disabled = false;
+      if (e && e.message === "username-taken") setPhoneMsg("Ye username kisi aur ne liya hua hai — koi aur chunein.", false);
+      else if (e && /^upload failed/.test(e.message || "")) setPhoneMsg("Photo upload nahi hui — internet check kar ke dobara try karein.", false);
+      else setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false);
+    });
   }
   function setPhoneMsg(text, ok) {
     var el = $("phoneMsg");
@@ -1907,7 +2134,7 @@
       var netText = net > 0 ? "+ " + fmtRs(net) : net < 0 ? "− " + fmtRs(-net) : "Settled";
       var last = p.last ? "Aakhri len-den: " + fmtDateLong(p.last) : "Abhi koi len-den nahi";
       html += '<button class="person" type="button" data-person="' + esc(id) + '">' +
-        '<span class="p-avatar">' + esc(initials(p.name)) + '</span>' +
+        '<span class="p-avatar">' + avatarHtml(p.avatar_url, initials(p.name)) + '</span>' +
         '<span class="p-main"><span class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</span>' +
         '<span class="p-last">' + esc(last) + '</span></span>' +
         '<span class="p-net ' + cls + '">' + esc(netText) + '</span></button>';
@@ -1917,13 +2144,16 @@
   }
 
   function renderAccount() {
-    var name = myName() || "";
+    var me = myProfile();
+    var name = (me && me.name) || myName() || "";
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-    $("headerAvatar").textContent = initial;
+    setAvatarEl($("headerAvatar"), me && me.avatar_url, initial);
     $("headerName").textContent = name || "Easy Khata";
-    $("acctAvatar").textContent = initial;
+    setAvatarEl($("acctAvatar"), me && me.avatar_url, initial);
     $("acctName").textContent = name || "—";
-    $("acctPhone").textContent = myPhone || "Number nahi diya";
+    var phoneTxt = myPhone || "Number nahi diya";
+    if (me && me.username) phoneTxt += " · @" + me.username;
+    $("acctPhone").textContent = phoneTxt;
   }
   function openPersonDetail(id) {
     if (!findPerson(id)) return;
@@ -1939,7 +2169,7 @@
     var list = personTxns(id);
     var first = null;
     list.forEach(function (t) { var d = String(t.txn_date || ""); if (d && (!first || d < first)) first = d; });
-    $("detailAvatar").textContent = initials(p.name || p.email);
+    setAvatarEl($("detailAvatar"), p.avatar_url, initials(p.name || p.email));
     $("detailName").textContent = p.name || p.email;
     $("detailSince").textContent = first ? "Pehla len-den: " + fmtDateLong(first) : "Abhi koi len-den nahi";
     var banner = $("detailBanner");
@@ -2414,7 +2644,7 @@
   $("detailRemoveBtn").addEventListener("click", function () { if (detailPersonId) deleteContact(detailPersonId); });
   $("detailDiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "given"); });
   $("detailLiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "taken"); });
-  $("acctEditBtn").addEventListener("click", function () { var b = $("acctPhoneBox"); b.hidden = !b.hidden; });
+  $("acctEditBtn").addEventListener("click", function () { var b = $("acctPhoneBox"); b.hidden = !b.hidden; if (!b.hidden) fillProfileForm(); });
   $("acctShareBtn").addEventListener("click", shareAll);
   $("acctShareMenuBtn").addEventListener("click", shareAll);
   $("acctLedgerBtn").addEventListener("click", function () {
@@ -2438,7 +2668,29 @@
   $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
   $("shareAllBtn").addEventListener("click", shareAll);
-  $("savePhoneBtn").addEventListener("click", savePhone);
+  $("savePhoneBtn").addEventListener("click", saveProfile);
+  $("profilePicInput").addEventListener("change", function () {
+    var f = $("profilePicInput").files && $("profilePicInput").files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type || "")) { setPhoneMsg("Sirf photo (image) chunein.", false); $("profilePicInput").value = ""; return; }
+    if (f.size > 8 * 1024 * 1024) { setPhoneMsg("Photo 8MB se chhoti honi chahiye.", false); $("profilePicInput").value = ""; return; }
+    pendingAvatarFile = f; removeAvatar = false;
+    try {
+      var rd = new FileReader();
+      rd.onload = function () { var prev = $("profilePicPreview"); if (prev) prev.innerHTML = '<img src="' + esc(String(rd.result || "")) + '" alt="">'; };
+      rd.readAsDataURL(f);
+    } catch (e) {}
+    $("removePicBtn").hidden = false;
+    setPhoneMsg("");
+  });
+  $("removePicBtn").addEventListener("click", function () {
+    pendingAvatarFile = null; removeAvatar = true;
+    $("profilePicInput").value = "";
+    var name = $("myNameInput").value.trim() || myName() || "";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+    setAvatarEl($("profilePicPreview"), null, initial);
+    $("removePicBtn").hidden = true;
+  });
   $("txnSearch").addEventListener("input", function (e) { txnSearchText = e.target.value; renderTxns(); });
   $("txnFilterPerson").addEventListener("change", function (e) { txnFilterPerson = e.target.value; renderTxns(); });
   // Live date filters (v21): date chunte hi list update ho — change ke saath

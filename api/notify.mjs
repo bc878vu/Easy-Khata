@@ -4,12 +4,18 @@
 //  2. The function checks the sender's Supabase JWT, then verifies
 //     that a record was just created between the sender and the recipient (last 5 min).
 //  3. Then it reads the recipient's push subscriptions (with the service-role key)
-//     and sends the notification via web-push. Expired subs (410) are deleted.
+//     and sends the notification:
+//       - rows with fcm_token  -> Firebase Cloud Messaging (Admin SDK, data-only
+//         message; firebase-messaging-sw.js shows it, even when the app is closed)
+//       - rows with endpoint   -> web-push (VAPID) — the older path, kept as fallback
+//     Expired subs (410 / unregistered FCM token) are deleted.
 //
 // Env vars (Vercel dashboard, never in the repo):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:...)
+//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:...),
+//   FIREBASE_SERVICE_ACCOUNT (the full service-account JSON string — secret!)
 import webpush from "web-push";
+import admin from "firebase-admin";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,6 +25,27 @@ webpush.setVapidDetails(
   process.env.VAPID_PUBLIC_KEY || "",
   process.env.VAPID_PRIVATE_KEY || ""
 );
+
+// Firebase Admin SDK — lazy init from the service-account JSON in the env var.
+// Never put the service-account key in the repo. If the env var is missing
+// the FCM rows are skipped (fcmSkipped) and the VAPID path still works.
+let fcmApp = null;
+let fcmInitTried = false;
+function getFcmMessaging() {
+  if (fcmApp) return fcmApp;
+  if (fcmInitTried) return null;
+  fcmInitTried = true;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) return null;
+  try {
+    const sa = JSON.parse(raw);
+    if (!sa || sa.type !== "service_account" || !sa.project_id || !sa.client_email || !sa.private_key) return null;
+    fcmApp = admin.initializeApp({ credential: admin.credential.cert(sa) }, "easy-khata-notify");
+    return fcmApp.messaging();
+  } catch (e) {
+    return null;
+  }
+}
 
 function json(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json");
@@ -70,20 +97,52 @@ export default async function handler(req, res) {
   } catch (e) { recent = false; }
   if (!recent) return json(res, 403, { error: "no_recent_record" });
 
-  // Read the recipient's subscriptions.
+  // Read the recipient's subscriptions (VAPID rows + FCM token rows).
   let subs = [];
   try {
     const r = await fetch(
-      SUPABASE_URL + "/rest/v1/khata_push_subs?select=id,endpoint,p256dh,auth&user_id=eq." + encodeURIComponent(recipientId),
+      SUPABASE_URL + "/rest/v1/khata_push_subs?select=id,endpoint,p256dh,auth,fcm_token&user_id=eq." + encodeURIComponent(recipientId),
       { headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY } }
     );
     if (r.ok) subs = await r.json();
   } catch (e) { subs = []; }
   if (!subs.length) return json(res, 200, { sent: 0, reason: "recipient_not_subscribed" });
 
+  const deleteSub = async (id) => {
+    try {
+      await fetch(SUPABASE_URL + "/rest/v1/khata_push_subs?id=eq." + encodeURIComponent(id), {
+        method: "DELETE",
+        headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY }
+      });
+    } catch (err) { /* ignore */ }
+  };
+
   const payload = JSON.stringify({ title: title, body: text, url: "/?view=notifs", tag: "easy-khata" });
-  let sent = 0, failed = 0, expired = 0;
+  // FCM data payload — strings only; the background handler shows the notification.
+  const fcmData = { title: title, body: text, url: "/?view=notifs", tag: "easy-khata" };
+  const messaging = getFcmMessaging();
+  let sent = 0, failed = 0, expired = 0, fcmSent = 0, fcmFailed = 0, fcmSkipped = 0;
   await Promise.all(subs.map(async (s) => {
+    // FCM token rows go through Firebase (closed-app delivery).
+    if (s.fcm_token) {
+      if (!messaging) { fcmSkipped++; return; }
+      try {
+        await messaging.send({ token: s.fcm_token, data: fcmData });
+        fcmSent++; sent++;
+      } catch (e) {
+        const code = (e && e.code) || "";
+        if (code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token" ||
+            code === "messaging/invalid-argument") {
+          expired++; await deleteSub(s.id);
+        } else {
+          fcmFailed++; failed++;
+        }
+      }
+      return;
+    }
+    // VAPID web-push rows (older path, kept as fallback).
+    if (!s.endpoint) { failed++; return; }
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -94,14 +153,9 @@ export default async function handler(req, res) {
       failed++;
       if (e && e.statusCode === 410) {
         expired++;
-        try {
-          await fetch(SUPABASE_URL + "/rest/v1/khata_push_subs?id=eq." + encodeURIComponent(s.id), {
-            method: "DELETE",
-            headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY }
-          });
-        } catch (err) { /* ignore */ }
+        await deleteSub(s.id);
       }
     }
   }));
-  return json(res, 200, { sent: sent, failed: failed, expired: expired });
+  return json(res, 200, { sent: sent, failed: failed, expired: expired, fcmSent: fcmSent, fcmFailed: fcmFailed, fcmSkipped: fcmSkipped });
 }
