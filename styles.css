@@ -68,9 +68,15 @@ body{
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.5;
-  padding-bottom:100px;
+  /* v24.3: footer ab fixed strip hai — content clearance context ke mutabiq:
+     auth page (koi bottom nav nahi): 48px; app screens (nav + footer): 110px
+     (body.has-nav, neeche). Pehle har jagah 100px tha. */
+  padding-bottom:48px;
   overflow-x:clip;
 }
+/* v24.3: app screens par bottom stack = bottom nav (~61px) + fixed footer
+   (~37px) — content ka aakhri card footer ke peeche na chhupe. */
+body.has-nav{padding-bottom:110px}
 h1{font-size:1.25rem;margin:0 0 8px}
 h2{font-size:1.05rem;margin:0 0 10px}
 h3{font-size:.95rem;margin:14px 0 6px}
@@ -97,14 +103,16 @@ p{margin:0 0 10px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---------- auth brand ---------- */
-.auth-brand{text-align:center;margin:28px auto 4px;max-width:440px;padding:0 14px}
-.auth-logo{width:72px;height:72px;border-radius:18px;box-shadow:var(--shadow)}
-.auth-brand h1{font-size:1.7rem;font-weight:800;margin:12px 0 4px}
-.auth-brand p{color:var(--muted);font-size:.95rem;margin:0 0 12px}
-.auth-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* v24.3: hero compact + clean — top margin 28→18px, logo 72→64px, tagline
+   balanced wrap (akela "se" dosri line mein na latke), chips chhote. */
+.auth-brand{text-align:center;margin:18px auto 4px;max-width:440px;padding:0 14px}
+.auth-logo{width:64px;height:64px;border-radius:16px;box-shadow:var(--shadow)}
+.auth-brand h1{font-size:1.6rem;font-weight:800;margin:10px 0 4px}
+.auth-brand p{color:var(--muted);font-size:.95rem;margin:0 auto 10px;max-width:340px;text-wrap:balance}
+.auth-chips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 .auth-chips span{
   background:var(--card);border:1px solid var(--line);border-radius:999px;
-  padding:5px 12px;font-size:.8rem;font-weight:600;box-shadow:var(--shadow);
+  padding:4px 11px;font-size:.78rem;font-weight:600;box-shadow:var(--shadow);
 }
 
 /* ---------- app header ---------- */
@@ -178,8 +186,8 @@ p{margin:0 0 10px}
 }
 .card.accent{border-top:3px solid var(--accent)}
 .card.setup{max-width:640px;margin:14px auto}
-.auth{max-width:440px;margin:14px auto}
-.auth .tabs{margin-bottom:12px}
+.auth{max-width:440px;margin:10px auto}
+.auth .tabs{margin-bottom:10px}
 .field{margin-bottom:10px}
 #adminAddUserBox{margin-top:12px}
 .field label{display:block;font-weight:600;font-size:.85rem;margin-bottom:4px}
@@ -198,12 +206,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .msg.err{color:var(--red)}
 .msg.ok{color:var(--green)}
 .hint{font-size:.82rem;color:var(--muted)}
+/* v24.3: auth info box — do lambe paragraphs ki jagah compact box; dono
+   meanings wahi (guest local-only + account benefits). Tight line-height,
+   chhota font, aik box mein — page ke end par khaali jagah nahi. */
+.auth-info{margin:12px 0 0;background:var(--tab-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.auth-info p{font-size:.8rem;color:var(--muted);line-height:1.45;margin:0 0 6px}
+.auth-info p:last-child{margin-bottom:0}
+.auth-info b{color:var(--ink);font-weight:700}
 /* v24: guest mode — login screen divider. (v24.1: bada Khata-screen banner
    hata diya — uski jagah header mein chhota Guest badge hai.) Theme-safe:
    accent-soft background + accent text, dono themes mein readable. */
-.guest-divider{display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:.85rem}
+.guest-divider{display:flex;align-items:center;gap:10px;margin:12px 0 10px;color:var(--muted);font-size:.85rem}
 .guest-divider::before,.guest-divider::after{content:"";flex:1;height:1px;background:var(--line)}
 .linklike{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:.9rem;text-decoration:underline}
+/* v24.3: "Password bhool gaye?" link — password field ke neeche saaf gap. */
+.forgot-row{margin-top:5px}
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:44px}
 .pw-eye{
@@ -471,7 +488,18 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 /* developer credit — only "Developed by Asad", nothing else; sits low on the
    Account screen (red-line position), colourful 3D gradient + drop shadow,
    modern professional, fully responsive. */
-.version{text-align:center;color:var(--accent);font-size:1.05rem;font-weight:800;letter-spacing:.03em;margin:110px 0 4px;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
+/* v24.3: footer FIXED at the bottom — user order 2026-11-07 (Account screenshots):
+   "Developed by Asad" hamesha neeche fixed rahe, attractive colourful style.
+   SUPERSEDES v24.2's "110px margin untouched" rule — user ne khud badla hai:
+   fixed hone par 110px spacer ki zaroorat nahi. App screens par bottom nav ke
+   THEEK UPAR (body.has-nav offset), auth page par viewport ke bilkul neeche.
+   Text EXACTLY wahi — "Developed by Asad", koi version string nahi. Gradient
+   + 3D drop-shadow wahi (neeche @supports block). Compact strip (.95rem),
+   aik line (nowrap), background taake scroll karta content peeche se na dikhe. */
+.version{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);z-index:35;text-align:center;color:var(--accent);font-size:.95rem;font-weight:800;letter-spacing:.03em;margin:0;padding:6px 10px 8px;background:var(--bg);white-space:nowrap;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
+/* Bottom nav ~61px (padding 12 + button ~48 + border 1) — footer uske theek
+   upar; +1px clearance taake nav ka top border kabhi cover na ho. */
+body.has-nav .version{bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
   .version{background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
 }

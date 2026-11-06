@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 
@@ -87,8 +87,12 @@
          nahi jata. -->
     <div class="guest-divider"><span>ya</span></div>
     <button id="guestBtn" class="btn btn-ghost btn-block" type="button">Bina Login Ke Istemal Karein</button>
-    <p class="hint">Bina login ke apna personal hisaab is phone par save karein — koi account nahi chahiye. Hisaab sirf is phone/browser par rahega.</p>
-    <p class="hint">Account banate hi aap ka naam hisaab mein aa jayega — phir dost aap ko shared kharchon ke liye chun sakenge. Aap ka phone number WhatsApp reminder ke liye hai — baad mein bhi add kar sakte hain.</p>
+    <!-- v24.3: do lambe paragraphs ki jagah compact info box — dono meanings
+         wahi (guest local-only + account benefits), text chhota. -->
+    <div class="auth-info">
+      <p>👤 <b>Bina login ke:</b> hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.</p>
+      <p>☁️ <b>Account banane par:</b> aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.</p>
+    </div>
     </div>
     <div id="forgotBox" hidden>
       <div class="field">
@@ -379,7 +383,6 @@
         <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
         <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
       </div>
-      <p class="version">Developed by Asad</p>
     </section>
 
     <section id="notifView" hidden>
@@ -499,6 +502,12 @@
     </div>
   </div>
 
-<script src="app.js?v=31"></script>
+<!-- v24.3: footer GLOBAL + FIXED — pehle sirf Account view ke andar tha
+     (Khata/auth par dikhta hi nahi tha). Ab body-level hai, har screen par
+     neeche fixed rehta hai (CSS: bottom nav ke upar app screens par, viewport
+     neeche auth page par). Text bilkul wahi: "Developed by Asad". -->
+<p class="version">Developed by Asad</p>
+
+<script src="app.js?v=32"></script>
 </body>
 </html>

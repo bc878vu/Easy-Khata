@@ -422,6 +422,9 @@
     hideSplash();
     teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
+    // v24.3: auth page par bottom nav nahi hota — fixed footer viewport ke
+    // bilkul neeche (body.has-nav hatao).
+    document.body.classList.remove("has-nav");
     $("authWrap").hidden = false;
     $("appShell").hidden = true;
     $("authBox").hidden = false;
@@ -434,6 +437,9 @@
   }
   function showApp() {
     hideSplash();
+    // v24.3: app screens par bottom nav dikhta hai — fixed footer nav ke
+    // theek upar (body.has-nav lagao).
+    document.body.classList.add("has-nav");
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
     // v24: guest mode mein notification bell nahi (koi push/notifs nahi).
