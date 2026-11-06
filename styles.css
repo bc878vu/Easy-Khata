@@ -18,6 +18,9 @@
   --red-soft:#fee2e2;
   --accent:#1d4ed8;
   --accent-soft:#dbeafe;
+  /* developer-credit gradient (light theme: blue -> violet) */
+  --credit-1:#1d4ed8;
+  --credit-2:#7c3aed;
   /* Button backgrounds: gehre rang taa ke safed text dono themes mein saaf dikhe.
      (var(--accent)/var(--green)/var(--red) dark theme mein halke hain — safed
      text un par dhundla parta hai.) */
@@ -46,6 +49,9 @@
   --red-soft:#450a0a;
   --accent:#60a5fa;
   --accent-soft:#1e3a5f;
+  /* developer-credit gradient (dark theme: light blue -> light violet) */
+  --credit-1:#60a5fa;
+  --credit-2:#a78bfa;
   --accent-btn:#1d4ed8;
   --btn-red-bg:#b91c1c;
   --btn-green-bg:#15803d;
@@ -430,7 +436,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .menu-item.danger{color:var(--red)}
 .menu-note{padding:12px 16px;font-size:.85rem;color:var(--muted);border-bottom:1px solid var(--line);background:var(--tab-bg)}
 .menu-note p{margin:0}
-.version{text-align:center;color:var(--muted);font-size:.78rem;margin:18px 0 4px}
+/* developer credit — only "Developed by Asad", nothing else; sits low on the
+   Account screen (red-line position), gradient text, fully responsive. */
+.version{text-align:center;color:var(--accent);font-size:.95rem;font-weight:700;letter-spacing:.02em;margin:60px 0 4px}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .version{background:linear-gradient(90deg,var(--credit-1),var(--credit-2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+}
 
 /* ---------- notifications / admin ---------- */
 .notifs{display:grid;gap:8px}
