@@ -53,14 +53,14 @@
 }
 *{box-sizing:border-box}
 button{font-family:inherit;color:inherit}
-html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-bottom:250px}
+html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-bottom:110px}
 body{
   margin:0;
   background:var(--bg);
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.5;
-  padding-bottom:240px;
+  padding-bottom:100px;
   overflow-x:clip;
 }
 h1{font-size:1.25rem;margin:0 0 8px}
