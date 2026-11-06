@@ -1193,13 +1193,13 @@
     $("sumGivenCount").textContent = gc ? gc + " times given" : "Nothing yet";
     $("sumTaken").textContent = fmtRs(taken);
     $("sumTakenCount").textContent = tc ? tc + " times taken" : "Nothing yet";
-    var net = given - taken; // +: I am owed, -: I owe
+    var net = given - taken; // +: to receive, -: to pay
     if (net > 0) {
       $("sumNet").textContent = fmtRs(net);
-      $("sumNetSub").textContent = "I am owed";
+      $("sumNetSub").textContent = "To receive";
     } else if (net < 0) {
       $("sumNet").textContent = fmtRs(-net);
-      $("sumNetSub").textContent = "I owe";
+      $("sumNetSub").textContent = "To pay";
     } else {
       $("sumNet").textContent = "Rs 0";
       $("sumNetSub").textContent = "Settled up";
@@ -1248,8 +1248,8 @@
   }
   function personShareText(p) {
     var s = personStats(p.id);
-    var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " — you owe me."
-      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I owe you." : "Net: settled up.";
+    var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " — you have to pay me."
+      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I have to pay you." : "Net: settled up.";
     var latest = latestLine(latestTxnWith(p.id));
     return "Easy Khata — Food Balance\n" +
       myName() + " & " + (p.name || p.email) + "\n\n" +
@@ -1265,8 +1265,8 @@
     var dc = "Debit (I gave): " + fmtRs(s.given) + " · Credit (I took): " + fmtRs(s.taken) + ".";
     var head = "Hi " + (p.name || "") + ",\n\n";
     var body, tail = "";
-    if (s.net > 0) { body = "As per Easy Khata, you owe me " + fmtRs(s.net) + " (food balance).\n" + dc; tail = "\n\nPlease check when you get a chance. Thank you!"; }
-    else if (s.net < 0) { body = "As per Easy Khata, I owe you " + fmtRs(-s.net) + " (food balance).\n" + dc; tail = "\n\nI will send it soon. Thank you!"; }
+    if (s.net > 0) { body = "As per Easy Khata, you have to pay me " + fmtRs(s.net) + " (food balance).\n" + dc; tail = "\n\nPlease check when you get a chance. Thank you!"; }
+    else if (s.net < 0) { body = "As per Easy Khata, I have to pay you " + fmtRs(-s.net) + " (food balance).\n" + dc; tail = "\n\nI will send it soon. Thank you!"; }
     else { body = "As per Easy Khata, our food balance is settled.\n" + dc; }
     return head + body + (latest ? "\n\n" + latest : "") + tail + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
   }
@@ -1374,8 +1374,8 @@
       if (t.receiver_id === myId()) taken += a;
     });
     var net = given - taken; // +: I am owed, -: I owe
-    var netLine = net > 0 ? "Net: " + fmtRs(net) + " — owed to me."
-      : net < 0 ? "Net: " + fmtRs(-net) + " — I owe." : "Net: settled up.";
+    var netLine = net > 0 ? "Net: " + fmtRs(net) + " — I will receive."
+      : net < 0 ? "Net: " + fmtRs(-net) + " — I have to pay." : "Net: settled up.";
     var latest = latestLine(latestTxn());
     var text = "Easy Khata — My Food Balance\n" +
       myName() + "\n\n" +
