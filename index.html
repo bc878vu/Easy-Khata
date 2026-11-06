@@ -10,26 +10,44 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
 
+<!-- Splash: dikhta hai jab app khul raha ho; app ready hote hi chhup jata hai -->
+<div id="splash" class="splash" aria-hidden="true">
+  <img class="splash-logo" src="icons/icon.svg" alt="Easy Khata logo" width="96" height="96">
+  <div class="splash-name">Easy Khata</div>
+  <div class="splash-tag">Doston ke saath khane ka hisaab</div>
+  <div class="splash-spinner" aria-label="Loading"></div>
+</div>
+<script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('hide');},6000);</script>
+
 <div id="setupBox" class="card setup" hidden>
-  <h2>Database setup pending</h2>
-  <p>The app is ready, but the tables are not created in Supabase yet. Run the <code>easy-khata.sql</code> file from the repo in the Supabase SQL Editor, then refresh the page.</p>
+  <h2>Database setup baaqi hai</h2>
+  <p>App tayyar hai, lekin Supabase mein tables abhi nahi bane. Repo ki <code>easy-khata.sql</code> file Supabase SQL Editor mein run karein, phir page refresh karein.</p>
 </div>
 
 <main class="wrap" id="authWrap">
+  <!-- Brand -->
+  <div class="auth-brand">
+    <img class="auth-logo" src="icons/icon.svg" alt="Easy Khata logo" width="72" height="72">
+    <h1>Easy Khata</h1>
+    <p>Doston ke saath khane ka hisaab — aasan tareeqe se</p>
+    <div class="auth-chips">
+      <span>📒 Poora hisaab</span><span>💬 WhatsApp reminder</span><span>⚡ Live update</span>
+    </div>
+  </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
     <div id="authForm">
     <div class="tabs">
       <button id="tabLogin" class="tab active" type="button">Login</button>
-      <button id="tabSignup" class="tab" type="button">New Account</button>
+      <button id="tabSignup" class="tab" type="button">Naya Account</button>
     </div>
 
     <div id="signupNameRow" class="field" hidden>
-      <label for="authName">Your name</label>
+      <label for="authName">Aap ka naam</label>
       <input id="authName" type="text" placeholder="Example: Asad" autocomplete="name">
     </div>
     <div id="signupPhoneRow" class="field" hidden>
@@ -43,41 +61,41 @@
     <div class="field">
       <label for="authPassword">Password</label>
       <div class="pw-wrap">
-        <input id="authPassword" type="password" placeholder="At least 6 characters" autocomplete="current-password">
+        <input id="authPassword" type="password" placeholder="Kam se kam 6 harf" autocomplete="current-password">
         <button id="authEye" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
       </div>
-      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Forgot password?</button></div>
+      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
     </div>
     <p id="authMsg" class="msg" role="status"></p>
-    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Log in</button>
-    <p class="hint">As soon as your account is created, your name appears in the ledger — then friends can pick you for shared expenses. Your phone number is for WhatsApp reminders — you can add it later too.</p>
+    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
+    <p class="hint">Account banate hi aap ka naam hisaab mein aa jayega — phir dost aap ko shared kharchon ke liye chun sakenge. Aap ka phone number WhatsApp reminder ke liye hai — baad mein bhi add kar sakte hain.</p>
     </div>
     <div id="forgotBox" hidden>
       <div class="field">
         <label for="forgotEmail">Email</label>
         <input id="forgotEmail" type="email" placeholder="you@email.com" autocomplete="email">
       </div>
-      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Send reset link</button>
+      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Reset link bhejein</button>
       <p id="forgotMsg" class="msg" role="status"></p>
-      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Back to login</button></p>
+      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Login par wapas</button></p>
     </div>
     <div id="resetBox" hidden>
-      <p class="muted">Enter a new password.</p>
+      <p class="muted">Naya password likhein.</p>
       <div class="field">
-        <label for="resetPassword">New password</label>
+        <label for="resetPassword">Naya password</label>
         <div class="pw-wrap">
-          <input id="resetPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+          <input id="resetPassword" type="password" placeholder="Kam se kam 6 harf" autocomplete="new-password">
           <button id="resetEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
       <div class="field">
-        <label for="resetPassword2">New password again</label>
+        <label for="resetPassword2">Naya password dobara</label>
         <div class="pw-wrap">
-          <input id="resetPassword2" type="password" placeholder="Type again" autocomplete="new-password">
+          <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
           <button id="resetEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
-      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Change password</button>
+      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Password badlein</button>
       <p id="resetMsg" class="msg" role="status"></p>
     </div>
   </section>
@@ -144,7 +162,7 @@
           <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Dost add karein (app par nahi hain)</button></div>
           <div id="addContactBox" hidden>
             <div class="field"><label for="newContactName">Naam</label><input id="newContactName" type="text" maxlength="80" placeholder="Example: Maha Chaudhary"></div>
-            <div class="field"><label for="newContactPhone">Phone number (optional — this number will link to their account later)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
+            <div class="field"><label for="newContactPhone">Phone number (optional — ye number baad mein un ke account se link ho jayega)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
             <div class="row">
               <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Choose from contacts</button>
               <button id="saveContactBtn" class="btn btn-primary" type="button">Save karein</button>
@@ -250,14 +268,14 @@
           <div class="field">
             <label for="newPass1">Naya password</label>
             <div class="pw-wrap">
-              <input id="newPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+              <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
               <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
           <div class="field">
             <label for="newPass2">Naya password dobara</label>
             <div class="pw-wrap">
-              <input id="newPass2" type="password" autocomplete="new-password" placeholder="Type again">
+              <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
               <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
@@ -286,7 +304,7 @@
         <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
         <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
       </div>
-      <p class="version">Easy Khata — App version 18</p>
+      <p class="version">Easy Khata — App version 19</p>
     </section>
 
     <section id="notifView" hidden>
@@ -303,7 +321,7 @@
       <div class="card">
         <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
         <h2 style="margin-top:10px">Admin Panel — Users</h2>
-        <p class="muted">Only the admin (Asad) can see this. Click a user — their full balance, edit, password, block and delete are all here.</p>
+        <p class="muted">Sirf admin (Asad) ye dekh sakta hai. Kisi user par click karein — un ka poora balance, edit, password, block aur delete sab yahan hai.</p>
         <p id="adminStats" class="muted"></p>
         <p id="adminMsg" class="msg" role="status"></p>
         <div id="adminUserList" class="people"></div>
@@ -329,40 +347,40 @@
           <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
         </div>
         <div id="adminEditBox" hidden>
-          <div class="field"><label for="adminEditName">Name</label><input id="adminEditName" type="text" maxlength="80"></div>
+          <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
           <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
-          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save</button>
+          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
           <p id="adminEditMsg" class="msg" role="status"></p>
         </div>
         <div id="adminPassBox" hidden>
-          <div class="field"><label for="adminNewPass1">New password</label>
+          <div class="field"><label for="adminNewPass1">Naya password</label>
             <div class="pw-wrap">
-              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
               <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
-          <div class="field"><label for="adminNewPass2">New password again</label>
+          <div class="field"><label for="adminNewPass2">Naya password dobara</label>
             <div class="pw-wrap">
-              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Type again">
+              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
               <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
-          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Save password</button>
+          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
           <p id="adminPassMsg" class="msg" role="status"></p>
         </div>
-        <h3 style="margin-top:16px">Set amount (admin)</h3>
-        <p class="muted">Create a record for this user — an opening balance or a correction. The record will be between you and this user, and they will also get a notification.</p>
-        <div class="field"><label for="adminSetAmount">Amount (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
-        <div class="field"><label>Direction</label>
+        <h3 style="margin-top:16px">Raqam set karein (admin)</h3>
+        <p class="muted">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
+        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
+        <div class="field"><label>Kisam</label>
           <div class="seg">
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> To receive from user</label>
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> To pay to user</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
           </div>
         </div>
         <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
-        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Set amount</button>
+        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Raqam set karein</button>
         <p id="adminSetMsg" class="msg" role="status"></p>
-        <h3 style="margin-top:16px">This user's ledger</h3>
+        <h3 style="margin-top:16px">Is user ka hisaab</h3>
         <div id="adminUserTxns" class="txns"></div>
         <p id="adminUserMsg" class="msg" role="status"></p>
       </div>
@@ -391,6 +409,6 @@
     </div>
   </div>
 
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>

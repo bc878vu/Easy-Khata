@@ -197,6 +197,44 @@
     return txns.filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
   }
 
+  /* ---------- settled-history lock ----------
+     Jo hisaab settle ho jaye, woh history mein save rehta hai — edit/delete nahi ho sakta.
+     Rule: settlement record (note "Settled up" se shuru) hamesha locked.
+     Har dost ke liye: un ki LATEST settlement ki date nikalo; us date tak ke (aur us se
+     pehle ke) saare records locked history hain. Us date ke BAAD ke records normal hain
+     (editable/deletable) — agle settlement tak. Net 0 bina settlement ke lock NAHI karta. */
+  var lockedCache = null;
+  function isSettlementNote(note) {
+    return String(note || "").indexOf("Settled up") === 0;
+  }
+  function pairKey(a, b) {
+    return a < b ? a + "|" + b : b + "|" + a;
+  }
+  function computeLockedIds() {
+    // Per unordered pair of people: latest settlement date; every record of that
+    // pair dated on/before it is locked history. Settlement rows are always locked.
+    var latestByPair = {};
+    txns.forEach(function (t) {
+      if (!isSettlementNote(t.note)) return;
+      var d = String(t.txn_date || "");
+      var k = pairKey(t.payer_id, t.receiver_id);
+      if (d && (!latestByPair[k] || d > latestByPair[k])) latestByPair[k] = d;
+    });
+    var locked = {};
+    txns.forEach(function (t) {
+      if (isSettlementNote(t.note)) { locked[t.id] = true; return; }
+      var latest = latestByPair[pairKey(t.payer_id, t.receiver_id)];
+      if (latest && String(t.txn_date || "") <= latest) locked[t.id] = true;
+    });
+    return locked;
+  }
+  function isTxnLocked(t) {
+    if (!t) return false;
+    if (!lockedCache) lockedCache = computeLockedIds();
+    return !!lockedCache[t.id];
+  }
+  var LOCK_MSG = "Settled hisaab ko edit/delete nahi kar sakte — ye history hai.";
+
   /* ---------- auth UI ---------- */
   function setAuthMsg(text, ok) {
     var el = $("authMsg");
@@ -214,11 +252,18 @@
     $("signupNameRow").hidden = authMode !== "signup";
     $("signupPhoneRow").hidden = authMode !== "signup";
     $("forgotRow").hidden = authMode !== "login";
-    $("authSubmitBtn").textContent = authMode === "signup" ? "Create account" : "Log in";
+    $("authSubmitBtn").textContent = authMode === "signup" ? "Account banayein" : "Login karein";
     $("authPassword").setAttribute("autocomplete", authMode === "signup" ? "new-password" : "current-password");
     setAuthMsg("");
   }
+  function hideSplash() {
+    // Splash sirf tab chhupta hai jab app ready ho (auth ya khata dikhe).
+    // 6-second inline fallback bhi hai (index.html) agar JS atak jaye.
+    var s = $("splash");
+    if (s) s.classList.add("hide");
+  }
   function showAuth() {
+    hideSplash();
     teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
     $("authWrap").hidden = false;
@@ -231,6 +276,7 @@
     renderAuthMode();
   }
   function showApp() {
+    hideSplash();
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
     renderAccount();
@@ -277,15 +323,15 @@
     // Show the server's real reason — a generic line had hidden the real error (2026-11-05).
     var raw = res.body && (res.body.msg || res.body.message || res.body.error_description || res.body.error);
     var m = typeof raw === "string" ? raw : "";
-    if (/invalid login/i.test(m)) return "Email or password is wrong.";
-    if (/already registered|already exists/i.test(m)) return "An account already exists with this email — please log in.";
-    if (/email not confirmed/i.test(m)) return "Email is not confirmed — check your inbox for the confirmation link, then log in.";
-    if (/only request this after|too many requests|rate limit/i.test(m) || res.status === 429) return "Please wait a bit and try again.";
-    if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "There was a problem sending the confirmation email — please try again in a bit.";
-    if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password must be at least 6 characters.";
-    if (/email/i.test(m) && /invalid/i.test(m)) return "Enter a valid email.";
+    if (/invalid login/i.test(m)) return "Email ya password ghalat hai.";
+    if (/already registered|already exists/i.test(m)) return "Is email par account pehle se hai — login karein.";
+    if (/email not confirmed/i.test(m)) return "Email confirm nahi hui — inbox mein confirmation link check karein, phir login karein.";
+    if (/only request this after|too many requests|rate limit/i.test(m) || res.status === 429) return "Thori der ruk kar dobara try karein.";
+    if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "Confirmation email bhejne mein masla hua — thori der baad dobara try karein.";
+    if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password kam se kam 6 harf ka ho.";
+    if (/email/i.test(m) && /invalid/i.test(m)) return "Sahi email likhein.";
     if (!m) { try { console.warn("EasyKhata auth error", res.status, res.body); } catch (e) {} }
-    return m || "Something went wrong — please try again.";
+    return m || "Kuch ghalat ho gaya — dobara try karein.";
   }
 
   function ensureProfile() {
@@ -330,7 +376,7 @@
     if (!body.access_token) {
       var pendingUser = body.user || (body.id && body.email ? body : null);
       if (pendingUser) {
-        setAuthMsg("Account created! A confirmation link has been sent to your email — click it, then log in.", true);
+        setAuthMsg("Account ban gaya! Confirmation link aap ke email par bhej diya hai — us par click karein, phir login karein.", true);
         authMode = "login";
         renderAuthMode();
         return;
@@ -339,7 +385,7 @@
       return;
     }
     saveSession(res.body);
-    setAuthMsg("Done!", true);
+    setAuthMsg("Ho gaya!", true);
     ensureProfile().catch(function () {}).then(function () {
       showApp();
       loadAll();
@@ -351,10 +397,10 @@
     var password = $("authPassword").value;
     var name = $("authName").value.trim();
     var phone = $("authPhone").value.trim();
-    if (!email || !password) { setAuthMsg("Email and password are required.", false); return; }
-    if (authMode === "signup" && !name) { setAuthMsg("Please enter your name.", false); return; }
-    if (authMode === "signup" && phone && !normPhone(phone)) { setAuthMsg("Enter a valid phone number (example: 0300 1234567).", false); return; }
-    if (password.length < 6) { setAuthMsg("Password must be at least 6 characters.", false); return; }
+    if (!email || !password) { setAuthMsg("Email aur password zaroori hain.", false); return; }
+    if (authMode === "signup" && !name) { setAuthMsg("Apna naam likhein.", false); return; }
+    if (authMode === "signup" && phone && !normPhone(phone)) { setAuthMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
+    if (password.length < 6) { setAuthMsg("Password kam se kam 6 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
     btn.disabled = true;
     var p = authMode === "signup"
@@ -376,7 +422,7 @@
       afterAuth(res);
     }).catch(function () {
       btn.disabled = false;
-      setAuthMsg("Can't reach the internet or server.", false);
+      setAuthMsg("Internet ya server se rabta nahi ho raha.", false);
     });
   }
 
@@ -413,17 +459,17 @@
   }
   function doForgot() {
     var email = $("forgotEmail").value.trim();
-    if (!email) { setForgotMsg("Enter your email.", false); return; }
+    if (!email) { setForgotMsg("Apna email likhein.", false); return; }
     var btn = $("forgotSendBtn");
     btn.disabled = true;
     authCall("/recover", { email: email, redirect_to: window.location.origin + "/" })
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) { setForgotMsg(authErrorText(res), false); return; }
-        setForgotMsg("Reset link sent — check your email inbox (and spam/junk too).", true);
+        setForgotMsg("Reset link bhej diya — apna inbox (aur spam/junk bhi) check karein.", true);
       }).catch(function () {
         btn.disabled = false;
-        setForgotMsg("Can't reach the internet or server.", false);
+        setForgotMsg("Internet ya server se rabta nahi ho raha.", false);
       });
   }
   function updatePassword(pw) {
@@ -444,8 +490,8 @@
   function doChangePass() {
     var p1 = $("newPass1").value;
     var p2 = $("newPass2").value;
-    if (!p1 || p1.length < 6) { setPassMsg("Password must be at least 6 characters.", false); return; }
-    if (p1 !== p2) { setPassMsg("Both passwords must match.", false); return; }
+    if (!p1 || p1.length < 6) { setPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setPassMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("savePassBtn");
     btn.disabled = true;
     updatePassword(p1).then(function (res) {
@@ -453,17 +499,17 @@
       if (!res.ok) { setPassMsg(authErrorText(res), false); return; }
       $("newPass1").value = "";
       $("newPass2").value = "";
-      setPassMsg("Password changed!", true);
+      setPassMsg("Password badal gaya!", true);
     }).catch(function () {
       btn.disabled = false;
-      setPassMsg("Can't reach the internet or server.", false);
+      setPassMsg("Internet ya server se rabta nahi ho raha.", false);
     });
   }
   function doReset() {
     var p1 = $("resetPassword").value;
     var p2 = $("resetPassword2").value;
-    if (!p1 || p1.length < 6) { setResetMsg("Password must be at least 6 characters.", false); return; }
-    if (p1 !== p2) { setResetMsg("Both passwords must match.", false); return; }
+    if (!p1 || p1.length < 6) { setResetMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setResetMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("resetBtn");
     btn.disabled = true;
     updatePassword(p1).then(function (res) {
@@ -473,10 +519,10 @@
       $("resetPassword2").value = "";
       saveSession(null);
       showAuth();
-      setAuthMsg("Password changed — now log in with your new password.", true);
+      setAuthMsg("Password badal gaya — naye password se login karein.", true);
     }).catch(function () {
       btn.disabled = false;
-      setResetMsg("Can't reach the internet or server.", false);
+      setResetMsg("Internet ya server se rabta nahi ho raha.", false);
     });
   }
   // If the app is opened from an email reset/confirm link, grab that session.
@@ -565,11 +611,12 @@
       loadNotifs();
       loadContacts();
     }).catch(function () {
-      setTxnMsg("Records couldn't be loaded — please refresh.", false);
+      setTxnMsg("Records load nahi hue — refresh karein.", false);
     });
   }
 
   function renderAll() {
+    lockedCache = computeLockedIds(); // settled-history lock map, fresh on every data change
     renderSummary();
     renderMonthStats();
     renderInsights();
@@ -656,17 +703,17 @@
     var a = fmtRs(t.amount);
     var note = t.note || "Food";
     var date = fmtDate(t.txn_date);
-    if (t.payer_id === recipientId) return "You gave " + other + " " + a + " — " + note + " · " + date;
-    return actor + " gave you " + a + " — " + note + " · " + date;
+    if (t.payer_id === recipientId) return "Aap ne " + other + " ko " + a + " diye — " + note + " · " + date;
+    return actor + " ne aap ko " + a + " diye — " + note + " · " + date;
   }
   function sendNotif(userId, kind, txn) {
     if (!userId || userId === myId() || !txn) return;
     var real = false;
     profiles.forEach(function (p) { if (p.id === userId) real = true; });
     if (!real) return; // a manual contact has no account — no notification can go to them
-    var title = kind === "settle" ? "Balance settled"
-      : kind === "admin" ? "Admin added a record"
-      : myName() + " added a record";
+    var title = kind === "settle" ? "Hisaab barabar ho gaya"
+      : kind === "admin" ? "Admin ne record add kiya"
+      : myName() + " ne record add kiya";
     sb("khata_notifications", { method: "POST", body: {
       user_id: userId, actor_id: myId(), txn_id: txn.id || null, kind: kind,
       title: title, body: notifBodyFor(txn, userId)
@@ -697,7 +744,7 @@
   }
   function renderNotifList() {
     if (!notifs.length) {
-      $("notifList").innerHTML = '<p class="empty">No notifications yet.</p>';
+      $("notifList").innerHTML = '<p class="empty">Abhi koi notification nahi.</p>';
       return;
     }
     var html = "";
@@ -730,6 +777,7 @@
       .then(function (res) {
         if (!res.ok) return 0;
         myContacts = (Array.isArray(res.body) ? res.body : []).map(function (c) { c.manual = true; return c; });
+        renderSummary(); // BUGFIX (v19): contacts Total Balance ko badalte hain — summary yahan dobara chahiye, warna manual dost (Ayaz) cards mein nahi aate
         renderPeople();
         renderPersonSelect();
         renderTxnFilterOptions();
@@ -792,13 +840,13 @@
     var phoneRaw = $("newContactPhone").value.trim();
     if (!name) { setContactMsg("Dost ka naam likhein.", false); return; }
     var phone = phoneRaw ? normPhone(phoneRaw) : "";
-    if (phoneRaw && !phone) { setContactMsg("Enter a valid phone number (example: 0300 1234567).", false); return; }
+    if (phoneRaw && !phone) { setContactMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
     var dupProfile = null;
     profiles.forEach(function (p) { if (phone && contactPhoneMatch(phone, p.phone)) dupProfile = p; });
-    if (dupProfile) { setContactMsg("This number is already on the app (" + (dupProfile.name || dupProfile.email) + ") — select them directly.", false); return; }
+    if (dupProfile) { setContactMsg("Ye number pehle se app par hai (" + (dupProfile.name || dupProfile.email) + ") — unhein seedha chunein.", false); return; }
     var dupContact = null;
     myContacts.forEach(function (c) { if (phone && contactPhoneMatch(phone, c.phone)) dupContact = c; });
-    if (dupContact) { setContactMsg("This number is already in your contacts (" + (dupContact.name || "") + ").", false); return; }
+    if (dupContact) { setContactMsg("Ye number pehle se aap ke contacts mein hai (" + (dupContact.name || "") + ").", false); return; }
     var btn = $("saveContactBtn");
     btn.disabled = true;
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: {
@@ -811,6 +859,7 @@
       $("newContactName").value = "";
       $("newContactPhone").value = "";
       setContactMsg("Dost add ho gaya!", true);
+      renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       if (created) $("txnPerson").value = created.id;
     }).catch(function () { btn.disabled = false; setContactMsg("Internet ya server se rabta nahi ho raha.", false); });
@@ -821,8 +870,12 @@
     if (!c) return;
     // My own manual contact — can be deleted even with records (user request 2026-11-05).
     // If there are records, those are deleted first (only the ones I created), then the contact.
-    var count = 0;
-    txns.forEach(function (t) { if (t.payer_id === id || t.receiver_id === id) count++; });
+    // BUT: settled history can never be deleted — if any record is locked, refuse.
+    var count = 0, hasLocked = false;
+    txns.forEach(function (t) {
+      if (t.payer_id === id || t.receiver_id === id) { count++; if (isTxnLocked(t)) hasLocked = true; }
+    });
+    if (hasLocked) { setPeopleMsg("Is dost ka settled hisaab history mein save hai — usay delete nahi kar sakte.", false); return; }
     var text = count > 0
       ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records bhi delete ho jayenge — ye wapas nahi hoga."
       : "'" + (c.name || "") + "' ko contacts se remove karein?";
@@ -830,19 +883,20 @@
       var deleteRow = function () {
         sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
           .then(function (res) {
-            if (!res.ok) { setPeopleMsg("Contact couldn't be deleted.", false); return; }
+            if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
             myContacts = myContacts.filter(function (x) { return x.id !== id; });
+            renderSummary();
             renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
-            setPeopleMsg("Contact removed.", true);
-          }).catch(function () { setPeopleMsg("Can't reach the internet or server.", false); });
+            setPeopleMsg("Contact remove ho gaya.", true);
+          }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
       };
       if (count === 0) { deleteRow(); return; }
       sb("khata_transactions?created_by=eq." + encodeURIComponent(myId()) + "&or=(payer_id.eq." + encodeURIComponent(id) + ",receiver_id.eq." + encodeURIComponent(id) + ")", { method: "DELETE" })
         .then(function (res) {
-          if (!res.ok) { setPeopleMsg("Records couldn't be deleted — please try again.", false); return; }
+          if (!res.ok) { setPeopleMsg("Records delete nahi hue — dobara try karein.", false); return; }
           refreshTxns();
           deleteRow();
-        }).catch(function () { setPeopleMsg("Can't reach the internet or server.", false); });
+        }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
     });
   }
   function pickContact() {
@@ -975,13 +1029,13 @@
     $("navAdminBtn").hidden = false;
     sb("rpc/admin_list_users", { method: "POST", body: {} })
       .then(function (res) {
-        if (!res.ok) { setAdminMsg("Users couldn't be loaded — please try again.", false); return; }
+        if (!res.ok) { setAdminMsg("Users load nahi hue — dobara try karein.", false); return; }
         adminUsers = Array.isArray(res.body) ? res.body : [];
         var total = 0;
         adminUsers.forEach(function (u) { total += Number(u.records) || 0; });
-        $("adminStats").textContent = "Total users: " + adminUsers.length + " · Total records: " + total;
+        $("adminStats").textContent = "Kull users: " + adminUsers.length + " · Kull records: " + total;
         if (!adminUsers.length) {
-          $("adminUserList").innerHTML = '<p class="empty">No users yet.</p>';
+          $("adminUserList").innerHTML = '<p class="empty">Abhi koi user nahi.</p>';
           return;
         }
         var me = myId();
@@ -993,28 +1047,28 @@
           var del = u.id === me ? "" : '<button class="btn-danger" type="button" data-admin-del="' + esc(u.id) + '">Delete user</button>';
           html += '<div class="person admin-user" data-admin-open="' + esc(u.id) + '"><div><div class="p-name">' + esc(u.name || u.email) + badge + '</div>' +
             '<div class="p-detail">' + esc(u.email || "") + (u.phone ? ' · ' + esc(u.phone) : '') + '</div>' +
-            '<div class="p-detail">' + (Number(u.records) || 0) + ' record · Joined ' + esc(fmtDate(u.created_at)) + '</div></div>' +
+            '<div class="p-detail">' + (Number(u.records) || 0) + ' record · Shamil ' + esc(fmtDate(u.created_at)) + '</div></div>' +
             '<div class="p-actions">' + del + '</div></div>';
         });
         $("adminUserList").innerHTML = html;
-      }).catch(function () { setAdminMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function deleteUser(id) {
     var p = null;
     adminUsers.forEach(function (x) { if (x.id === id) p = x; });
     if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
-    if (!window.confirm("'" + (p.name || p.email) + "' — delete them?\n\nTheir account, profile and all records will be deleted. This can't be undone.")) return;
+    if (!window.confirm("'" + (p.name || p.email) + "' — delete karein?\n\nUn ka account, profile aur saare records delete ho jayenge. Ye wapas nahi hoga.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
-        if (!res.ok) { setAdminMsg("User couldn't be deleted — please try again.", false); return; }
-        setAdminMsg("User deleted.", true);
+        if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
+        setAdminMsg("User delete ho gaya.", true);
         if (adminCurrentUser && adminCurrentUser.id === id) {
           adminCurrentUser = null;
           showView("admin");
         }
         loadAll();
-      }).catch(function () { setAdminMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function setAdminUserMsg(text, ok) {
     var el = $("adminUserMsg");
@@ -1062,19 +1116,20 @@
       if (t.receiver_id === u.id) taken += a;
     });
     $("adminUserSummary").innerHTML =
-      '<div class="sum-card"><span class="sum-label">Given</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
-      '<div class="sum-card"><span class="sum-label">Taken</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
-      '<div class="sum-card net"><span class="sum-label">Net (given − taken)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
+      '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
+      '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
+      '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
     if (!mine.length) {
-      $("adminUserTxns").innerHTML = '<p class="empty">This user has no records.</p>';
+      $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>';
     } else {
       var html = "";
       mine.forEach(function (t) {
         var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
-        var dir = t.payer_id === u.id ? "→ " + other + " (given)" : "← " + other + " (taken)";
-        html += '<div class="txn"><div><div class="t-main">' + esc(dir) + '</div>' +
-          '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div></div>' +
-          '<div class="t-right"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span></div></div>';
+        var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
+        var lock = isTxnLocked(t) ? ' <span class="t-lock">🔒 Settled</span>' : "";
+        html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div>' +
+          '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
+          '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + lock + '</div></div>';
       });
       $("adminUserTxns").innerHTML = html;
     }
@@ -1084,56 +1139,56 @@
     if (!isAdmin() || !adminCurrentUser) return;
     var name = $("adminEditName").value.trim();
     var phone = $("adminEditPhone").value.trim();
-    if (!name) { setAdminEditMsg("Name can't be empty.", false); return; }
+    if (!name) { setAdminEditMsg("Naam khaali nahi ho sakta.", false); return; }
     var btn = $("adminEditSaveBtn");
     btn.disabled = true;
     sb("rpc/admin_update_user", { method: "POST", body: { p_target: adminCurrentUser.id, p_name: name, p_phone: phone } })
       .then(function (res) {
         btn.disabled = false;
-        if (!res.ok) { setAdminEditMsg("Couldn't be updated — please try again.", false); return; }
+        if (!res.ok) { setAdminEditMsg("Update nahi hua — dobara try karein.", false); return; }
         adminCurrentUser.name = name;
         adminCurrentUser.phone = phone || null;
         $("adminUserTitle").textContent = name;
         $("adminUserPhone").textContent = phone || "—";
-        setAdminEditMsg("User updated.", true);
+        setAdminEditMsg("User update ho gaya.", true);
         loadAll();
-      }).catch(function () { btn.disabled = false; setAdminEditMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { btn.disabled = false; setAdminEditMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function saveAdminPass() {
     if (!isAdmin() || !adminCurrentUser) return;
     var p1 = $("adminNewPass1").value;
     var p2 = $("adminNewPass2").value;
-    if (!p1 || p1.length < 6) { setAdminPassMsg("Password must be at least 6 characters.", false); return; }
-    if (p1 !== p2) { setAdminPassMsg("Both passwords must match.", false); return; }
+    if (!p1 || p1.length < 6) { setAdminPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (p1 !== p2) { setAdminPassMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("adminPassSaveBtn");
     btn.disabled = true;
     sb("rpc/admin_set_user_password", { method: "POST", body: { p_target: adminCurrentUser.id, p_password: p1 } })
       .then(function (res) {
         btn.disabled = false;
-        if (!res.ok) { setAdminPassMsg("Password couldn't be changed — please try again.", false); return; }
+        if (!res.ok) { setAdminPassMsg("Password nahi badla — dobara try karein.", false); return; }
         $("adminNewPass1").value = "";
         $("adminNewPass2").value = "";
-        setAdminPassMsg("Password changed — the user can log in with the new password.", true);
-      }).catch(function () { btn.disabled = false; setAdminPassMsg("Can't reach the internet or server.", false); });
+        setAdminPassMsg("Password badal gaya — user naye password se login kar sakta hai.", true);
+      }).catch(function () { btn.disabled = false; setAdminPassMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function toggleAdminBlock() {
     if (!isAdmin() || !adminCurrentUser) return;
     var u = adminCurrentUser;
-    if (u.id === myId()) { setAdminUserMsg("You can't block yourself.", false); return; }
+    if (u.id === myId()) { setAdminUserMsg("Khud ko block nahi kar sakte.", false); return; }
     var blocking = !u.blocked;
     if (!window.confirm(blocking
-      ? ("'" + (u.name || u.email) + "' — BLOCK them?\n\nThey won't be able to log in again (their data will stay safe).")
-      : ("'" + (u.name || u.email) + "' — UNBLOCK them?"))) return;
+      ? ("'" + (u.name || u.email) + "' — BLOCK karein?\n\nWo dobara login nahi kar sakega (un ka data mehfooz rahega).")
+      : ("'" + (u.name || u.email) + "' — UNBLOCK karein?"))) return;
     sb("rpc/admin_set_user_blocked", { method: "POST", body: { p_target: u.id, p_blocked: blocking } })
       .then(function (res) {
-        if (!res.ok) { setAdminUserMsg("Block couldn't be updated — please try again.", false); return; }
+        if (!res.ok) { setAdminUserMsg("Block update nahi hua — dobara try karein.", false); return; }
         u.blocked = blocking;
         $("adminBlockBtn").textContent = blocking ? "Unblock" : "Block";
         $("adminUserBadges").innerHTML = (u.id === myId() ? '<span class="badge-admin">Admin (you)</span> ' : '') +
           (blocking ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
-        setAdminUserMsg(blocking ? "User blocked — they won't be able to log in again." : "User unblocked.", true);
+        setAdminUserMsg(blocking ? "User block ho gaya — ab login nahi kar sakega." : "User unblock ho gaya.", true);
         loadAll();
-      }).catch(function () { setAdminUserMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { setAdminUserMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
 
   function setAdminSetMsg(text, ok) {
@@ -1144,9 +1199,9 @@
   function saveAdminSet() {
     if (!isAdmin() || !adminCurrentUser) return;
     var amount = parseFloat($("adminSetAmount").value);
-    if (!amount || amount <= 0) { setAdminSetMsg("Enter a valid amount.", false); return; }
+    if (!amount || amount <= 0) { setAdminSetMsg("Sahi raqam likhein.", false); return; }
     var dir = (document.querySelector('input[name="adminSetDir"]:checked') || {}).value || "take";
-    var note = $("adminSetNote").value.trim() || "Admin set the amount";
+    var note = $("adminSetNote").value.trim() || "Admin ne raqam set ki";
     var me = myId();
     var u = adminCurrentUser;
     var body = {
@@ -1159,19 +1214,19 @@
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         btn.disabled = false;
-        if (!res.ok) { setAdminSetMsg("Amount couldn't be set — please try again.", false); return; }
+        if (!res.ok) { setAdminSetMsg("Raqam set nahi hui — dobara try karein.", false); return; }
         var created = res.body && res.body[0];
         if (created) {
           sendNotif(u.id, "admin", created);
-          triggerPush(u.id, "Admin added a record", notifBodyFor(created, u.id));
+          triggerPush(u.id, "Admin ne record add kiya", notifBodyFor(created, u.id));
           txns.unshift(created);
         }
         $("adminSetAmount").value = "";
         $("adminSetNote").value = "";
-        setAdminSetMsg("Amount set!", true);
+        setAdminSetMsg("Raqam set ho gayi!", true);
         openAdminUser(u.id);
         loadAll();
-      }).catch(function () { btn.disabled = false; setAdminSetMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { btn.disabled = false; setAdminSetMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
 
   function renderMonthStats() {
@@ -1225,19 +1280,19 @@
   function finishPhoneSave(phone) {
     myPhone = phone;
     profiles.forEach(function (p) { if (p.id === myId()) p.phone = phone || null; });
-    setPhoneMsg(phone ? "Number saved!" : "Number removed.", true);
+    setPhoneMsg(phone ? "Number save ho gaya!" : "Number hata diya.", true);
   }
   function savePhone() {
     var phone = $("myPhone").value.trim();
-    if (phone && !normPhone(phone)) { setPhoneMsg("Enter a valid phone number (example: 0300 1234567).", false); return; }
+    if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
     sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
       method: "PATCH",
       prefer: "return=representation",
       body: { phone: phone || null }
     }).then(function (res) {
       if (!res.ok) {
-        if (res.body && res.body.code === "42703") { setPhoneMsg("The phone column isn't in the database yet — run easy-khata-v2.sql first.", false); return; }
-        setPhoneMsg("Number couldn't be saved — please try again.", false); return;
+        if (res.body && res.body.code === "42703") { setPhoneMsg("Phone wala column abhi database mein nahi hai — pehle easy-khata-v2.sql run karein.", false); return; }
+        setPhoneMsg("Number save nahi hua — dobara try karein.", false); return;
       }
       if (res.body && res.body.length) { finishPhoneSave(phone); return; }
       // No profile row exists — PATCH silently does nothing, so create it with an upsert.
@@ -1247,10 +1302,10 @@
         prefer: "resolution=merge-duplicates,return=minimal",
         body: { id: myId(), name: meta.full_name || myName(), email: (session.user && session.user.email) || "", phone: phone || null }
       }).then(function (res2) {
-        if (!res2.ok) { setPhoneMsg("Number couldn't be saved — please try again.", false); return; }
+        if (!res2.ok) { setPhoneMsg("Number save nahi hua — dobara try karein.", false); return; }
         finishPhoneSave(phone);
-      }).catch(function () { setPhoneMsg("Can't reach the internet or server.", false); });
-    }).catch(function () { setPhoneMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
+    }).catch(function () { setPhoneMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function setPhoneMsg(text, ok) {
     var el = $("phoneMsg");
@@ -1322,12 +1377,12 @@
   function personShareText(p) {
     var s = personStats(p.id);
     var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " — you have to pay me."
-      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I have to pay you." : "Net: settled up.";
+      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I have to pay you." : "Net: settled up — no balance.";
     var latest = latestLine(latestTxnWith(p.id));
     return "Easy Khata — Food Balance\n" +
       myName() + " & " + (p.name || p.email) + "\n\n" +
       "Debit (I gave): " + fmtRs(s.given) + "\n" +
-      "Credit (I took): " + fmtRs(s.taken) + "\n" +
+      "Credit (I took): " + fmtRs(s.taken) + "\n\n" +
       netLine + "\n" +
       (latest ? "\n" + latest + "\n" : "") +
       "\nEasy Khata: " + APP_SHORT_URL;
@@ -1335,17 +1390,18 @@
   function personRemindText(p) {
     var s = personStats(p.id);
     var latest = latestLine(latestTxnWith(p.id));
-    var dc = "Debit (I gave): " + fmtRs(s.given) + " · Credit (I took): " + fmtRs(s.taken) + ".";
+    var dc = "Debit (I gave): " + fmtRs(s.given) + "\nCredit (I took): " + fmtRs(s.taken) + ".";
     var head = "Hi " + (p.name || "") + ",\n\n";
-    var body, tail = "";
-    if (s.net > 0) { body = "As per Easy Khata, you have to pay me " + fmtRs(s.net) + " (food balance).\n" + dc; tail = "\n\nPlease check when you get a chance. Thank you!"; }
-    else if (s.net < 0) { body = "As per Easy Khata, I have to pay you " + fmtRs(-s.net) + " (food balance).\n" + dc; tail = "\n\nI will send it soon. Thank you!"; }
-    else { body = "As per Easy Khata, our food balance is settled.\n" + dc; }
-    return head + body + (latest ? "\n\n" + latest : "") + tail + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
+    var netLine, tail = "";
+    if (s.net > 0) { netLine = "You have to pay me: " + fmtRs(s.net); tail = "\n\nPlease check when you get a chance. Thank you!"; }
+    else if (s.net < 0) { netLine = "I have to pay you: " + fmtRs(-s.net); tail = "\n\nI will send it soon. Thank you!"; }
+    else { netLine = "Settled up — no balance."; tail = "\n\nThank you!"; }
+    return head + "As per Easy Khata, your food balance is:\n\n" + netLine + "\n\n" + dc +
+      (latest ? "\n\n" + latest : "") + tail + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
   }
   function shareText(text) {
     if (navigator.share) return navigator.share({ text: text }).catch(function () {});
-    return copyText(text).then(function () { setPeopleMsg("Text copied — paste it in WhatsApp or any app.", true); });
+    return copyText(text).then(function () { setPeopleMsg("Text copy ho gaya — WhatsApp ya kisi bhi app mein paste karein.", true); });
   }
   function findPerson(id) {
     var found = null;
@@ -1387,7 +1443,7 @@
         if (res.ok && res.body && res.body.length) return;
         return sb("khata_notifications", { method: "POST", body: {
           user_id: id, actor_id: myId(), txn_id: null, kind: "remind",
-          title: myName() + " reminded you", body: text
+          title: myName() + " ne yaad dilaya", body: text
         } });
       }).catch(function () {});
   }
@@ -1401,15 +1457,15 @@
     if (p.phone && normPhone(p.phone)) {
       copyText(text).catch(function () {});
       openWaLink(waLink(p.phone, text));
-      setPeopleMsg("Opening WhatsApp — if it doesn't open, the text is copied, paste it in WhatsApp.", true);
+      setPeopleMsg("WhatsApp khul raha hai — agar na khule to text copy hai, WhatsApp mein paste karein.", true);
       if (real && s.net) sendRemindNotif(id, text);
       return;
     }
     copyText(text).then(function () {
-      setPeopleMsg("This friend has no WhatsApp number — the reminder text is copied, please send it yourself.", true);
+      setPeopleMsg("Is dost ka WhatsApp number nahi hai — reminder text copy ho gaya, khud bhej dein.", true);
       if (real && s.net) sendRemindNotif(id, text);
     }).catch(function () {
-      setPeopleMsg("Couldn't copy — save a number or write the text yourself and send it.", false);
+      setPeopleMsg("Copy nahi hua — number save karein ya text khud likh kar bhej dein.", false);
     });
   }
   function settlePerson(id) {
@@ -1433,7 +1489,7 @@
       .then(function (res) {
         if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara try karein.", false); return; }
         var created = res.body && res.body[0];
-        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Balance settled", notifBodyFor(created, id)); }
+        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
         setPeopleMsg("Hisaab barabar ho gaya!", true);
         loadAll();
       }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
@@ -1448,17 +1504,17 @@
     });
     var net = given - taken; // +: I am owed, -: I owe
     var netLine = net > 0 ? "Net: " + fmtRs(net) + " — I will receive."
-      : net < 0 ? "Net: " + fmtRs(-net) + " — I have to pay." : "Net: settled up.";
+      : net < 0 ? "Net: " + fmtRs(-net) + " — I have to pay." : "Net: settled up — no balance.";
     var latest = latestLine(latestTxn());
     var text = "Easy Khata — My Food Balance\n" +
       myName() + "\n\n" +
       "Debit (I gave): " + fmtRs(given) + "\n" +
-      "Credit (I took): " + fmtRs(taken) + "\n" +
+      "Credit (I took): " + fmtRs(taken) + "\n\n" +
       netLine + "\n" +
       (latest ? "\n" + latest + "\n" : "") +
       "\nEasy Khata: " + APP_SHORT_URL;
     if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
-    copyText(text).then(function () { setTxnMsg("Balance copied — paste it in any app.", true); });
+    copyText(text).then(function () { setTxnMsg("Balance copy ho gaya — kisi bhi app mein paste karein.", true); });
   }
 
   function renderPeople() {
@@ -1543,8 +1599,15 @@
       $("detailTxns").innerHTML = '<p class="empty">Abhi koi len-den nahi — neeche se pehla record add karein.</p>';
       return;
     }
+    // Newest first — defensive sort (API already returns this order, but the running
+    // balance below is only right if the order is newest-first).
+    var sorted = list.slice().sort(function (a, b) {
+      var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
+      if (d) return d;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    });
     // Running balance, oldest first, then show newest first.
-    var asc = list.slice().reverse();
+    var asc = sorted.slice().reverse();
     var run = 0;
     var balById = {};
     asc.forEach(function (t) {
@@ -1554,7 +1617,7 @@
       balById[t.id] = run;
     });
     var html = '<div class="dtable-head"><span>TIME</span><span>DIYE</span><span>LIYE</span></div>';
-    list.forEach(function (t) {
+    sorted.forEach(function (t) {
       var a = Number(t.amount) || 0;
       var iGave = t.payer_id === me;
       var bal = balById[t.id];
@@ -1563,7 +1626,9 @@
         : bal < 0 ? "Bal: " + fmtRs(-bal) + " · dene hain" : "Bal: Rs 0 · settled";
       var timeStr = fmtTime(t.created_at);
       var btns = "";
-      if (t.created_by === me) {
+      if (isTxnLocked(t)) {
+        btns = '<span class="t-lock">🔒 Settled</span>';
+      } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       } else if (isAdmin()) {
@@ -1642,7 +1707,7 @@
   function csvCell(v) { return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
   function exportCsv() {
     var list = filteredTxns();
-    if (!list.length) { setTxnMsg("No records to download.", false); return; }
+    if (!list.length) { setTxnMsg("Download ke liye koi record nahi.", false); return; }
     var rows = [["Date", "Giver", "Receiver", "Amount (Rs)", "Food / Note"]];
     list.forEach(function (t) {
       rows.push([fmtDate(t.txn_date), profileName(t.payer_id), profileName(t.receiver_id), Number(t.amount) || 0, t.note || "Food"]);
@@ -1655,7 +1720,7 @@
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-    setTxnMsg("CSV downloaded (" + list.length + " records).", true);
+    setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
   function renderTxns() {
     var me = myId();
@@ -1675,16 +1740,19 @@
       var iTook = t.receiver_id === me;
       var amtCls = iGave ? "given" : iTook ? "taken" : "";
       var sign = iGave ? "− " : iTook ? "+ " : "";
+      var locked = isTxnLocked(t);
       var btns = "";
-      if (t.created_by === me) {
+      if (locked) {
+        btns = '<span class="t-lock">🔒 Settled</span>';
+      } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       } else if (isAdmin()) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
-      html += '<div class="txn"><div><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
-        '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div></div>' +
-        '<div class="t-right"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
+      html += '<div class="txn"><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
+        '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
+        '<div class="t-foot"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
     });
     $("txnList").innerHTML = html;
   }
@@ -1705,6 +1773,7 @@
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t || t.created_by !== myId()) return;
+    if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     showView("khata");
     setSplitMode(false);
     var me = myId();
@@ -1730,7 +1799,10 @@
       if (p.id === me) return;
       html += '<label><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</label>';
     });
-    $("splitList").innerHTML = html || '<p class="empty">No other users yet.</p>';
+    myContacts.forEach(function (c) {
+      html += '<label><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</label>';
+    });
+    $("splitList").innerHTML = html || '<p class="empty">Abhi koi dost nahi.</p>';
     updateSplitHint();
   }
   function selectedSplitIds() {
@@ -1742,11 +1814,14 @@
   function updateSplitHint() {
     var total = parseFloat($("txnAmount").value) || 0;
     var ids = selectedSplitIds();
-    if (!ids.length) { $("splitHint").textContent = "Choose friends first, then enter the amount."; return; }
-    if (!total || total <= 0) { $("splitHint").textContent = ids.length + " friends chosen — now enter the total amount."; return; }
+    if (!ids.length) { $("splitHint").textContent = "Pehle dost chunein, phir raqam likhein."; return; }
+    if (!total || total <= 0) { $("splitHint").textContent = ids.length + " dost chune — ab kull raqam likhein."; return; }
     var people = ids.length + 1; // friends + you — your share counts too
     var share = Math.floor(total / people * 100) / 100;
-    $("splitHint").textContent = "Each person's share: " + fmtRs(share) + " (" + ids.length + " friends + you · total " + fmtRs(total) + " · your share " + fmtRs(share) + ")";
+    // Last friend gets the leftover paisa so the split adds up to the total exactly.
+    var remainder = Math.round((total - share * people) * 100) / 100;
+    var extra = remainder > 0 ? " · aakhri dost ko " + fmtRs(share + remainder) + " (baaqi paisay)" : "";
+    $("splitHint").textContent = "Har aik ka hissa: " + fmtRs(share) + " (" + ids.length + " dost + aap · kull " + fmtRs(total) + " · aap ka hissa " + fmtRs(share) + ")" + extra;
   }
   function setSplitMode(on) {
     splitMode = on;
@@ -1779,7 +1854,7 @@
         payer_id: me, receiver_id: id, amount: amt,
         note: (note || "Food") + " (split equally)", txn_date: date, created_by: me
       } }).then(function (res) {
-        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " added a record", notifBodyFor(created, id)); } }
+        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id)); } }
         else failed++;
         next();
       })
@@ -1790,7 +1865,7 @@
 
   function addTxn(e) {
     e.preventDefault();
-    if (!dbReady) { setTxnMsg("Database setup is pending.", false); return; }
+    if (!dbReady) { setTxnMsg("Database setup baaqi hai.", false); return; }
     var person = $("txnPerson").value;
     var dir = (document.querySelector('input[name="txnDir"]:checked') || {}).value || "given";
     var amount = parseFloat($("txnAmount").value);
@@ -1834,7 +1909,7 @@
         btn.disabled = false;
         if (!res.ok) { setTxnMsg("Record save nahi hua — dobara try karein.", false); return; }
         var created = res.body && res.body[0];
-        if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " added a record", notifBodyFor(created, person)); }
+        if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person)); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
         setTxnMsg("Record save ho gaya!", true);
@@ -1846,12 +1921,17 @@
   }
 
   function deleteTxn(id) {
+    var t = null;
+    txns.forEach(function (x) { if (x.id === id) t = x; });
+    if (!t) return;
+    if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
+    if (t.created_by !== myId() && !isAdmin()) return;
     askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
     sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
       .then(function (res) {
-        if (!res.ok) { setTxnMsg("Couldn't be deleted.", false); return; }
+        if (!res.ok) { setTxnMsg("Delete nahi hua.", false); return; }
         loadAll();
-      }).catch(function () { setTxnMsg("Couldn't be deleted.", false); });
+      }).catch(function () { setTxnMsg("Delete nahi hua.", false); });
     });
   }
 
@@ -1908,8 +1988,8 @@
     shareText("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL);
   });
   $("acctWaBtn").addEventListener("click", function () {
-    // No support number exists — open WhatsApp with the app link to share.
-    openWaLink("https://wa.me/?text=" + encodeURIComponent("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL));
+    // WhatsApp helpline — Asad ka apna number (03098851445).
+    openWaLink("https://wa.me/923098851445?text=" + encodeURIComponent("Easy Khata — madad chahiye"));
   });
   $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
   $("savePassBtn").addEventListener("click", doChangePass);
@@ -2065,6 +2145,7 @@
   } catch (e) {}
 
   if (!API || !ANON) {
+    hideSplash();
     $("setupBox").hidden = false;
     $("authWrap").hidden = true;
     return;

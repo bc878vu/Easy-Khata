@@ -42,14 +42,15 @@
 }
 *{box-sizing:border-box}
 button{font-family:inherit}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-bottom:170px}
 body{
   margin:0;
   background:var(--bg);
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.5;
-  padding-bottom:76px;
+  padding-bottom:160px;
+  overflow-x:clip;
 }
 h1{font-size:1.25rem;margin:0 0 8px}
 h2{font-size:1.05rem;margin:0 0 10px}
@@ -57,6 +58,35 @@ h3{font-size:.95rem;margin:14px 0 6px}
 p{margin:0 0 10px}
 .muted{color:var(--muted);font-size:.85rem}
 .wrap{max-width:640px;margin:0 auto;padding:14px 14px 20px}
+
+/* ---------- splash ---------- */
+.splash{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:24px;text-align:center;
+  transition:opacity .35s ease,visibility .35s ease;
+}
+.splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+.splash-logo{width:96px;height:96px;border-radius:24px;box-shadow:var(--shadow)}
+.splash-name{font-size:1.6rem;font-weight:800;letter-spacing:-.01em}
+.splash-tag{color:var(--muted);font-size:.95rem}
+.splash-spinner{
+  width:28px;height:28px;margin-top:14px;border-radius:50%;
+  border:3px solid var(--line);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- auth brand ---------- */
+.auth-brand{text-align:center;margin:28px auto 4px;max-width:440px;padding:0 14px}
+.auth-logo{width:72px;height:72px;border-radius:18px;box-shadow:var(--shadow)}
+.auth-brand h1{font-size:1.7rem;font-weight:800;margin:12px 0 4px}
+.auth-brand p{color:var(--muted);font-size:.95rem;margin:0 0 12px}
+.auth-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.auth-chips span{
+  background:var(--card);border:1px solid var(--line);border-radius:999px;
+  padding:5px 12px;font-size:.8rem;font-weight:600;box-shadow:var(--shadow);
+}
 
 /* ---------- app header ---------- */
 .app-header{
@@ -115,7 +145,7 @@ p{margin:0 0 10px}
 }
 .card.accent{border-top:3px solid var(--accent)}
 .card.setup{max-width:640px;margin:14px auto}
-.auth{max-width:440px;margin:24px auto}
+.auth{max-width:440px;margin:14px auto}
 .auth .tabs{margin-bottom:12px}
 .field{margin-bottom:12px}
 .field label{display:block;font-weight:600;font-size:.85rem;margin-bottom:4px}
@@ -252,26 +282,36 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .month-stats strong{color:var(--ink)}
 .empty{color:var(--muted);font-size:.9rem;padding:8px 2px}
 
-/* ---------- ledger / transactions ---------- */
-.list-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* ---------- ledger / transactions ----------
+   Stacked rows: naam apni line par, raqam + buttons doosri line par —
+   360px par bhi kabhi overflow nahi (side-by-side layout right edge par cut ho raha tha). */
+.list-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .toolbar{display:grid;gap:8px;margin:10px 0}
-.toolbar input,.toolbar select{font-size:.92rem}
-.date-wrap{display:flex;align-items:center;gap:8px}
+.toolbar input,.toolbar select{font-size:.92rem;min-width:0}
+.date-wrap{display:flex;align-items:center;gap:8px;min-width:0}
 .date-wrap span{font-size:.85rem;color:var(--muted);min-width:22px}
+.date-wrap input{flex:1;min-width:0}
 .txns{display:grid;gap:8px}
 .txn{
-  display:flex;gap:10px;align-items:flex-start;background:var(--tab-bg);
+  display:block;background:var(--tab-bg);
   border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+  min-width:0;
 }
-.t-main{flex:1;min-width:0}
+.t-main{font-weight:600;overflow-wrap:anywhere;min-width:0}
 .t-sub{font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}
+.t-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px}
 .t-amt{font-weight:700;white-space:nowrap}
 .t-amt.given{color:var(--red)}
 .t-amt.taken{color:var(--green)}
 .t-amt.settle{color:var(--accent)}
 .t-right{text-align:right}
-.t-btns{display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap}
+.t-btns{display:flex;gap:6px;flex-wrap:wrap}
 .t-btns .btn-danger{background:none;border-color:var(--line);color:var(--red-dark)}
+.t-lock{
+  display:inline-block;font-size:.78rem;font-weight:700;color:var(--muted);
+  white-space:nowrap;
+}
+.d-time .t-lock{margin-top:6px}
 
 /* ---------- person detail ---------- */
 .detail-head{display:flex;align-items:center;gap:12px;margin:6px 0 12px}
@@ -309,8 +349,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 .dtable-head span:nth-child(2),.dtable-head span:nth-child(3){text-align:right}
 .drow{
-  display:grid;grid-template-columns:1fr 74px 74px;gap:8px;align-items:start;
+  display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:8px;align-items:start;
   background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+  min-width:0;
 }
 .d-time{display:flex;gap:8px;min-width:0}
 .d-ico{
@@ -319,7 +360,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 .d-ico.up{background:var(--red-soft);color:var(--red-dark)}
 .d-ico.down{background:var(--green-soft);color:var(--green-dark)}
-.d-date{font-size:.82rem;font-weight:600}
+.d-date{font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
 .d-note{font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}
 .d-bal{font-size:.75rem;font-weight:700;margin-top:2px}
 .d-bal.pos{color:var(--green)}
