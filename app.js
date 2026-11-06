@@ -739,8 +739,6 @@
     var b = $("notifBadge");
     b.textContent = n > 99 ? "99+" : String(n);
     b.hidden = n === 0;
-    var rr = $("remindRowText");
-    if (rr) rr.textContent = "Yaad Dehani (" + n + ")";
   }
   function renderNotifList() {
     if (!notifs.length) {
@@ -1387,17 +1385,17 @@
       (latest ? "\n" + latest + "\n" : "") +
       "\nEasy Khata: " + APP_SHORT_URL;
   }
-  function personRemindText(p) {
+  function personShortText(p) {
+    // WhatsApp message: SIRF current balance — koi Debit/Credit, koi Latest,
+    // koi history nahi. Share button poora detailed message bhejta hai
+    // (personShareText), WhatsApp sirf ye chhota balance message.
     var s = personStats(p.id);
-    var latest = latestLine(latestTxnWith(p.id));
-    var dc = "Debit (I gave): " + fmtRs(s.given) + "\nCredit (I took): " + fmtRs(s.taken) + ".";
     var head = "Hi " + (p.name || "") + ",\n\n";
-    var netLine, tail = "";
-    if (s.net > 0) { netLine = "You have to pay me: " + fmtRs(s.net); tail = "\n\nPlease check when you get a chance. Thank you!"; }
-    else if (s.net < 0) { netLine = "I have to pay you: " + fmtRs(-s.net); tail = "\n\nI will send it soon. Thank you!"; }
-    else { netLine = "Settled up — no balance."; tail = "\n\nThank you!"; }
-    return head + "As per Easy Khata, your food balance is:\n\n" + netLine + "\n\n" + dc +
-      (latest ? "\n\n" + latest : "") + tail + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
+    var line;
+    if (s.net > 0) line = "As per Easy Khata, you have to pay me " + fmtRs(s.net) + " (food balance).";
+    else if (s.net < 0) line = "As per Easy Khata, I have to pay you " + fmtRs(-s.net) + " (food balance).";
+    else line = "As per Easy Khata, our food balance is settled up — no balance.";
+    return head + line + "\n\n— " + myName() + "\nEasy Khata: " + APP_SHORT_URL;
   }
   function shareText(text) {
     if (navigator.share) return navigator.share({ text: text }).catch(function () {});
@@ -1450,7 +1448,7 @@
   function remindPerson(id) {
     var p = findPerson(id);
     if (!p) return;
-    var text = personRemindText(p);
+    var text = personShortText(p); // WhatsApp: sirf current balance (chhota message)
     var s = personStats(id);
     var real = false;
     profiles.forEach(function (x) { if (x.id === id) real = true; });
@@ -1956,7 +1954,6 @@
   $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
-  $("remindRow").addEventListener("click", showNotifView);
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); });
   $("addPersonBtn").addEventListener("click", function () {
     showView("khata");
@@ -2129,16 +2126,24 @@
   }
 
   /* ---------- theme ---------- */
+  // Ek hi setting (localStorage "easykhata_theme") — header icon aur Account
+  // toggle dono usi ko badalte hain aur dono ke icons sync rehte hain.
+  // Icon woh dikhata hai jis par tap karne se theme badlegi: light mein 🌙
+  // (dark karo), dark mein ☀️ (light karo).
   function applyTheme(mode) {
     document.documentElement.setAttribute("data-theme", mode);
     var ic = $("themeIcon");
     if (ic) ic.textContent = mode === "dark" ? "☀️" : "🌙";
+    var hb = $("themeHeaderBtn");
+    if (hb) hb.textContent = mode === "dark" ? "☀️" : "🌙";
     try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
   }
-  $("themeBtn").addEventListener("click", function () {
+  function toggleTheme() {
     var cur = document.documentElement.getAttribute("data-theme") || "light";
     applyTheme(cur === "dark" ? "light" : "dark");
-  });
+  }
+  $("themeBtn").addEventListener("click", toggleTheme);
+  $("themeHeaderBtn").addEventListener("click", toggleTheme);
   try {
     var savedTheme = window.localStorage.getItem("easykhata_theme");
     if (savedTheme === "dark" || savedTheme === "light") applyTheme(savedTheme);
