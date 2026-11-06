@@ -1278,6 +1278,9 @@
     }).then(function (res) { if (!res.ok) throw new Error("save failed"); });
   }
   // FCM token ki maujoodgi check (self-heal: token milte hi DB mein save).
+  // v23.1: "on" sirf tab jab DB save CONFIRM ho — pehle token milte hi
+  // "on" set ho jata tha aur save error chhup jata tha, is liye UI jhootha
+  // "On ✓" dikhata tha jab ke DB mein zero rows thi (Awais case).
   function fcmTokenState() {
     var messaging;
     try { messaging = fcmMessaging(); } catch (e) { return Promise.resolve("off"); }
@@ -1285,9 +1288,13 @@
       return messaging.getToken({ vapidKey: cfg.FCM_VAPID_KEY, serviceWorkerRegistration: reg });
     }).then(function (token) {
       if (!token) return "off";
-      pushState = "on"; updatePushToggleLabel();
-      saveFcmToken(token).catch(function () {});
-      return "on";
+      return saveFcmToken(token).then(function () {
+        pushState = "on"; updatePushToggleLabel();
+        return "on";
+      }, function () {
+        pushState = "off"; updatePushToggleLabel();
+        return "off";
+      });
     }).catch(function () { return "off"; });
   }
   function enablePushFcm() {
@@ -1350,12 +1357,16 @@
       return reg.pushManager.getSubscription();
     }).then(function (sub) {
       if (!sub) { pushState = "off"; updatePushToggleLabel(); return pushState; }
-      pushState = "on";
-      updatePushToggleLabel();
-      // Browser mein subscription hai — DB mein bhi honi chahiye (upsert).
-      // Agar pehle save fail hua tha to ab theek ho jayega.
-      savePushSub(sub).catch(function () {});
-      return pushState;
+      // v23.1: "on" sirf tab jab DB save CONFIRM ho — pehle subscription
+      // milte hi "on" set ho jata tha aur save error chhup jata tha (FCM
+      // wala hi bug). Save fail ho to "off" taake user dobara try kar sake.
+      return savePushSub(sub).then(function () {
+        pushState = "on"; updatePushToggleLabel();
+        return pushState;
+      }, function () {
+        pushState = "off"; updatePushToggleLabel();
+        return pushState;
+      });
     }).catch(function () { return pushState; });
   }
   // Chrome's own notification permission popup appears as soon as the app opens.
@@ -1403,17 +1414,25 @@
   }
   // v22: Account menu ka "Notifications On karein" button — user gesture se
   // chalti hai, is liye Chrome prompt dikhata hai. v23: asal wajah dikhata hai.
+  // v23.1: "on" par early return HATA DIYA — button dabane se enablePush()
+  // HAMESHA dobara chalta hai (token/sub dobara save hota hai). Pehle ye
+  // shortcut save fail ko hamesha chhupa deta tha (Awais case: UI "On ✓",
+  // DB mein zero rows). "pehle se on hain" sirf tab jab save pehle se
+  // confirm ho (pushState "on" = save confirm, fcmTokenState/vapidPushState
+  // ke baad) — aur phir bhi dobara save karke confirm kiya jata hai.
   function enablePushFromButton() {
     if (!pushSupported) { setPushMsg(pushReasonText("unsupported"), false); return; }
     if (window.Notification && Notification.permission === "denied") {
       setPushMsg(pushReasonText("permission-denied"), false);
       return;
     }
-    if (pushState === "on") { setPushMsg("Notifications pehle se on hain ✓", true); return; }
+    var wasOn = (pushState === "on");
     setPushMsg("Notifications on ho rahi hain…", true);
     enablePush().then(function (r) {
-      if (r.ok) setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega — app band ho to bhi.", true);
-      else setPushMsg(pushReasonText(r.reason, r.detail), false);
+      if (r.ok) {
+        if (wasOn) setPushMsg("Notifications pehle se on hain ✓", true);
+        else setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega — app band ho to bhi.", true);
+      } else setPushMsg(pushReasonText(r.reason, r.detail), false);
     });
   }
   function triggerPush(recipientId, title, text) {
