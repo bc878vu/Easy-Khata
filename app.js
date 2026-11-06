@@ -84,11 +84,17 @@
       else window.localStorage.removeItem(SESSION_KEY);
     } catch (e) {}
   }
-  function myId() { return session && session.user ? session.user.id : ""; }
+  function myId() {
+    // v24: guest mode mein "me" = local guest id — saara render/share/balance
+    // code isi par chalta hai, is liye guest ledger bina kisi server call ke
+    // wahi UI use karta hai jo logged-in mode mein chalta hai.
+    return guestMode ? guestMeId : (session && session.user ? session.user.id : "");
+  }
   function isAdmin() {
     return !!ADMIN_EMAIL && session && session.user && session.user.email === ADMIN_EMAIL;
   }
   function myName() {
+    if (guestMode) return guestMeName || "Aap";
     if (!session || !session.user) return "";
     var m = session.user.user_metadata || {};
     return m.full_name || session.user.email || "";
@@ -154,6 +160,68 @@
   var CACHE_KEY = "easykhata_cache_v1";
   var OUTBOX_KEY = "easykhata_outbox_v1";
   var OUTBOX_MAX = 200;
+  /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
+     Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
+     Server ko kabhi kuch nahi bheja jata: na Supabase (na profiles, na
+     transactions, na contacts), na /api/notify, na push subscription, na
+     realtime channel. Logged-in cache (easykhata_cache_v1) aur outbox
+     (easykhata_outbox_v1) se bilkul alag key hai — kabhi mix nahi hoti.
+     Guest mode mein NO push, NO multi-device sync, NO admin panel,
+     NO realtime, NO cloud backup (jab tak account na banayein). */
+  var GUEST_KEY = "easykhata_guest_v1";
+  var guestMode = false;
+  var guestMeId = "";
+  var guestMeName = "Aap";
+  function loadGuestStore() {
+    try {
+      var raw = window.localStorage.getItem(GUEST_KEY);
+      if (!raw) return null;
+      var g = JSON.parse(raw);
+      if (!g || typeof g !== "object" || !Array.isArray(g.contacts) || !Array.isArray(g.txns)) return null;
+      return g;
+    } catch (e) { return null; }
+  }
+  function saveGuestStore() {
+    // Sirf guest mode mein — logged-in cache ko kabhi guest data nahi likhte.
+    if (!guestMode) return;
+    try {
+      window.localStorage.setItem(GUEST_KEY, JSON.stringify({
+        me: { id: guestMeId, name: guestMeName },
+        contacts: myContacts, txns: txns, savedAt: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function guestHasData() {
+    var g = loadGuestStore();
+    return !!(g && ((g.contacts && g.contacts.length) || (g.txns && g.txns.length)));
+  }
+  function loadGuestIntoState() {
+    // Guest store -> in-memory state. Logged-in data ko kabhi nahi chhoota:
+    // ye sirf guest mode mein chalta hai (loadAll / enterGuestMode se).
+    var g = loadGuestStore();
+    guestMeId = (g && g.me && g.me.id) || ("guest-" + newUuid());
+    guestMeName = (g && g.me && g.me.name) || "Aap";
+    profiles = [{ id: guestMeId, name: guestMeName, email: "", phone: "" }];
+    myContacts = (g && g.contacts ? g.contacts : []).map(function (c) { c.manual = true; return c; });
+    txns = (g && g.txns) || [];
+    notifs = [];
+    dbReady = true;
+    offlineMode = false;
+  }
+  function enterGuestMode() {
+    guestMode = true;
+    loadGuestIntoState();
+    saveGuestStore(); // pehli dafa: guest id persist ho jaye taake reload par wahi rahe
+    showApp();
+    renderAll();
+  }
+  // Reload par: agar guest hisaab maujood hai aur koi login session nahi,
+  // to seedha guest mode mein wapas — user ka hisaab wahin milta hai.
+  function enterGuestIfSaved() {
+    if (!guestHasData()) return false;
+    enterGuestMode();
+    return true;
+  }
   function newUuid() {
     try {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -186,6 +254,10 @@
     saveOutbox(ops);
   }
   function saveCache() {
+    // v24 SECURITY: guest mode mein kabhi logged-in cache key mein nahi
+    // likhte — guest data sirf easykhata_guest_v1 mein rehta hai, warna
+    // guest ka hisaab kisi aur ke logged-in cache mein ghus jata.
+    if (guestMode) return;
     // Khali data se acha cache kharab na ho — sirf tab save karein jab
     // profiles maujood hon (kamyab load ka nishan). Naya user bhi apni
     // profile rakhta hai, is liye kamyab load par profiles hamesha non-empty
@@ -340,6 +412,17 @@
     if (s) s.classList.add("hide");
   }
   function showAuth() {
+    // v24 SECURITY: login screen par aate hi guest/logged-in state bilkul
+    // alag ho jati hai — in-memory data saaf, taake guest ka hisaab kabhi
+    // logged-in session mein na dikhe aur vice versa. Guest store
+    // (localStorage key) mehfooz rehta hai — sirf memory saaf hoti hai.
+    guestMode = false;
+    guestMeId = "";
+    guestMeName = "Aap";
+    profiles = [];
+    txns = [];
+    myContacts = [];
+    notifs = [];
     hideSplash();
     teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
@@ -347,6 +430,8 @@
     $("appShell").hidden = true;
     $("authBox").hidden = false;
     $("fabAdd").hidden = true;
+    $("notifBtn").hidden = false;
+    $("guestNotice").hidden = true;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
     $("resetBox").hidden = true;
@@ -356,9 +441,14 @@
     hideSplash();
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
+    // v24: guest mode mein notification bell nahi (koi push/notifs nahi)
+    // aur device-only notice dikhta hai.
+    $("guestNotice").hidden = !guestMode;
+    $("notifBtn").hidden = guestMode;
     renderAccount();
     showView("khata");
     $("txnDate").value = todayLocal();
+    if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
     loadNotifs();
     refreshPushState().then(function () { maybeAskPushPermission(); });
     setupRealtime();
@@ -466,6 +556,7 @@
     ensureProfile().catch(function () {}).then(function () {
       showApp();
       loadAll();
+      maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
     });
   }
 
@@ -624,7 +715,13 @@
   }
 
   function authValidate() {
-    if (!session || !session.access_token) { showAuth(); return; }
+    if (!session || !session.access_token) {
+      // v24: koi login session nahi aur guest hisaab maujood hai to seedha
+      // guest mode mein wapas — warna login screen.
+      if (enterGuestIfSaved()) return;
+      showAuth();
+      return;
+    }
     fetch(API + "/auth/v1/user", {
       headers: { "apikey": ANON, "Authorization": "Bearer " + session.access_token }
     }).then(function (r) {
@@ -641,6 +738,7 @@
       if (user && session) { session.user = user; saveSession(session); }
       showApp();
       loadAll();
+      maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
     }).catch(function () {
       saveSession(null);
       showAuth();
@@ -662,6 +760,7 @@
   // Settled-lock rejection = op drop karein (kabhi accept nahi hoga),
   // network error = ruk jayein (ops queued rahein, baad mein retry).
   function flushOutbox() {
+    if (guestMode) return Promise.resolve(false); // v24: guest ka koi outbox nahi — kuch sync nahi hota
     if (syncing) return Promise.resolve(false);
     var ops = loadOutbox();
     if (!ops.length || !navigator.onLine) return Promise.resolve(false);
@@ -802,6 +901,14 @@
   }
 
   function loadAll() {
+    if (guestMode) {
+      // v24: guest mode mein Refresh sirf local store dobara parhta hai —
+      // server ko koi call nahi jati.
+      loadGuestIntoState();
+      renderAll();
+      setTxnMsg("", true);
+      return;
+    }
     setTxnMsg("");
     profilesQuery(true).then(function (res) {
       // If the phone column doesn't exist yet (v2 SQL not run), load without the phone.
@@ -850,6 +957,62 @@
         return;
       }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
+    });
+  }
+
+  /* ---------- guest -> account migration (v24) ----------
+     Signup/login ke baad, agar is device par guest hisaab maujood ho to
+     aik dafa poocha jata hai ke use cloud account mein save karna hai ya
+     nahi. SAFE design: guest UUIDs random hain, is liye contact/record ids
+     wahi rehte hain — sirf guestMe ki jagah naya user id aata hai
+     (payer/receiver/created_by/owner_id). Settlement notes waisi ki waisi
+     rehti hain, to settled-lock bhi saath chalta hai. Agar koi record fail
+     ho to guest store NAHI mit-ta — data mehfooz rehta hai aur agle login
+     par dobara offer hoti hai. Guest store sirf tab mit-ta hai jab sab
+     kuch kamyab ho jaye. */
+  var guestMigrationOffered = false;
+  function maybeOfferGuestMigration() {
+    if (guestMigrationOffered || guestMode) return;
+    if (!guestHasData()) return;
+    guestMigrationOffered = true;
+    var g = loadGuestStore();
+    var n = (g.txns || []).length, c = (g.contacts || []).length;
+    askConfirm("Guest hisaab save karein?",
+      "Aap ke guest mode ke " + n + " records aur " + c + " dost is account mein save ho jayenge — phir ye cloud par mehfooz rahenge.",
+      "Save karein", doGuestMigration);
+  }
+  function doGuestMigration() {
+    var g = loadGuestStore();
+    if (!g) return;
+    var me = myId();
+    var guestMe = (g.me && g.me.id) || "";
+    var contactJobs = (g.contacts || []).map(function (ct) {
+      return sb("khata_contacts", { method: "POST", prefer: "return=representation", body: {
+        id: ct.id, owner_id: me, name: ct.name, phone: ct.phone || null
+      } });
+    });
+    Promise.all(contactJobs).then(function () {
+      var txnJobs = (g.txns || []).map(function (t) {
+        return sb("khata_transactions", { method: "POST", prefer: "return=representation", body: {
+          id: t.id,
+          payer_id: t.payer_id === guestMe ? me : t.payer_id,
+          receiver_id: t.receiver_id === guestMe ? me : t.receiver_id,
+          amount: t.amount, note: t.note, txn_date: t.txn_date,
+          created_by: me, created_at: t.created_at || new Date().toISOString()
+        } });
+      });
+      return Promise.all(txnJobs);
+    }).then(function (results) {
+      var failed = results.filter(function (r) { return !r.ok; }).length;
+      if (failed) {
+        setTxnMsg(failed + " records migrate nahi hue — guest hisaab mehfooz hai, agle login par phir poocha jayega.", false);
+        return;
+      }
+      try { window.localStorage.removeItem(GUEST_KEY); } catch (e) {}
+      loadAll(); // pehle load (ye txnMsg saaf karta hai), phir kamyabi ka message
+      setTxnMsg("Guest hisaab cloud mein save ho gaya! ✓", true);
+    }).catch(function () {
+      setTxnMsg("Migration nahi hui — internet check karein. Guest hisaab mehfooz hai.", false);
     });
   }
 
@@ -1090,6 +1253,19 @@
     var dupContact = null;
     myContacts.forEach(function (c) { if (phone && contactPhoneMatch(phone, c.phone)) dupContact = c; });
     if (dupContact) { setContactMsg("Ye number pehle se aap ke contacts mein hai (" + (dupContact.name || "") + ").", false); return; }
+    if (guestMode) {
+      // v24: guest contact — sirf local store, server ko kuch nahi.
+      var guestRec = { id: newUuid(), owner_id: guestMeId, name: name, phone: phone || null, created_at: new Date().toISOString(), manual: true };
+      myContacts.push(guestRec);
+      saveGuestStore();
+      $("newContactName").value = "";
+      $("newContactPhone").value = "";
+      setContactMsg("Dost add ho gaya!", true);
+      renderSummary();
+      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      $("txnPerson").value = guestRec.id;
+      return;
+    }
     var btn = $("saveContactBtn");
     btn.disabled = true;
     var contactBody = { id: newUuid(), owner_id: myId(), name: name, phone: phone || null };
@@ -1142,6 +1318,18 @@
       ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records bhi delete ho jayenge — ye wapas nahi hoga."
       : "'" + (c.name || "") + "' ko contacts se remove karein?";
     askConfirm("Dost remove karein?", text, "Remove karein", function () {
+      if (guestMode) {
+        // v24: guest contact — sirf local: us ke saare records + contact
+        // delete, koi server call, koi outbox nahi. Settled history pehle
+        // hi upar rok di gayi hai (hasLocked check).
+        txns = txns.filter(function (t) { return !(t.payer_id === id || t.receiver_id === id); });
+        myContacts = myContacts.filter(function (x) { return x.id !== id; });
+        saveGuestStore();
+        renderSummary();
+        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+        setPeopleMsg("Contact remove ho gaya.", true);
+        return;
+      }
       var deleteRowOffline = function () {
         // Pending contact insert hai to use hata dein (delete op nahi chahiye).
         if (!removePendingInsert("khata_contacts", id)) {
@@ -2089,6 +2277,14 @@
       txn_date: todayLocal(),
       created_by: me
     };
+    if (guestMode) {
+      // v24: guest settlement — sirf local; settled-lock yahan bhi lagta hai.
+      txns.unshift(Object.assign({ created_at: new Date().toISOString() }, body));
+      saveGuestStore();
+      renderAll();
+      setPeopleMsg("Hisaab barabar ho gaya!", true);
+      return;
+    }
     if (isOffline()) {
       offlineTxnInsert(body);
       setPeopleMsg("Settlement offline save ho gayi — online hote hi sync hogi.", true);
@@ -2138,7 +2334,9 @@
       ids = ids.filter(function (id) { return String(map[id].name || "").toLowerCase().indexOf(q) !== -1; });
     }
     if (!total) {
-      $("peopleList").innerHTML = '<p class="empty">Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.</p>';
+      $("peopleList").innerHTML = guestMode
+        ? '<p class="empty">Abhi koi dost nahi — neeche se pehla dost add karein.</p>'
+        : '<p class="empty">Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.</p>';
       return;
     }
     if (!ids.length) {
@@ -2173,6 +2371,19 @@
     var phoneTxt = myPhone || "Number nahi diya";
     if (me && me.username) phoneTxt += " · @" + me.username;
     $("acctPhone").textContent = phoneTxt;
+    // v24: guest mode mein Account sirf guest cheezein dikhata hai — profile
+    // edit (server), push button aur privacy (account wali) chhup jate hain.
+    var gb = $("guestAcctBox");
+    if (gb) gb.hidden = !guestMode;
+    if (guestMode) {
+      $("acctName").textContent = guestMeName || "Aap";
+      $("acctPhone").textContent = "Guest mode — bina login ke";
+      var gn = $("guestNameInput");
+      if (gn) gn.value = guestMeName || "";
+    }
+    $("acctPushBtn").hidden = guestMode;
+    $("acctPrivacyBtn").hidden = guestMode;
+    $("acctEditBtn").hidden = guestMode;
   }
   function openPersonDetail(id) {
     if (!findPerson(id)) return;
@@ -2472,6 +2683,27 @@
     $("splitBox").hidden = !on;
     if (on) renderSplitList();
   }
+  // v24: guest split — wahi barabar baant, sirf local store mein.
+  function guestAddSplitTxns(amount, note, date, btn) {
+    var ids = selectedSplitIds();
+    if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
+    var me = myId();
+    var people = ids.length + 1; // friends + you — your share counts too
+    var share = Math.floor(amount / people * 100) / 100;
+    if (share <= 0) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
+    ids.forEach(function (id, idx) {
+      var amt = (idx === ids.length - 1) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
+      txns.unshift({
+        id: newUuid(), payer_id: me, receiver_id: id, amount: amt,
+        note: (note || "Food") + " (split equally)", txn_date: date,
+        created_by: me, created_at: new Date().toISOString()
+      });
+    });
+    saveGuestStore();
+    renderAll();
+    resetTxnForm();
+    setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true);
+  }
   function addSplitTxns(amount, note, date, btn) {
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
@@ -2533,6 +2765,7 @@
     if (!amount || amount <= 0) { setTxnMsg("Sahi raqam likhein.", false); return; }
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
     if (splitMode && !editingId) {
+      if (guestMode) { guestAddSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]')); return; }
       addSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]'));
       return;
     }
@@ -2548,6 +2781,34 @@
     var btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
     var recId = newUuid(); // client UUID pehle se — lost response par retry duplicate nahi banayega
+    if (guestMode) {
+      // v24: guest record — sirf local store, koi server call, koi
+      // notification, koi push nahi. Settled history yahan bhi locked hai.
+      if (editingId) {
+        var editId = editingId;
+        var gt = null;
+        txns.forEach(function (x) { if (x.id === editId) gt = x; });
+        if (gt && isTxnLocked(gt)) { btn.disabled = false; setTxnMsg(LOCK_MSG, false); return; }
+        if (gt) {
+          gt.payer_id = body.payer_id; gt.receiver_id = body.receiver_id;
+          gt.amount = body.amount; gt.note = body.note; gt.txn_date = body.txn_date;
+        }
+        saveGuestStore();
+        renderAll();
+        resetTxnForm();
+        setTxnMsg("Record update ho gaya!", true);
+        btn.disabled = false;
+        return;
+      }
+      txns.unshift(Object.assign({ id: recId, created_at: new Date().toISOString() }, body));
+      saveGuestStore();
+      renderAll();
+      $("txnAmount").value = "";
+      $("txnNote").value = "";
+      setTxnMsg("Record save ho gaya!", true);
+      btn.disabled = false;
+      return;
+    }
     if (editingId) {
       var editId = editingId;
       if (isOffline()) {
@@ -2610,6 +2871,14 @@
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     if (t.created_by !== myId() && !isAdmin()) return;
     askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
+    if (guestMode) {
+      // v24: guest record — sirf local delete, koi server call nahi.
+      txns = txns.filter(function (x) { return x.id !== id; });
+      saveGuestStore();
+      renderAll();
+      setTxnMsg("Record delete ho gaya.", true);
+      return;
+    }
     if (isOffline()) {
       offlineTxnDelete(id);
       setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
@@ -2630,6 +2899,34 @@
   $("tabLogin").addEventListener("click", function () { authMode = "login"; renderAuthMode(); });
   $("tabSignup").addEventListener("click", function () { authMode = "signup"; renderAuthMode(); });
   $("authSubmitBtn").addEventListener("click", doAuth);
+  // v24: guest mode — aik tap, koi email/password nahi.
+  $("guestBtn").addEventListener("click", enterGuestMode);
+  function setGuestNameMsg(text, ok) {
+    var el = $("guestNameMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  $("guestSaveNameBtn").addEventListener("click", function () {
+    if (!guestMode) return;
+    var nm = $("guestNameInput").value.trim();
+    if (!nm) { setGuestNameMsg("Apna naam likhein.", false); return; }
+    if (nm.length > 80) { setGuestNameMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
+    guestMeName = nm;
+    if (profiles.length) profiles[0].name = nm;
+    saveGuestStore();
+    renderAll();
+    setGuestNameMsg("Naam save ho gaya! ✓", true);
+  });
+  // v24: guest mode se account banayein — login screen signup mode mein
+  // khulti hai; guest store mehfooz rehta hai, signup ke baad migration
+  // ki offer aati hai.
+  $("guestCreateAccountBtn").addEventListener("click", function () {
+    authMode = "signup";
+    showAuth();
+  });
+  // v24: guest mode se bahar — login screen; guest store mehfooz rehta hai.
+  $("guestExitBtn").addEventListener("click", function () { showAuth(); });
   $("forgotLink").addEventListener("click", function () { showForgot(true); });
   wireEye("authEye", "authPassword");
   wireEye("resetEye1", "resetPassword");
@@ -2642,7 +2939,7 @@
   $("forgotSendBtn").addEventListener("click", doForgot);
   $("resetBtn").addEventListener("click", doReset);
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
-  $("logoutBtn").addEventListener("click", function () { saveSession(null); showAuth(); });
+  $("logoutBtn").addEventListener("click", function () { if (!guestMode) saveSession(null); showAuth(); });
   $("navKhata").addEventListener("click", function () { showView("khata"); });
   $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
@@ -2834,6 +3131,13 @@
   function renderOffline() {
     var b = $("offlineBadge");
     if (!b) return;
+    if (guestMode) {
+      // v24: guest mode mein koi "Sync pending" nahi hota — sirf asli
+      // offline honay par badge dikhe (sab kuch local hai).
+      b.hidden = navigator.onLine;
+      b.textContent = "Offline";
+      return;
+    }
     var pending = loadOutbox().length;
     if (!navigator.onLine || offlineMode) {
       // offlineMode = load fail hua aur cache se dikhaya ja raha hai

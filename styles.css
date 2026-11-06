@@ -186,6 +186,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .msg.err{color:var(--red)}
 .msg.ok{color:var(--green)}
 .hint{font-size:.82rem;color:var(--muted)}
+/* v24: guest mode — login screen divider + device-only notice. Theme-safe:
+   accent-soft background + accent text, dono themes mein readable. */
+.guest-divider{display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:.85rem}
+.guest-divider::before,.guest-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.guest-notice{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:.92rem;font-weight:600}
 .linklike{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:.9rem;text-decoration:underline}
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:44px}

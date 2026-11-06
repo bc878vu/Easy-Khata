@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=23">
+<link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
 
@@ -81,6 +81,13 @@
     </div>
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
+    <!-- v24: GUEST MODE — bina login ke personal manual hisaab. Koi email,
+         password ya account nahi chahiye; data sirf is phone/browser par
+         localStorage (easykhata_guest_v1) mein rehta hai, server ko kuch
+         nahi jata. -->
+    <div class="guest-divider"><span>ya</span></div>
+    <button id="guestBtn" class="btn btn-ghost btn-block" type="button">Bina Login Ke Istemal Karein</button>
+    <p class="hint">Bina login ke apna personal hisaab is phone par save karein — koi account nahi chahiye. Hisaab sirf is phone/browser par rahega.</p>
     <p class="hint">Account banate hi aap ka naam hisaab mein aa jayega — phir dost aap ko shared kharchon ke liye chun sakenge. Aap ka phone number WhatsApp reminder ke liye hai — baad mein bhi add kar sakte hain.</p>
     </div>
     <div id="forgotBox" hidden>
@@ -136,6 +143,8 @@
 
     <!-- Khata (main) -->
     <section id="khataView">
+      <!-- v24: guest-mode notice — user ko saaf pata ho ke hisaab sirf is device par hai. -->
+      <p id="guestNotice" class="guest-notice" hidden>👤 Guest mode — Ye hisaab sirf is phone/browser par save hai. Account banane par cloud par save hoga.</p>
       <p class="total-label">TOTAL BALANCE</p>
       <div class="total-cards">
         <div class="total-card receive">
@@ -276,6 +285,23 @@
           <span id="acctPhone" class="muted">—</span>
         </div>
         <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit">✎</button>
+      </div>
+      <!-- v24: GUEST MODE account box — sirf guest mode mein dikhta hai.
+           Naam (optional), Account Banayein (upgrade + migration offer) aur
+           guest mode se bahar nikalna. Is mode mein NO push, NO admin,
+           NO profile edit, NO cloud — sab kuch local hai. -->
+      <div id="guestAcctBox" class="card" hidden>
+        <h3 style="margin-top:0">Guest mode — bina login ke</h3>
+        <p class="muted">Ye hisaab sirf is phone/browser par save hai — account banane par cloud par save hoga.</p>
+        <div class="field">
+          <label for="guestNameInput">Apna naam</label>
+          <input id="guestNameInput" type="text" maxlength="80" placeholder="Example: Asad" autocomplete="name">
+        </div>
+        <button id="guestSaveNameBtn" class="btn btn-primary" type="button">Naam save karein</button>
+        <p id="guestNameMsg" class="msg" role="status"></p>
+        <button id="guestCreateAccountBtn" class="btn btn-primary btn-block" type="button" style="margin-top:10px">Account Banayein — Data Cloud Par Save Karein</button>
+        <p class="muted">Account banane ke baad aap se poocha jayega ke guest hisaab cloud mein save karna hai ya nahi.</p>
+        <button id="guestExitBtn" class="btn btn-ghost btn-block" type="button">Guest mode se bahar niklein</button>
       </div>
       <!-- v23: poora profile edit — photo, naam, username, phone, password.
            Pencil dabate hi khulta hai; "Profile save karein" sab kuch aik
@@ -471,6 +497,6 @@
     </div>
   </div>
 
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>
