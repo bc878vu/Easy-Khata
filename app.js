@@ -2379,7 +2379,10 @@
     if (gb) gb.hidden = !guestMode;
     if (guestMode) {
       $("acctName").textContent = guestMeName || "Aap";
-      $("acctPhone").textContent = "Guest mode — bina login ke";
+      // v24.2: profile card ka subtitle ab "Guest mode — bina login ke" NAHI
+      // kehta — wohi jumla guest box ki heading mein bhi tha (do baar repeat).
+      // Subtitle ab mukhtalif aur chhota hai; poora notice sirf guest box mein.
+      $("acctPhone").textContent = "Bina login ke — personal hisaab";
       var gn = $("guestNameInput");
       if (gn) gn.value = guestMeName || "";
     }
