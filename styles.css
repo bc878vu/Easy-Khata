@@ -139,7 +139,7 @@ p{margin:0 0 10px}
 }
 .offline-badge{
   display:inline-block;font-size:.7rem;font-weight:700;color:var(--red-dark);
-  background:var(--red-soft);border-radius:999px;padding:3px 8px;
+  background:var(--red-soft);border-radius:999px;padding:3px 8px;cursor:pointer;
 }
 .live-updating{font-size:.72rem;color:var(--muted);white-space:nowrap}
 
@@ -167,6 +167,7 @@ p{margin:0 0 10px}
 .auth{max-width:440px;margin:14px auto}
 .auth .tabs{margin-bottom:12px}
 .field{margin-bottom:12px}
+#adminAddUserBox{margin-top:12px}
 .field label{display:block;font-weight:600;font-size:.85rem;margin-bottom:4px}
 input,select,textarea{
   width:100%;padding:10px;border:1px solid var(--input-border);border-radius:10px;

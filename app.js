@@ -145,6 +145,80 @@
   var detailPersonId = null;
   var peopleSearchText = "";
 
+  /* ---------- offline mode + sync (v22) ----------
+     Internet na ho to data localStorage mein save hota hai aur app poori
+     tarah offline chalti hai; online hote hi outbox sync ho jata hai.
+     Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
+  var offlineMode = false;   // true jab cache se dikhaya ja raha ho
+  var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
+  var CACHE_KEY = "easykhata_cache_v1";
+  var OUTBOX_KEY = "easykhata_outbox_v1";
+  var OUTBOX_MAX = 200;
+  function newUuid() {
+    try {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    } catch (e) {}
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  function isOffline() { return !navigator.onLine; }
+  function loadOutbox() {
+    try {
+      var raw = window.localStorage.getItem(OUTBOX_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveOutbox(ops) {
+    try { window.localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops || [])); } catch (e) {}
+    renderOffline();
+  }
+  function queueOp(op) {
+    var ops = loadOutbox();
+    ops.push(op);
+    if (ops.length > OUTBOX_MAX) {
+      ops = ops.slice(ops.length - OUTBOX_MAX);
+      try { console.warn("Easy Khata: outbox full — sab se purane ops hata diye."); } catch (e) {}
+    }
+    saveOutbox(ops);
+  }
+  function saveCache() {
+    // Khali data se acha cache kharab na ho — sirf tab save karein jab
+    // profiles maujood hon (kamyab load ka nishan). Naya user bhi apni
+    // profile rakhta hai, is liye kamyab load par profiles hamesha non-empty
+    // hoti hai; loadNotifs/loadContacts loadAll se pehle chal jayein to bhi
+    // cache mehfooz rehta hai.
+    if (!profiles || !profiles.length) return;
+    try {
+      window.localStorage.setItem(CACHE_KEY, JSON.stringify({
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, savedAt: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function loadCache() {
+    try {
+      var raw = window.localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var c = JSON.parse(raw);
+      if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
+      return c;
+    } catch (e) { return null; }
+  }
+  // Pending insert hata dein (server par kabhi gaya hi nahi) — delete/update op nahi chahiye.
+  function removePendingInsert(table, id) {
+    var ops = loadOutbox();
+    var kept = [], removed = false;
+    ops.forEach(function (o) {
+      if (o.op === "insert" && o.table === table && o.id === id) removed = true;
+      else kept.push(o);
+    });
+    if (removed) saveOutbox(kept);
+    return removed;
+  }
+
   function profileName(id) {
     for (var i = 0; i < profiles.length; i++) {
       if (profiles[i].id === id) return profiles[i].name || profiles[i].email || "Unknown";
@@ -584,6 +658,149 @@
     return sb("khata_profiles?select=id,name,email,created_at" + (withPhone ? ",phone" : "") + "&order=name.asc");
   }
 
+  // Outbox sync: pending ops ko order mein server par bhejein.
+  // Settled-lock rejection = op drop karein (kabhi accept nahi hoga),
+  // network error = ruk jayein (ops queued rahein, baad mein retry).
+  function flushOutbox() {
+    if (syncing) return Promise.resolve(false);
+    var ops = loadOutbox();
+    if (!ops.length || !navigator.onLine) return Promise.resolve(false);
+    syncing = true;
+    setTxnMsg("Sync ho raha hai…", true);
+    var done = 0, skipped = 0, skippedSettled = 0;
+    function dropOp(key) {
+      var rest = loadOutbox().filter(function (o) { return o.key !== key; });
+      saveOutbox(rest);
+    }
+    function next(i) {
+      if (i >= ops.length) {
+        syncing = false;
+        renderOffline();
+        if (loadOutbox().length) return flushOutbox(); // sync ke dauran naye ops aa gaye
+        loadAll();
+        var msg = "Sync ho gaya! " + done + " record sync hue.";
+        if (skipped) msg += " " + skipped + " skip hue" + (skipped === skippedSettled ? " (settled history)." : ".");
+        setTxnMsg(msg, true);
+        return Promise.resolve(true);
+      }
+      var op = ops[i];
+      var p;
+      if (op.op === "insert") {
+        p = sb(op.table, { method: "POST", prefer: "return=representation", body: op.body });
+      } else if (op.op === "update") {
+        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "PATCH", prefer: "return=minimal", body: op.body });
+      } else {
+        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "DELETE" });
+      }
+      return p.then(function (res) {
+        if (res.ok) {
+          done++;
+          dropOp(op.key);
+          if (op.op === "insert" && op.table === "khata_transactions" && op.body) {
+            try {
+              var other = op.body.payer_id === myId() ? op.body.receiver_id : op.body.payer_id;
+              if (other && other !== myId()) {
+                var isSettle = String(op.body.note || "").indexOf("Settled up") === 0;
+                sendNotif(other, isSettle ? "settle" : "record", op.body);
+                triggerPush(other, isSettle ? "Hisaab barabar ho gaya" : myName() + " ne record add kiya", notifBodyFor(op.body, other));
+              }
+            } catch (e) {}
+          }
+          return next(i + 1);
+        }
+        if (res.status === 401 || res.status === 403) {
+          syncing = false;
+          renderOffline();
+          setTxnMsg("Sync ruk gaya — dobara login karein.", false);
+          return Promise.resolve(false);
+        }
+        var errMsg = (res.body && res.body.message) || "";
+        if (op.op === "insert" && (res.status === 409 || errMsg.indexOf("duplicate") !== -1)) {
+          done++; // record pehle hi server par hai (lost response ke baad retry) — duplicate nahi
+          dropOp(op.key);
+          return next(i + 1);
+        }
+        skipped++;
+        if (errMsg.indexOf("Settled") !== -1) skippedSettled++;
+        dropOp(op.key);
+        return next(i + 1);
+      }).catch(function () {
+        syncing = false;
+        renderOffline();
+        setTxnMsg("Sync ruk gaya — internet aate hi dobara hoga.", false);
+        return Promise.resolve(false);
+      });
+    }
+    return next(0);
+  }
+  // Offline write helpers: record local state mein lagayein + outbox mein queue karein.
+  function offlineTxnInsert(body) {
+    var rec = {
+      id: body.id || newUuid(),
+      payer_id: body.payer_id, receiver_id: body.receiver_id,
+      amount: body.amount, note: body.note, txn_date: body.txn_date,
+      created_by: body.created_by, created_at: body.created_at || new Date().toISOString()
+    };
+    txns.unshift(rec);
+    queueOp({ key: newUuid(), op: "insert", table: "khata_transactions", id: rec.id, body: rec, ts: Date.now() });
+    saveCache();
+    renderAll();
+    return rec;
+  }
+  function applyTxnUpdateLocal(id, body) {
+    for (var j = 0; j < txns.length; j++) {
+      if (txns[j].id === id) {
+        txns[j].payer_id = body.payer_id;
+        txns[j].receiver_id = body.receiver_id;
+        txns[j].amount = body.amount;
+        txns[j].note = body.note;
+        txns[j].txn_date = body.txn_date;
+        break;
+      }
+    }
+    saveCache();
+    renderAll();
+  }
+  function offlineTxnUpdate(id, body) {
+    // Agar is record ka pending insert hai to usi ki body update karein (alag update op nahi).
+    var ops = loadOutbox();
+    for (var i = 0; i < ops.length; i++) {
+      if (ops[i].op === "insert" && ops[i].table === "khata_transactions" && ops[i].id === id) {
+        ops[i].body.payer_id = body.payer_id;
+        ops[i].body.receiver_id = body.receiver_id;
+        ops[i].body.amount = body.amount;
+        ops[i].body.note = body.note;
+        ops[i].body.txn_date = body.txn_date;
+        ops[i].ts = Date.now();
+        saveOutbox(ops);
+        applyTxnUpdateLocal(id, body);
+        return;
+      }
+    }
+    queueOp({ key: newUuid(), op: "update", table: "khata_transactions", id: id, body: body, ts: Date.now() });
+    applyTxnUpdateLocal(id, body);
+  }
+  function offlineTxnDelete(id) {
+    // Pending insert hai to use hata dein (server par kabhi gaya hi nahi — delete op nahi chahiye).
+    if (!removePendingInsert("khata_transactions", id)) {
+      queueOp({ key: newUuid(), op: "delete", table: "khata_transactions", id: id, ts: Date.now() });
+    }
+    txns = txns.filter(function (t) { return t.id !== id; });
+    saveCache();
+    renderAll();
+  }
+  function offlineContactInsert(body) {
+    var rec = {
+      id: body.id || newUuid(),
+      owner_id: body.owner_id, name: body.name, phone: body.phone || null,
+      created_at: body.created_at || new Date().toISOString(), manual: true
+    };
+    myContacts.push(rec);
+    queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: rec.id, body: { id: rec.id, owner_id: rec.owner_id, name: rec.name, phone: rec.phone }, ts: Date.now() });
+    saveCache();
+    return rec;
+  }
+
   function loadAll() {
     setTxnMsg("");
     profilesQuery(true).then(function (res) {
@@ -610,10 +827,28 @@
       if (!res.ok) throw new Error("txns load failed");
       txns = res.body || [];
       rtLastFetch = Date.now();
+      offlineMode = false;
       renderAll();
       loadNotifs();
       loadContacts();
+      saveCache();
+      flushOutbox();
     }).catch(function () {
+      // Offline: aakhri save hua data dikhayein (agar cache hai).
+      var c = loadCache();
+      if (c) {
+        offlineMode = true;
+        dbReady = true;
+        profiles = c.profiles || [];
+        txns = c.txns || [];
+        myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
+        notifs = c.notifs || [];
+        renderAll();
+        renderNotifBadge();
+        setTxnMsg("Offline — aakhri save hua data dikhaya ja raha hai.", false);
+        renderOffline();
+        return;
+      }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
     });
   }
@@ -730,6 +965,7 @@
         notifs = Array.isArray(res.body) ? res.body : [];
         renderNotifBadge();
         if (!$("notifView").hidden) renderNotifList();
+        saveCache();
       }).catch(function () {});
   }
   function unreadNotifCount() {
@@ -787,6 +1023,7 @@
         // (Ayaz) ke naam pehle "Private contact" dikhte the aur wahi stuck rehta
         // tha — contacts aate hi ledger dobara render karein.
         renderTxns();
+        saveCache();
         return maybeLinkContacts();
       }).catch(function () { return 0; });
   }
@@ -855,9 +1092,19 @@
     if (dupContact) { setContactMsg("Ye number pehle se aap ke contacts mein hai (" + (dupContact.name || "") + ").", false); return; }
     var btn = $("saveContactBtn");
     btn.disabled = true;
-    sb("khata_contacts", { method: "POST", prefer: "return=representation", body: {
-      owner_id: myId(), name: name, phone: phone || null
-    } }).then(function (res) {
+    var contactBody = { id: newUuid(), owner_id: myId(), name: name, phone: phone || null };
+    if (isOffline()) {
+      var createdOffline = offlineContactInsert(contactBody);
+      $("newContactName").value = "";
+      $("newContactPhone").value = "";
+      setContactMsg("Dost offline add ho gaya — online hote hi sync hoga.", true);
+      renderSummary();
+      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      $("txnPerson").value = createdOffline.id;
+      btn.disabled = false;
+      return;
+    }
+    sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) { setContactMsg("Dost save nahi hua — dobara try karein.", false); return; }
       var created = res.body && res.body[0];
@@ -868,7 +1115,16 @@
       renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       if (created) $("txnPerson").value = created.id;
-    }).catch(function () { btn.disabled = false; setContactMsg("Internet ya server se rabta nahi ho raha.", false); });
+    }).catch(function () {
+      btn.disabled = false;
+      var createdOffline = offlineContactInsert(contactBody);
+      $("newContactName").value = "";
+      $("newContactPhone").value = "";
+      setContactMsg("Dost offline add ho gaya — online hote hi sync hoga.", true);
+      renderSummary();
+      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      $("txnPerson").value = createdOffline.id;
+    });
   }
   function deleteContact(id) {
     var c = null;
@@ -886,6 +1142,27 @@
       ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records bhi delete ho jayenge — ye wapas nahi hoga."
       : "'" + (c.name || "") + "' ko contacts se remove karein?";
     askConfirm("Dost remove karein?", text, "Remove karein", function () {
+      var deleteRowOffline = function () {
+        // Pending contact insert hai to use hata dein (delete op nahi chahiye).
+        if (!removePendingInsert("khata_contacts", id)) {
+          queueOp({ key: newUuid(), op: "delete", table: "khata_contacts", id: id, ts: Date.now() });
+        }
+        myContacts = myContacts.filter(function (x) { return x.id !== id; });
+        saveCache();
+        renderSummary();
+        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+        setPeopleMsg("Contact offline remove ho gaya — online hote hi sync hoga.", true);
+      };
+      var deleteTxnsOffline = function () {
+        // Sirf apne banaye hue records (online version ki tarah) — locked wale pehle hi rok diye gaye.
+        var mine = txns.filter(function (t) { return t.created_by === myId() && (t.payer_id === id || t.receiver_id === id); });
+        mine.forEach(function (t) { offlineTxnDelete(t.id); });
+      };
+      if (isOffline()) {
+        deleteTxnsOffline();
+        deleteRowOffline();
+        return;
+      }
       var deleteRow = function () {
         sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
           .then(function (res) {
@@ -894,7 +1171,10 @@
             renderSummary();
             renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
             setPeopleMsg("Contact remove ho gaya.", true);
-          }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+          }).catch(function () {
+            deleteTxnsOffline();
+            deleteRowOffline();
+          });
       };
       if (count === 0) { deleteRow(); return; }
       sb("khata_transactions?created_by=eq." + encodeURIComponent(myId()) + "&or=(payer_id.eq." + encodeURIComponent(id) + ",receiver_id.eq." + encodeURIComponent(id) + ")", { method: "DELETE" })
@@ -902,7 +1182,10 @@
           if (!res.ok) { setPeopleMsg("Records delete nahi hue — dobara try karein.", false); return; }
           refreshTxns();
           deleteRow();
-        }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+        }).catch(function () {
+          deleteTxnsOffline();
+          deleteRowOffline();
+        });
     });
   }
   function pickContact() {
@@ -935,30 +1218,59 @@
       body: { user_id: myId(), endpoint: sub.endpoint, p256dh: k.keys.p256dh, auth: k.keys.auth }
     });
   }
-  // v21: Account se "Notifications: Off" toggle hata diya — notifications sirf
-  // browser ke native popup se allow hoti hain (maybeAskPushPermission, app open
-  // par). Yeh function ab no-op hai; call sites ko chheda nahi gaya.
-  function updatePushToggleLabel() { return; }
+  // v22: Account mein "Notifications On karein" button wapas — user khud
+  // on kar sakta hai (user gesture se Chrome permission prompt dikhata hai;
+  // app open par bina gesture ke prompt aksar chhup jata hai — yahi asal
+  // masla tha). Label pushState ke mutabiq badalta hai.
+  function updatePushToggleLabel() {
+    var el = $("acctPushLabel");
+    if (!el) return;
+    if (!pushSupported) { el.textContent = "Notifications: Is browser mein nahi"; return; }
+    if (pushState === "on") el.textContent = "Notifications: On ✓";
+    else if (pushState === "denied") el.textContent = "Notifications: Blocked — browser settings se on karein";
+    else el.textContent = "Notifications On karein";
+  }
+  function setPushMsg(text, ok) {
+    var el = $("pushMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  // serviceWorker.ready kabhi resolve na ho (SW register fail) to push flow
+  // hang na ho — timeout ke baad null milta hai.
+  function swReady(timeoutMs) {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (resolve) { setTimeout(function () { resolve(null); }, timeoutMs || 4000); })
+    ]);
+  }
   function refreshPushState() {
     if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState); }
     if (window.Notification && Notification.permission === "denied") {
       pushState = "denied"; updatePushToggleLabel(); return Promise.resolve(pushState);
     }
-    return navigator.serviceWorker.ready.then(function (reg) {
+    return swReady(4000).then(function (reg) {
+      if (!reg) return null;
       return reg.pushManager.getSubscription();
     }).then(function (sub) {
-      pushState = sub ? "on" : "off";
+      if (!sub) { pushState = "off"; updatePushToggleLabel(); return pushState; }
+      pushState = "on";
       updatePushToggleLabel();
+      // Browser mein subscription hai — DB mein bhi honi chahiye (upsert).
+      // Agar pehle save fail hua tha to ab theek ho jayega.
+      savePushSub(sub).catch(function () {});
       return pushState;
     }).catch(function () { return pushState; });
   }
   // Chrome's own notification permission popup appears as soon as the app opens.
   // In-app banner removed (2026-11-05) — the browser asks itself.
   // Once per fresh open (session guard); doesn't ask again after Block.
+  // v22: sirf "on" hone par skip karein — "unknown" (SW abhi ready nahi) par
+  // bhi poochna chahiye, warna prompt kabhi nahi aata.
   function maybeAskPushPermission() {
     if (!pushSupported) return;
     if (!window.Notification || Notification.permission !== "default") return;
-    if (pushState !== "off") return;
+    if (pushState === "on") return;
     try { if (window.sessionStorage.getItem("easykhata_push_asked") === "1") return; } catch (e) {}
     try { window.sessionStorage.setItem("easykhata_push_asked", "1"); } catch (e) {}
     Notification.requestPermission().then(function (perm) {
@@ -976,9 +1288,11 @@
         pushState = "denied"; updatePushToggleLabel();
         return false;
       }
-      return navigator.serviceWorker.ready.then(function (reg) {
+      return swReady(5000).then(function (reg) {
+        if (!reg) return false;
         return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushVapidKey()) });
       }).then(function (sub) {
+        if (!sub) return false;
         return savePushSub(sub).then(function () {
           pushState = "on"; updatePushToggleLabel();
           return true;
@@ -988,9 +1302,22 @@
       return false;
     });
   }
-  // v21: disablePush hata diya — Account toggle ab hai hi nahi; notifications
-  // sirf browser ke native popup se allow hoti hain, off karna browser ke site
-  // settings se hota hai. enablePush() abhi bhi maybeAskPushPermission se chalti hai.
+  // v22: Account menu ka "Notifications On karein" button — user gesture se
+  // chalti hai, is liye Chrome prompt dikhata hai. Saaf confirmation deti hai.
+  function enablePushFromButton() {
+    if (!pushSupported) { setPushMsg("Is browser mein notifications nahi chalti — Chrome use karein.", false); return; }
+    if (window.Notification && Notification.permission === "denied") {
+      setPushMsg("Notifications block hain — Chrome ki site settings mein ja kar Easy Khata ke liye Notifications allow karein.", false);
+      return;
+    }
+    if (pushState === "on") { setPushMsg("Notifications pehle se on hain ✓", true); return; }
+    setPushMsg("Notifications on ho rahi hain…", true);
+    enablePush().then(function (ok) {
+      if (ok) setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega.", true);
+      else if (window.Notification && Notification.permission === "denied") setPushMsg("Permission nahi mili — Chrome ki site settings se allow karein.", false);
+      else setPushMsg("Notifications on nahi hui — app dobara khol kar dobara try karein.", false);
+    });
+  }
   function triggerPush(recipientId, title, text) {
     // Fire-and-forget: the server function sends the push to the recipient.
     // The save flow never waits on this.
@@ -1057,6 +1384,48 @@
         }
         loadAll();
       }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
+  }
+  function setAdminAddMsg(text, ok) {
+    var el = $("adminAddMsg");
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  // v22: admin user bana sakta hai (full CRUD — CREATE). Server par
+  // admin_create_user RPC auth user + profile banata hai; naya user
+  // foran login kar sakta hai. Admin ka kaam online-only hai.
+  function createAdminUser() {
+    if (!isAdmin()) return;
+    if (!navigator.onLine) { setAdminAddMsg("Admin kaam ke liye internet chahiye.", false); return; }
+    var name = $("adminAddName").value.trim();
+    var email = $("adminAddEmail").value.trim();
+    var phone = $("adminAddPhone").value.trim();
+    var pass = $("adminAddPass").value;
+    if (!name) { setAdminAddMsg("Naam likhein.", false); return; }
+    if (email.indexOf("@") === -1 || email.indexOf(".") === -1) { setAdminAddMsg("Sahi email likhein.", false); return; }
+    if (!pass || pass.length < 6) { setAdminAddMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    var btn = $("adminAddSaveBtn");
+    btn.disabled = true;
+    sb("rpc/admin_create_user", { method: "POST", body: { p_name: name, p_email: email, p_phone: phone, p_password: pass } })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) {
+          var msg = (res.body && res.body.message) || "";
+          if (msg.indexOf("email already registered") !== -1) setAdminAddMsg("Ye email pehle se registered hai.", false);
+          else if (msg.indexOf("not admin") !== -1) setAdminAddMsg("Sirf admin user bana sakta hai.", false);
+          else if (msg.indexOf("password too short") !== -1) setAdminAddMsg("Password kam se kam 6 harf ka ho.", false);
+          else if (msg.indexOf("valid email") !== -1) setAdminAddMsg("Sahi email likhein.", false);
+          else if (msg.indexOf("name required") !== -1) setAdminAddMsg("Naam likhein.", false);
+          else setAdminAddMsg("User nahi bana — dobara try karein.", false);
+          return;
+        }
+        $("adminAddName").value = "";
+        $("adminAddEmail").value = "";
+        $("adminAddPhone").value = "";
+        $("adminAddPass").value = "";
+        $("adminAddUserBox").hidden = true;
+        setAdminAddMsg("User ban gaya! " + name + " ab login kar sakta hai.", true);
+        renderAdmin();
+      }).catch(function () { btn.disabled = false; setAdminAddMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function setAdminUserMsg(text, ok) {
     var el = $("adminUserMsg");
@@ -1466,6 +1835,7 @@
     askConfirm("Hisaab barabar karein?", who + " — " + fmtRs(amt) + " ka settlement record ban jayega.", "Confirm karein", function () {
     var me = myId();
     var body = {
+      id: newUuid(),
       payer_id: s.net > 0 ? id : me,
       receiver_id: s.net > 0 ? me : id,
       amount: amt,
@@ -1473,6 +1843,11 @@
       txn_date: todayLocal(),
       created_by: me
     };
+    if (isOffline()) {
+      offlineTxnInsert(body);
+      setPeopleMsg("Settlement offline save ho gayi — online hote hi sync hogi.", true);
+      return;
+    }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara try karein.", false); return; }
@@ -1480,7 +1855,10 @@
         if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
         setPeopleMsg("Hisaab barabar ho gaya!", true);
         loadAll();
-      }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () {
+        offlineTxnInsert(body);
+        setPeopleMsg("Settlement offline save ho gayi — online hote hi sync hogi.", true);
+      });
     });
   }
   function shareAll() {
@@ -1853,26 +2231,43 @@
     var share = Math.floor(amount / people * 100) / 100;
     if (share <= 0) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
     btn.disabled = true;
-    var done = 0, failed = 0, i = 0;
+    var done = 0, failed = 0, i = 0, offlineSaved = false;
     function next() {
       if (i >= ids.length) {
         btn.disabled = false;
         if (failed) setTxnMsg(done + " records save ho gaye, " + failed + " fail — dobara check karein.", false);
+        else if (offlineSaved) { setTxnMsg(ids.length + " records offline save ho gaye — online hote hi sync honge!", true); resetTxnForm(); }
         else { setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); }
         loadAll();
         return;
       }
       var id = ids[i++];
       var amt = (i === ids.length) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
-      sb("khata_transactions", { method: "POST", prefer: "return=representation", body: {
+      var recBody = {
+        id: newUuid(),
         payer_id: me, receiver_id: id, amount: amt,
         note: (note || "Food") + " (split equally)", txn_date: date, created_by: me
-      } }).then(function (res) {
+      };
+      if (isOffline()) {
+        // Offline: record local save karein, sync baad mein hoga.
+        offlineTxnInsert(recBody);
+        done++;
+        offlineSaved = true;
+        next();
+        return;
+      }
+      sb("khata_transactions", { method: "POST", prefer: "return=representation", body: recBody }).then(function (res) {
         if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id)); } }
         else failed++;
         next();
       })
-      .catch(function () { failed++; next(); });
+      .catch(function () {
+        // Network error: record offline save karein, sync baad mein hoga.
+        offlineTxnInsert(recBody);
+        done++;
+        offlineSaved = true;
+        next();
+      });
     }
     next();
   }
@@ -1903,8 +2298,20 @@
     };
     var btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
+    var recId = newUuid(); // client UUID pehle se — lost response par retry duplicate nahi banayega
     if (editingId) {
       var editId = editingId;
+      if (isOffline()) {
+        // Offline edit: local state + outbox. Settled history kabhi edit nahi hoti.
+        var t = null;
+        txns.forEach(function (x) { if (x.id === editId) t = x; });
+        if (t && isTxnLocked(t)) { btn.disabled = false; setTxnMsg(LOCK_MSG, false); return; }
+        offlineTxnUpdate(editId, body);
+        resetTxnForm();
+        setTxnMsg("Edit offline save ho gayi — online hote hi sync hogi.", true);
+        btn.disabled = false;
+        return;
+      }
       sb("khata_transactions?id=eq." + encodeURIComponent(editId), { method: "PATCH", prefer: "return=minimal", body: body })
         .then(function (res) {
           btn.disabled = false;
@@ -1914,11 +2321,21 @@
           loadAll();
         }).catch(function () {
           btn.disabled = false;
-          setTxnMsg("Internet ya server se rabta nahi ho raha.", false);
+          offlineTxnUpdate(editId, body);
+          resetTxnForm();
+          setTxnMsg("Edit offline save ho gayi — online hote hi sync hogi.", true);
         });
       return;
     }
-    sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
+    if (isOffline()) {
+      offlineTxnInsert(Object.assign({ id: recId }, body));
+      $("txnAmount").value = "";
+      $("txnNote").value = "";
+      setTxnMsg("Record offline save ho gaya — online hote hi sync hoga.", true);
+      btn.disabled = false;
+      return;
+    }
+    sb("khata_transactions", { method: "POST", prefer: "return=representation", body: Object.assign({ id: recId }, body) })
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) { setTxnMsg("Record save nahi hua — dobara try karein.", false); return; }
@@ -1930,7 +2347,10 @@
         loadAll();
       }).catch(function () {
         btn.disabled = false;
-        setTxnMsg("Internet ya server se rabta nahi ho raha.", false);
+        offlineTxnInsert(Object.assign({ id: recId }, body));
+        $("txnAmount").value = "";
+        $("txnNote").value = "";
+        setTxnMsg("Record offline save ho gaya — online hote hi sync hoga.", true);
       });
   }
 
@@ -1941,11 +2361,19 @@
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     if (t.created_by !== myId() && !isAdmin()) return;
     askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
+    if (isOffline()) {
+      offlineTxnDelete(id);
+      setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
+      return;
+    }
     sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
       .then(function (res) {
         if (!res.ok) { setTxnMsg("Delete nahi hua.", false); return; }
         loadAll();
-      }).catch(function () { setTxnMsg("Delete nahi hua.", false); });
+      }).catch(function () {
+        offlineTxnDelete(id);
+        setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
+      });
     });
   }
 
@@ -1995,6 +2423,7 @@
     if (card) setTimeout(function () { card.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
   });
   $("acctBackupBtn").addEventListener("click", exportCsv);
+  $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", function () {
     shareText("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL);
@@ -2057,8 +2486,11 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
-  // v21: pushToggleBtn (Account toggle) hata diya — notifications sirf browser
-  // ke native popup se allow hoti hain (maybeAskPushPermission, app open par).
+  $("adminAddUserBtn").addEventListener("click", function () { var b = $("adminAddUserBox"); b.hidden = !b.hidden; setAdminAddMsg(""); });
+  $("adminAddSaveBtn").addEventListener("click", createAdminUser);
+  // v22: Account mein "Notifications On karein" button (acctPushBtn) — user
+  // gesture se enablePush chalti hai; auto-ask (maybeAskPushPermission) bhi
+  // app open par chalta hai. Off karna browser ke site settings se hota hai.
   $("confirmOkBtn").addEventListener("click", function () { var cb = confirmCallback; closeConfirm(); if (cb) cb(); });
   $("confirmCancelBtn").addEventListener("click", closeConfirm);
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
@@ -2130,10 +2562,24 @@
   /* ---------- PWA: offline ---------- */
   function renderOffline() {
     var b = $("offlineBadge");
-    if (b) b.hidden = navigator.onLine;
+    if (!b) return;
+    var pending = loadOutbox().length;
+    if (!navigator.onLine || offlineMode) {
+      // offlineMode = load fail hua aur cache se dikhaya ja raha hai
+      // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
+      b.hidden = false;
+      b.textContent = "Offline";
+    } else if (pending > 0) {
+      b.hidden = false;
+      b.textContent = "Sync pending (" + pending + ")";
+    } else {
+      b.hidden = true;
+    }
   }
-  window.addEventListener("online", renderOffline);
+  window.addEventListener("online", function () { renderOffline(); flushOutbox(); });
   window.addEventListener("offline", renderOffline);
+  var offlineBadgeEl = $("offlineBadge");
+  if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", function () { flushOutbox(); });
   renderOffline();
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {

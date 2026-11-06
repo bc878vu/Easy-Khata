@@ -1,15 +1,15 @@
 /* Easy Khata service worker — installable + offline shell.
    CACHE v1: app shell cache-first; ledger GETs network-first with
    cache fallback (last-synced balance is visible offline too). Auth, POST and
-   DELETE are always network-only — a record written offline doesn't sync, so
-   you need internet to write a new record. */
-var CACHE = "easy-khata-v21";
+   DELETE are always network-only — a record written offline is queued in the
+   app's outbox (localStorage) and syncs automatically when back online. */
+var CACHE = "easy-khata-v22";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=21",
+  "styles.css?v=22",
   "config.js?v=3",
-  "app.js?v=26",
+  "app.js?v=27",
   "manifest.webmanifest",
   "icons/icon.svg"
 ];

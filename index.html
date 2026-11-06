@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=21">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -311,6 +311,8 @@
       </div>
 
       <div class="menu-list">
+        <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
+        <p id="pushMsg" class="msg" role="status"></p>
         <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
@@ -342,6 +344,15 @@
         <p class="muted">Sirf admin (Asad) ye dekh sakta hai. Kisi user par click karein — un ka poora balance, edit, password, block aur delete sab yahan hai.</p>
         <p id="adminStats" class="muted"></p>
         <p id="adminMsg" class="msg" role="status"></p>
+        <button id="adminAddUserBtn" class="btn btn-primary" type="button">+ User add karein</button>
+        <div id="adminAddUserBox" hidden>
+          <div class="field"><label for="adminAddName">Naam</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan"></div>
+          <div class="field"><label for="adminAddEmail">Email</label><input id="adminAddEmail" type="email" placeholder="Example: ali@gmail.com"></div>
+          <div class="field"><label for="adminAddPhone">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="Example: 0300 1234567"></div>
+          <div class="field"><label for="adminAddPass">Password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf"></div>
+          <button id="adminAddSaveBtn" class="btn btn-primary" type="button">User banayein</button>
+          <p id="adminAddMsg" class="msg" role="status"></p>
+        </div>
         <div id="adminUserList" class="people"></div>
       </div>
     </section>
@@ -427,6 +438,6 @@
     </div>
   </div>
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
