@@ -5,12 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Easy Khata — Food Money Ledger</title>
 <meta name="description" content="Easy Khata — track food money with friends. Who paid how much, and everyone's balance in one place.">
+<!-- Open Graph + Twitter Card (v21): WhatsApp/Facebook par share karne par
+     link ek pyara preview card dikhaye — title, description aur icon ke saath.
+     og:image PNG hai (icons/icon-512.png, 512x512); SVG preview nahi banta. -->
+<meta property="og:title" content="Easy Khata — Food Money Ledger">
+<meta property="og:description" content="Track food money with friends. Who paid how much, and everyone's balance in one place.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://easy-khata-asad2327s-projects.vercel.app/">
+<meta property="og:image" content="https://easy-khata-asad2327s-projects.vercel.app/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#f7f8fa">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 
@@ -208,14 +220,22 @@
         </div>
         <p class="muted">Saare records — naye pehle.</p>
         <div class="toolbar">
-          <input id="txnSearch" type="search" placeholder="Naam, khana ya raqam dhoondhein...">
-          <select id="txnFilterPerson"><option value="">Sab</option></select>
-          <label class="date-wrap"><span>Se</span><input id="txnFrom" type="date" title="From (date)"></label>
-          <label class="date-wrap"><span>Tak</span><input id="txnTo" type="date" title="To (date)"></label>
-          <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
-          <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
+          <div class="tb-row">
+            <input id="txnSearch" type="search" placeholder="Naam, khana ya raqam dhoondhein...">
+            <select id="txnFilterPerson"><option value="">Sab</option></select>
+          </div>
+          <div class="tb-row">
+            <label class="date-cell"><span>Se</span><input id="txnFrom" type="date" title="From (date)"></label>
+            <label class="date-cell"><span>Tak</span><input id="txnTo" type="date" title="To (date)"></label>
+          </div>
+          <div class="tb-row">
+            <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
+            <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
+          </div>
+          <p id="filterCount" class="filter-count" hidden></p>
         </div>
-        <div id="txnList" class="txns"></div>
+        <div id="txnList" class="txns scroll-box"></div>
+        <p id="txnScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane records dekhne ke liye</p>
       </div>
     </section>
 
@@ -236,7 +256,8 @@
         <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span>Hisaab barabar</span></button>
       </div>
       <p class="section-label">LEN-DEN</p>
-      <div id="detailTxns" class="dtable"></div>
+      <div id="detailTxns" class="dtable scroll-box"></div>
+      <p id="detailScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane len-den dekhne ke liye</p>
       <div class="detail-bottom">
         <button id="detailDiyeBtn" class="btn btn-diye" type="button">↑ Mainey Diye</button>
         <button id="detailLiyeBtn" class="btn btn-liye" type="button">↓ Mainey Liye</button>
@@ -286,12 +307,9 @@
       <div class="acct-shortcuts">
         <button id="acctShareBtn" class="shortcut" type="button"><span class="sc-ico">📤</span><span>Share Easy Khata</span></button>
         <button id="acctLedgerBtn" class="shortcut" type="button"><span class="sc-ico">📒</span><span>Poora hisaab</span></button>
-        <button id="acctNotifBtn" class="shortcut" type="button"><span class="sc-ico">🔔</span><span>Yaad Dehani</span></button>
       </div>
 
       <div class="menu-list">
-        <button id="themeBtn" class="menu-item" type="button"><span class="mi-ico">🌙</span><span>Dark mode</span><span id="themeIcon" class="menu-right">🌙</span></button>
-        <button id="pushToggleBtn" class="menu-item" type="button">🔔 Notifications: Off</button>
         <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
@@ -303,7 +321,7 @@
         <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
         <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
       </div>
-      <p class="version">Easy Khata — App version 20</p>
+      <p class="version">Easy Khata — App version 21</p>
     </section>
 
     <section id="notifView" hidden>
@@ -408,6 +426,6 @@
     </div>
   </div>
 
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

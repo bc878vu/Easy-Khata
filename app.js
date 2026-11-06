@@ -9,7 +9,10 @@
   var SESSION_KEY = "easykhata_auth";
   var ADMIN_EMAIL = cfg.ADMIN_EMAIL || "";
   var APP_URL = "https://easy-khata-asad2327s-projects.vercel.app";
-  var APP_SHORT_URL = "https://is.gd/4IoxbU"; // short link for shared messages (verified: redirects to APP_URL)
+  // v21: share messages mein ab DIRECT app URL — is.gd short link se WhatsApp
+  // par koi preview nahi banta tha aur user ke phone par link kaam bhi nahi kar
+  // raha tha; direct URL + index.html ke OG tags se ab preview card banta hai.
+  var APP_SHORT_URL = APP_URL;
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) {
@@ -149,7 +152,7 @@
     for (var j = 0; j < myContacts.length; j++) {
       if (myContacts[j].id === id) return myContacts[j].name || "Unknown";
     }
-    return id === myId() ? myName() : "Private contact";
+    return id === myId() ? myName() : "Naam nahi mila";
   }
 
   function initials(name) {
@@ -779,6 +782,11 @@
         renderPeople();
         renderPersonSelect();
         renderTxnFilterOptions();
+        // BUGFIX (v21): ledger contacts se PEHLE render ho jata hai (loadAll mein
+        // renderAll loadContacts se pehle chal jata hai), is liye manual doston
+        // (Ayaz) ke naam pehle "Private contact" dikhte the aur wahi stuck rehta
+        // tha — contacts aate hi ledger dobara render karein.
+        renderTxns();
         return maybeLinkContacts();
       }).catch(function () { return 0; });
   }
@@ -927,17 +935,10 @@
       body: { user_id: myId(), endpoint: sub.endpoint, p256dh: k.keys.p256dh, auth: k.keys.auth }
     });
   }
-  function deletePushSub(sub) {
-    return sb("khata_push_subs?endpoint=eq." + encodeURIComponent(sub.endpoint), { method: "DELETE" });
-  }
-  function updatePushToggleLabel() {
-    var b = $("pushToggleBtn");
-    if (!b) return;
-    b.textContent = pushState === "on" ? "🔔 Notifications: On"
-      : pushState === "denied" ? "🔔 Notifications: Blocked"
-      : pushState === "unsupported" ? "🔔 Notifications: Not in this browser"
-      : "🔔 Notifications: Off";
-  }
+  // v21: Account se "Notifications: Off" toggle hata diya — notifications sirf
+  // browser ke native popup se allow hoti hain (maybeAskPushPermission, app open
+  // par). Yeh function ab no-op hai; call sites ko chheda nahi gaya.
+  function updatePushToggleLabel() { return; }
   function refreshPushState() {
     if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState); }
     if (window.Notification && Notification.permission === "denied") {
@@ -987,20 +988,9 @@
       return false;
     });
   }
-  function disablePush() {
-    if (!pushSupported) return Promise.resolve(false);
-    return navigator.serviceWorker.ready.then(function (reg) {
-      return reg.pushManager.getSubscription();
-    }).then(function (sub) {
-      if (!sub) { pushState = "off"; updatePushToggleLabel(); return true; }
-      return sub.unsubscribe().then(function () {
-        return deletePushSub(sub).catch(function () {}).then(function () {
-          pushState = "off"; updatePushToggleLabel();
-          return true;
-        });
-      });
-    }).catch(function () { return false; });
-  }
+  // v21: disablePush hata diya — Account toggle ab hai hi nahi; notifications
+  // sirf browser ke native popup se allow hoti hain, off karna browser ke site
+  // settings se hota hai. enablePush() abhi bhi maybeAskPushPermission se chalti hai.
   function triggerPush(recipientId, title, text) {
     // Fire-and-forget: the server function sends the push to the recipient.
     // The save flow never waits on this.
@@ -1595,6 +1585,7 @@
     var me = myId();
     if (!list.length) {
       $("detailTxns").innerHTML = '<p class="empty">Abhi koi len-den nahi — neeche se pehla record add karein.</p>';
+      refreshScrollHints();
       return;
     }
     // Newest first — defensive sort (API already returns this order, but the running
@@ -1642,6 +1633,7 @@
         '</div>';
     });
     $("detailTxns").innerHTML = html;
+    refreshScrollHints();
   }
   function openAddFor(personId, dir) {
     // From the detail screen: open the add form, pre-filled for this person + direction.
@@ -1720,15 +1712,38 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
+  // Scrollable history boxes (v21): box tab scrollable ho (scrollHeight >
+  // clientHeight) to neeche wali hint dikhate hain — user ko pata chale ke
+  // andar scroll karke purane records dekh sakta hai.
+  function updateScrollHint(boxEl, hintEl) {
+    if (!boxEl || !hintEl) return;
+    try {
+      hintEl.hidden = !(boxEl.scrollHeight > boxEl.clientHeight + 4);
+    } catch (e) { hintEl.hidden = true; }
+  }
+  function refreshScrollHints() {
+    updateScrollHint($("txnList"), $("txnScrollHint"));
+    updateScrollHint($("detailTxns"), $("detailScrollHint"));
+  }
+  window.addEventListener("resize", refreshScrollHints);
   function renderTxns() {
     var me = myId();
     var list = filteredTxns();
+    // Live filter count (v21): koi filter laga ho to batayein kitne records mile.
+    var fc = $("filterCount");
+    if (fc) {
+      var anyFilter = !!(txnSearchText || txnFilterPerson || txnFromDate || txnToDate);
+      fc.hidden = !anyFilter;
+      if (anyFilter) fc.textContent = list.length + " records dikh rahe hain";
+    }
     if (!txns.length) {
       $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
+      refreshScrollHints();
       return;
     }
     if (!list.length) {
       $("txnList").innerHTML = '<p class="empty">Is search/filter se koi record nahi mila.</p>';
+      refreshScrollHints();
       return;
     }
     var html = "";
@@ -1753,6 +1768,7 @@
         '<div class="t-foot"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
     });
     $("txnList").innerHTML = html;
+    refreshScrollHints();
   }
 
   /* ---------- add / edit / delete ---------- */
@@ -1978,7 +1994,6 @@
     var card = $("ledgerCard");
     if (card) setTimeout(function () { card.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
   });
-  $("acctNotifBtn").addEventListener("click", showNotifView);
   $("acctBackupBtn").addEventListener("click", exportCsv);
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", function () {
@@ -1997,8 +2012,12 @@
   $("savePhoneBtn").addEventListener("click", savePhone);
   $("txnSearch").addEventListener("input", function (e) { txnSearchText = e.target.value; renderTxns(); });
   $("txnFilterPerson").addEventListener("change", function (e) { txnFilterPerson = e.target.value; renderTxns(); });
+  // Live date filters (v21): date chunte hi list update ho — change ke saath
+  // input bhi sunte hain, taaki date picker ke har badlav par filter chal jaye.
   $("txnFrom").addEventListener("change", function (e) { txnFromDate = e.target.value; renderTxns(); });
+  $("txnFrom").addEventListener("input", function (e) { txnFromDate = e.target.value; renderTxns(); });
   $("txnTo").addEventListener("change", function (e) { txnToDate = e.target.value; renderTxns(); });
+  $("txnTo").addEventListener("input", function (e) { txnToDate = e.target.value; renderTxns(); });
   $("clearFilterBtn").addEventListener("click", function () {
     txnSearchText = ""; txnFilterPerson = ""; txnFromDate = ""; txnToDate = "";
     $("txnSearch").value = ""; $("txnFilterPerson").value = ""; $("txnFrom").value = ""; $("txnTo").value = "";
@@ -2038,10 +2057,8 @@
   $("adminBlockBtn").addEventListener("click", toggleAdminBlock);
   $("adminDeleteBtn").addEventListener("click", function () { if (adminCurrentUser) deleteUser(adminCurrentUser.id); });
   $("adminSetSaveBtn").addEventListener("click", saveAdminSet);
-  $("pushToggleBtn").addEventListener("click", function () {
-    if (pushState === "on") disablePush();
-    else enablePush();
-  });
+  // v21: pushToggleBtn (Account toggle) hata diya — notifications sirf browser
+  // ke native popup se allow hoti hain (maybeAskPushPermission, app open par).
   $("confirmOkBtn").addEventListener("click", function () { var cb = confirmCallback; closeConfirm(); if (cb) cb(); });
   $("confirmCancelBtn").addEventListener("click", closeConfirm);
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
@@ -2132,8 +2149,7 @@
   // (dark karo), dark mein ☀️ (light karo).
   function applyTheme(mode) {
     document.documentElement.setAttribute("data-theme", mode);
-    var ic = $("themeIcon");
-    if (ic) ic.textContent = mode === "dark" ? "☀️" : "🌙";
+    // v21: themeIcon (Account row ka icon) hata diya — sirf header icon bachta hai.
     var hb = $("themeHeaderBtn");
     if (hb) hb.textContent = mode === "dark" ? "☀️" : "🌙";
     try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
@@ -2142,7 +2158,9 @@
     var cur = document.documentElement.getAttribute("data-theme") || "light";
     applyTheme(cur === "dark" ? "light" : "dark");
   }
-  $("themeBtn").addEventListener("click", toggleTheme);
+  // v21: themeBtn (Account "Dark mode" row) hata diya — theme ab sirf header
+  // icon (themeHeaderBtn) se badalta hai; applyTheme dono ko sync karta tha,
+  // themeIcon ka null guard pehle se hai.
   $("themeHeaderBtn").addEventListener("click", toggleTheme);
   try {
     var savedTheme = window.localStorage.getItem("easykhata_theme");

@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline doesn't sync, so
    you need internet to write a new record. */
-var CACHE = "easy-khata-v20";
+var CACHE = "easy-khata-v21";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=20",
+  "styles.css?v=21",
   "config.js?v=3",
-  "app.js?v=25",
+  "app.js?v=26",
   "manifest.webmanifest",
   "icons/icon.svg"
 ];

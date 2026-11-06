@@ -53,14 +53,14 @@
 }
 *{box-sizing:border-box}
 button{font-family:inherit;color:inherit}
-html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-bottom:220px}
+html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-bottom:250px}
 body{
   margin:0;
   background:var(--bg);
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.5;
-  padding-bottom:210px;
+  padding-bottom:240px;
   overflow-x:clip;
 }
 h1{font-size:1.25rem;margin:0 0 8px}
@@ -292,11 +292,31 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    Stacked rows: naam apni line par, raqam + buttons doosri line par —
    360px par bhi kabhi overflow nahi (side-by-side layout right edge par cut ho raha tha). */
 .list-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* Compact live filters (v21): chhotay boxes, phone par bhi 2-column rows —
+   search + dropdown ek row, Se/Tak dates ek row (label upar, kabhi cut nahi),
+   buttons ek row. Filtering live hai — type karte hi list update hoti hai. */
 .toolbar{display:grid;gap:8px;margin:10px 0}
-.toolbar input,.toolbar select{font-size:.92rem;min-width:0}
-.date-wrap{display:flex;align-items:center;gap:8px;min-width:0}
-.date-wrap span{font-size:.85rem;color:var(--muted);min-width:22px}
-.date-wrap input{flex:1;min-width:0}
+.tb-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+.tb-row>*{min-width:0}
+.toolbar input,.toolbar select{font-size:.88rem;padding:8px 10px;min-width:0;width:100%}
+.date-cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+.date-cell span{font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.date-cell input{width:100%;min-width:0}
+.toolbar .btn{padding:8px 10px;min-height:38px;font-size:.88rem}
+.filter-count{grid-column:1/-1;margin:0;font-size:.78rem;color:var(--muted)}
+/* Scrollable history box (v21): Poora hisaab + LEN-DEN sirf ~5-7 rows dikhate
+   hain, baaki andar scroll hota hai — lambi list ab FAB/bottom-nav ke peeche
+   nahi jaati, aur filters box ke upar hamesha nazar aate hain. */
+.scroll-box{
+  max-height:600px;overflow-y:auto;overscroll-behavior:contain;
+  border:1px solid var(--line);border-radius:12px;padding:8px;
+  background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--muted) transparent;
+}
+.scroll-box::-webkit-scrollbar{width:6px}
+.scroll-box::-webkit-scrollbar-thumb{background:var(--muted);border-radius:3px}
+.scroll-box::-webkit-scrollbar-track{background:transparent}
+.scroll-hint{text-align:center;font-size:.78rem;color:var(--muted);margin:8px 0 0}
 .txns{display:grid;gap:8px}
 .txn{
   display:block;background:var(--tab-bg);
@@ -351,7 +371,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .dtable{display:grid;gap:8px}
 .dtable-head{
   display:grid;grid-template-columns:1fr 74px 74px;gap:8px;
-  font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--muted);padding:0 4px;
+  font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--muted);padding:4px;
+  /* LEN-DEN box ke andar scroll karte waqt header upar chipka rehta hai (v21). */
+  position:sticky;top:0;background:var(--card);z-index:1;border-radius:8px;
 }
 .dtable-head span:nth-child(2),.dtable-head span:nth-child(3){text-align:right}
 .drow{
@@ -382,7 +404,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .acct-card{display:flex;align-items:center;gap:12px}
 .acct-info{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
 .acct-info strong{font-size:1.05rem;overflow-wrap:anywhere}
-.acct-shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.acct-shortcuts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
 .shortcut{
   background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
   padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -443,10 +465,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .confirm-card{background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:100%;box-shadow:var(--shadow)}
 .confirm-card .row{justify-content:flex-end;margin-top:14px}
 
-@media (min-width:560px){
-  .toolbar{grid-template-columns:1fr 1fr}
-  .toolbar input[type="search"]{grid-column:1/-1}
-}
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important}
 }
