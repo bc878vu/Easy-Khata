@@ -31,6 +31,18 @@ messaging.onBackgroundMessage(function (payload) {
     tag: d.tag || "easy-khata",
     data: { url: d.url || "/?view=notifs" }
   };
+  // v24.4: app icon badge (Badging API) — FCM push aane par home screen ke
+  // app icon par badge (unread count ho to wahi, warna 1). API na ho to
+  // silent skip; asal count app khulte hi syncAppBadge se set hota hai.
+  try {
+    if ("setAppBadge" in navigator) {
+      var n = 1;
+      var u = parseInt(d.unread, 10); // FCM data values hamesha string hoti hain
+      if (!isNaN(u) && u > 0) n = u;
+      var bp = navigator.setAppBadge(n);
+      if (bp && bp.catch) bp.catch(function () {});
+    }
+  } catch (err) {}
   return self.registration.showNotification(title, options);
 });
 

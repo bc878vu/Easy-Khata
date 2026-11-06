@@ -319,7 +319,10 @@
     var me = myId();
     var map = {};
     profiles.forEach(function (p) {
-      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", given: 0, taken: 0, first: null, last: null };
+      // v24.4: avatar_url bhi map karo — warna DOST list mein pic kabhi nahi
+      // dikhti (peopleMap avatar_url drop kar deta tha, is liye renderPeople
+      // ko hamesha undefined milta tha aur sirf initials dikhte the).
+      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, given: 0, taken: 0, first: null, last: null };
     });
     myContacts.forEach(function (c) {
       map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", given: 0, taken: 0, manual: true, first: null, last: null };
@@ -422,9 +425,14 @@
     hideSplash();
     teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
-    // v24.3: auth page par bottom nav nahi hota — fixed footer viewport ke
-    // bilkul neeche (body.has-nav hatao).
+    // v24.4: auth page par na bottom nav hota hai na footer — footer sirf
+    // Account page par dikhta hai (body.has-nav + has-footer hatao).
+    // Logout/boot par icon badge bhi clear (koi user nahi = koi unread nahi).
     document.body.classList.remove("has-nav");
+    document.body.classList.remove("has-footer");
+    clearAppBadgeNow();
+    var vf0 = $("versionFooter");
+    if (vf0) vf0.hidden = true;
     $("authWrap").hidden = false;
     $("appShell").hidden = true;
     $("authBox").hidden = false;
@@ -437,8 +445,9 @@
   }
   function showApp() {
     hideSplash();
-    // v24.3: app screens par bottom nav dikhta hai — fixed footer nav ke
-    // theek upar (body.has-nav lagao).
+    // v24.4: app screens par bottom nav dikhta hai (body.has-nav lagao).
+    // Footer sirf Account view par dikhta hai — showView("khata") use chhupata
+    // hai; Account kholte hi showView use dikhata hai.
     document.body.classList.add("has-nav");
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
@@ -475,6 +484,13 @@
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser");
     $("fabAdd").hidden = name !== "khata";
+    // v24.4: footer SIRF Account (settings) page par — Khata/detail/notifs/
+    // admin par fixed footer content ke upar aa jata tha (screenshots:
+    // "+ Dost add karein" button aur "Kis liye?" field par overlap). Footer
+    // Account par fixed rehta hai (bottom nav ke upar), baaki views par hidden.
+    var vf = $("versionFooter");
+    if (vf) vf.hidden = name !== "account";
+    document.body.classList.toggle("has-footer", name === "account");
     window.scrollTo(0, 0);
   }
   function showAppView() {
@@ -755,7 +771,11 @@
   }
 
   function profilesQuery(withPhone) {
-    return sb("khata_profiles?select=id,name,email,created_at" + (withPhone ? ",phone" : "") + "&order=name.asc");
+    // v24.4: avatar_url + username bhi load karo. Root cause (live DB se sabit):
+    // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
+    // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
+    // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username" + (withPhone ? ",phone" : "") + "&order=name.asc");
   }
 
   // Outbox sync: pending ops ko order mein server par bhejein.
@@ -913,8 +933,9 @@
     }
     setTxnMsg("");
     profilesQuery(true).then(function (res) {
-      // If the phone column doesn't exist yet (v2 SQL not run), load without the phone.
-      if (!res.ok && res.body && res.body.code === "42703") return profilesQuery(false);
+      // If a column doesn't exist yet (purana SQL), load with the minimal
+      // columns — warna 42703 retry bhi wahi columns mangta.
+      if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
       return res;
     }).then(function (res) {
       if (!res.ok) {
@@ -1129,6 +1150,7 @@
         if (!res.ok) return;
         notifs = Array.isArray(res.body) ? res.body : [];
         renderNotifBadge();
+        syncAppBadge(); // v24.4: icon badge = asal unread count
         if (!$("notifView").hidden) renderNotifList();
         saveCache();
       }).catch(function () {});
@@ -1143,6 +1165,32 @@
     var b = $("notifBadge");
     b.textContent = n > 99 ? "99+" : String(n);
     b.hidden = n === 0;
+  }
+  // v24.4: app icon badge (Badging API) — PWA install hone par home screen ke
+  // app icon par unread count dikhe, taake notification bina app khole nazar
+  // aaye. API na ho to silent skip (koi crash/error nahi). Badge hamesha
+  // ASAL unread count hota hai; list khuli ho to sync rukta hai (user dekh
+  // raha hai — badge wapas tab aata hai jab list band ho aur unread bachein).
+  var appBadgeCount = -1; // aakhri baar icon par kya set kiya (-1 = unknown)
+  function clearAppBadgeNow() {
+    try {
+      if (typeof navigator !== "undefined" && "clearAppBadge" in navigator) {
+        var c = navigator.clearAppBadge();
+        if (c && c.catch) c.catch(function () {});
+      }
+    } catch (e) {}
+    appBadgeCount = 0;
+  }
+  function syncAppBadge() {
+    try {
+      if (typeof navigator === "undefined" || !("setAppBadge" in navigator)) return;
+      if (!$("notifView").hidden) return; // Yaad Dehani khuli hai — user dekh raha hai
+      var n = unreadNotifCount();
+      if (n === appBadgeCount) return; // pehle se wahi hai — dobara set nahi
+      appBadgeCount = n;
+      if (n > 0) { var p = navigator.setAppBadge(n); if (p && p.catch) p.catch(function () {}); }
+      else if ("clearAppBadge" in navigator) { var c2 = navigator.clearAppBadge(); if (c2 && c2.catch) c2.catch(function () {}); }
+    } catch (e) {}
   }
   function renderNotifList() {
     if (!notifs.length) {
@@ -1168,6 +1216,7 @@
   }
   function showNotifView() {
     showView("notifs");
+    clearAppBadgeNow(); // v24.4: list kholi = dekh liya — icon badge clear
     loadNotifs();
   }
 
@@ -1949,9 +1998,13 @@
     profiles.forEach(function (p) { if (p.id === myId()) me = p; });
     return me;
   }
+  // v24.4: tooti/khali pic par initials fallback — kabhi toota image icon na
+  // dikhe (header, account card, person detail, DOST list — har jagah).
+  function jsq(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
   function avatarHtml(url, initial) {
-    if (url) return '<img src="' + esc(url) + '" alt="">';
-    return esc(initial || "?");
+    var ini = initial || "?";
+    if (url) return '<img src="' + esc(url) + '" alt="" onerror="this.onerror=null;this.outerHTML=\'' + jsq(ini) + '\'">';
+    return esc(ini);
   }
   function setAvatarEl(el, url, initial) {
     if (!el) return;

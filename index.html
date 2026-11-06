@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=27">
+<link rel="stylesheet" href="styles.css?v=28">
 </head>
 <body>
 
@@ -163,7 +163,8 @@
         </div>
       </div>
 
-      <div class="people-search-wrap">
+      <div class="people-search-wrap search-wrap">
+        <span class="search-icon" aria-hidden="true">🔍</span>
         <input id="peopleSearch" type="search" placeholder="Dost dhoondhein — naam likhein...">
       </div>
 
@@ -237,7 +238,10 @@
         <p class="muted">Saare records — naye pehle.</p>
         <div class="toolbar">
           <div class="tb-row">
-            <input id="txnSearch" type="search" placeholder="Naam, khana ya raqam dhoondhein...">
+            <span class="search-wrap tb-search">
+              <span class="search-icon" aria-hidden="true">🔍</span>
+              <input id="txnSearch" type="search" placeholder="Naam, khana ya raqam dhoondhein...">
+            </span>
             <select id="txnFilterPerson"><option value="">Sab</option></select>
           </div>
           <div class="tb-row">
@@ -502,12 +506,12 @@
     </div>
   </div>
 
-<!-- v24.3: footer GLOBAL + FIXED — pehle sirf Account view ke andar tha
-     (Khata/auth par dikhta hi nahi tha). Ab body-level hai, har screen par
-     neeche fixed rehta hai (CSS: bottom nav ke upar app screens par, viewport
-     neeche auth page par). Text bilkul wahi: "Developed by Asad". -->
-<p class="version">Developed by Asad</p>
+<!-- v24.4: footer SIRF Account (settings) page par — v24.3 ka "global fixed"
+     rule user order se supersede ho gaya (Khata/detail par fixed footer
+     content ke upar aa jata tha). Body-level hi rehta hai, showView("account")
+     par dikhta hai, baaki views par hidden. Text bilkul wahi: "Developed by Asad". -->
+<p class="version" id="versionFooter" hidden>Developed by Asad</p>
 
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

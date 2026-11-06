@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v24-3";
+var CACHE = "easy-khata-v24-4";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=27",
+  "styles.css?v=28",
   "config.js?v=4",
-  "app.js?v=32",
+  "app.js?v=33",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg"
@@ -41,7 +41,20 @@ self.addEventListener("push", function (e) {
     tag: data.tag || "easy-khata",
     data: { url: data.url || "/?view=notifs" }
   };
-  e.waitUntil(self.registration.showNotification(title, options));
+  // v24.4: app icon badge (Badging API) — push aane par home screen ke app
+  // icon par badge: payload mein unread count ho to wahi number, warna 1.
+  // API na ho to silent skip. Asal count app khulte hi syncAppBadge se set
+  // hota hai; server payload mein unread count nahi bhejta (change nahi).
+  var badgeWork = (function () {
+    try {
+      if ("setAppBadge" in navigator) {
+        var n = (typeof data.unread === "number" && data.unread > 0) ? data.unread : 1;
+        return navigator.setAppBadge(n);
+      }
+    } catch (err) {}
+    return Promise.resolve();
+  })();
+  e.waitUntil(Promise.all([self.registration.showNotification(title, options), badgeWork]));
 });
 
 self.addEventListener("notificationclick", function (e) {
