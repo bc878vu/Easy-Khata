@@ -4,89 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Easy Khata — Food Money Ledger</title>
-<meta name="description" content="Easy Khata — track food money with friends. Who paid how much, who owes whom, everyone's balance in one place.">
+<meta name="description" content="Easy Khata — track food money with friends. Who paid how much, and everyone's balance in one place.">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#14532d">
+<meta name="theme-color" content="#f7f8fa">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">📒</span>
-    <div>
-      <h1>Easy Khata</h1>
-      <p>Food money, clear accounts</p>
-    </div>
-  </div>
-  <div class="top-actions">
-    <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
-    <button id="notifBtn" class="icon-btn" type="button" title="Notifications" hidden>🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
-    <button id="avatarBtn" class="avatar-btn" type="button" title="Profile" hidden>?</button>
-    <button id="menuBtn" class="icon-btn" type="button" title="Menu" hidden>☰</button>
-  </div>
-</header>
 
-<div id="drawerOverlay" class="drawer-overlay" hidden></div>
-<aside id="drawer" class="drawer" hidden aria-label="Menu">
-  <div class="drawer-head">
-    <div class="drawer-profile">
-      <span id="drawerAvatar" class="avatar-btn big">?</span>
-      <div>
-        <strong id="drawerName"></strong>
-        <span id="drawerEmail" class="muted"></span>
-      </div>
-    </div>
-    <button id="drawerCloseBtn" class="icon-btn dark" type="button" title="Close">✕</button>
-  </div>
-  <nav class="drawer-nav">
-    <button id="navKhataBtn" class="drawer-item" type="button">📒 My Ledger</button>
-    <button id="navAdminBtn" class="drawer-item" type="button" hidden>🛡️ Admin Panel</button>
-  </nav>
-  <div class="drawer-section">
-    <h3>Settings</h3>
-    <button id="themeBtn" class="drawer-item" type="button"><span id="themeIcon">🌙</span> Dark mode</button>
-    <button id="pushToggleBtn" class="drawer-item" type="button">🔔 Notifications: Off</button>
-    <div class="field" style="margin-top:12px">
-      <label for="myPhone">My WhatsApp number</label>
-      <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
-      <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Save number</button>
-      <p id="phoneMsg" class="msg" role="status"></p>
-    </div>
-    <button id="changePassBtn" class="drawer-item" type="button">🔑 Change password</button>
-    <div id="changePassBox" hidden>
-      <div class="field">
-        <label for="newPass1">New password</label>
-        <div class="pw-wrap">
-          <input id="newPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
-          <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="newPass2">New password again</label>
-        <div class="pw-wrap">
-          <input id="newPass2" type="password" autocomplete="new-password" placeholder="Type again">
-          <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-        </div>
-      </div>
-      <button id="savePassBtn" class="btn btn-primary" type="button">Save password</button>
-      <p id="passMsg" class="msg" role="status"></p>
-    </div>
-  </div>
-  <div class="drawer-foot">
-    <button id="logoutBtn" class="btn btn-block btn-logout" type="button">Logout</button>
-  </div>
-</aside>
+<div id="setupBox" class="card setup" hidden>
+  <h2>Database setup pending</h2>
+  <p>The app is ready, but the tables are not created in Supabase yet. Run the <code>easy-khata.sql</code> file from the repo in the Supabase SQL Editor, then refresh the page.</p>
+</div>
 
-<main class="wrap">
-
-  <div id="setupBox" class="card setup" hidden>
-    <h2>Database setup pending</h2>
-    <p>The app is ready, but the tables are not created in Supabase yet. Run the <code>easy-khata.sql</code> file from the repo in the Supabase SQL Editor, then refresh the page.</p>
-  </div>
-
+<main class="wrap" id="authWrap">
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
     <div id="authForm">
@@ -148,198 +81,304 @@
       <p id="resetMsg" class="msg" role="status"></p>
     </div>
   </section>
-
-  <!-- Main app -->
-  <section id="appBox" hidden>
-
-    <div class="summary">
-      <div class="sum-card given">
-        <span class="sum-label">I gave</span>
-        <strong id="sumGiven">Rs 0</strong>
-        <span id="sumGivenCount" class="sum-sub"></span>
-      </div>
-      <div class="sum-card taken">
-        <span class="sum-label">I took</span>
-        <strong id="sumTaken">Rs 0</strong>
-        <span id="sumTakenCount" class="sum-sub"></span>
-      </div>
-      <div class="sum-card net">
-        <span class="sum-label">My net balance</span>
-        <strong id="sumNet">Rs 0</strong>
-        <span id="sumNetSub" class="sum-sub"></span>
-      </div>
-    </div>
-
-    <div id="monthStats" class="month-stats" hidden></div>
-    <div id="insightStats" class="month-stats" hidden></div>
-    <div class="actions-row">
-      <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Share my balance</button>
-    </div>
-
-    <div class="card accent" id="txnFormCard">
-      <h2 id="txnFormTitle">Add a new record</h2>
-      <form id="txnForm">
-        <div class="field" id="txnPersonRow">
-          <label for="txnPerson">With whom?</label>
-          <select id="txnPerson"></select>
-        </div>
-        <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Add a contact (not on the app)</button></div>
-        <div id="addContactBox" hidden>
-          <div class="field"><label for="newContactName">Name</label><input id="newContactName" type="text" maxlength="80" placeholder="Example: Maha Chaudhary"></div>
-          <div class="field"><label for="newContactPhone">Phone number (optional — this number will link to their account later)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
-          <div class="row">
-            <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Choose from contacts</button>
-            <button id="saveContactBtn" class="btn btn-primary" type="button">Save contact</button>
-          </div>
-          <p id="contactMsg" class="msg" role="status"></p>
-        </div>
-        <div class="field" id="txnDirRow">
-          <label>Type of transaction</label>
-          <div class="seg">
-            <label class="seg-opt"><input type="radio" name="txnDir" value="given" checked> I gave</label>
-            <label class="seg-opt"><input type="radio" name="txnDir" value="taken"> I took</label>
-          </div>
-        </div>
-        <div class="field">
-          <label class="check"><input id="txnSplit" type="checkbox"> One meal, several friends — split the amount equally</label>
-        </div>
-        <div id="splitBox" class="field" hidden>
-          <label>Choose friends (to split with)</label>
-          <div id="splitList" class="split-list"></div>
-          <p id="splitHint" class="muted"></p>
-        </div>
-        <div class="field">
-          <label for="txnAmount">Amount (Rs)</label>
-          <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500" required>
-        </div>
-        <div class="field">
-          <label for="txnNote">What for? (food, tea, lunch...)</label>
-          <input id="txnNote" type="text" placeholder="Example: Lunch — biryani" maxlength="120">
-        </div>
-        <div class="field">
-          <label for="txnDate">Date</label>
-          <input id="txnDate" type="date" required>
-        </div>
-        <p id="txnMsg" class="msg" role="status"></p>
-        <button class="btn btn-primary btn-block" type="submit">Save record</button>
-        <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Cancel edit</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Balance with everyone</h2>
-      <p class="muted">With each friend — how much you gave them, how much you took from them.</p>
-      <p id="peopleMsg" class="msg" role="status"></p>
-      <div id="peopleList" class="people"></div>
-    </div>
-
-
-    <div class="card">
-      <div class="list-head">
-        <h2>Full ledger</h2>
-        <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
-      </div>
-      <p class="muted">All records with all friends — newest first.</p>
-      <div class="toolbar">
-        <input id="txnSearch" type="search" placeholder="Search — name, food or amount...">
-        <select id="txnFilterPerson"><option value="">Everyone</option></select>
-        <label class="date-wrap"><span>From</span><input id="txnFrom" type="date" title="From (date)"></label>
-        <label class="date-wrap"><span>To</span><input id="txnTo" type="date" title="To (date)"></label>
-        <button id="clearFilterBtn" class="btn btn-ghost" type="button">Clear filters</button>
-        <button id="exportCsvBtn" class="btn btn-soft" type="button">Download CSV</button>
-      </div>
-      <div id="txnList" class="txns"></div>
-    </div>
-
-  </section>
-
-  <section id="notifView" hidden>
-    <div class="card">
-      <button id="notifBackBtn" class="btn btn-ghost" type="button">← Back to Ledger</button>
-      <h2 style="margin-top:10px">Notifications</h2>
-      <p class="muted">When someone saves a record with you, a message will appear here.</p>
-      <button id="markAllReadBtn" class="btn btn-soft" type="button">Mark all as read</button>
-      <div id="notifList" class="notifs" style="margin-top:12px"></div>
-    </div>
-  </section>
-
-  <section id="adminView" hidden>
-    <div class="card">
-      <button id="adminBackBtn" class="btn btn-ghost" type="button">← Back to Ledger</button>
-      <h2 style="margin-top:10px">Admin Panel — Users</h2>
-      <p class="muted">Only the admin (Asad) can see this. Click a user — their full balance, edit, password, block and delete are all here.</p>
-      <p id="adminStats" class="muted"></p>
-      <p id="adminMsg" class="msg" role="status"></p>
-      <div id="adminUserList" class="people"></div>
-    </div>
-  </section>
-
-  <section id="adminUserView" hidden>
-    <div class="card">
-      <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Back to Users</button>
-      <h2 id="adminUserTitle" style="margin-top:10px"></h2>
-      <p id="adminUserBadges"></p>
-      <dl class="kv">
-        <dt>Email</dt><dd id="adminUserEmail"></dd>
-        <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
-        <dt>Joined</dt><dd id="adminUserJoined"></dd>
-        <dt>User ID</dt><dd id="adminUserId"></dd>
-      </dl>
-      <div id="adminUserSummary" class="summary"></div>
-      <div class="detail-actions">
-        <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
-        <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
-        <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
-        <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
-      </div>
-      <div id="adminEditBox" hidden>
-        <div class="field"><label for="adminEditName">Name</label><input id="adminEditName" type="text" maxlength="80"></div>
-        <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
-        <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save</button>
-        <p id="adminEditMsg" class="msg" role="status"></p>
-      </div>
-      <div id="adminPassBox" hidden>
-        <div class="field"><label for="adminNewPass1">New password</label>
-          <div class="pw-wrap">
-            <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
-            <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-          </div>
-        </div>
-        <div class="field"><label for="adminNewPass2">New password again</label>
-          <div class="pw-wrap">
-            <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Type again">
-            <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-          </div>
-        </div>
-        <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Save password</button>
-        <p id="adminPassMsg" class="msg" role="status"></p>
-      </div>
-      <h3 style="margin-top:16px">Set amount (admin)</h3>
-      <p class="muted">Create a record for this user — an opening balance or a correction. The record will be between you and this user, and they will also get a notification.</p>
-      <div class="field"><label for="adminSetAmount">Amount (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
-      <div class="field"><label>Direction</label>
-        <div class="seg">
-          <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> To receive from user</label>
-          <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> To pay to user</label>
-        </div>
-      </div>
-      <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
-      <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Set amount</button>
-      <p id="adminSetMsg" class="msg" role="status"></p>
-      <h3 style="margin-top:16px">This user's ledger</h3>
-      <div id="adminUserTxns" class="txns"></div>
-      <p id="adminUserMsg" class="msg" role="status"></p>
-    </div>
-  </section>
-
 </main>
 
-<footer class="foot">
-  <p>Easy Khata — your balance, clear accounts.</p>
-</footer>
+<!-- Logged-in app shell -->
+<div id="appShell" hidden>
+  <header class="app-header">
+    <div class="app-user">
+      <span id="headerAvatar" class="avatar">?</span>
+      <div class="app-user-text">
+        <strong id="headerName">Easy Khata</strong>
+        <span class="app-sub">Food money ledger</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="liveUpdating" class="live-updating" hidden>Updating…</span>
+      <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
+      <button id="notifBtn" class="icon-btn" type="button" title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Khata (main) -->
+    <section id="khataView">
+      <p class="total-label">TOTAL BALANCE</p>
+      <div class="total-cards">
+        <div class="total-card receive">
+          <span class="tc-icon">↓</span>
+          <div class="tc-text"><strong id="sumReceive">Rs 0</strong><span>Maine lene hain</span><span id="sumReceiveCount" class="tc-sub"></span></div>
+        </div>
+        <div class="total-card give">
+          <span class="tc-icon">↑</span>
+          <div class="tc-text"><strong id="sumPay">Rs 0</strong><span>Maine dene hain</span><span id="sumPayCount" class="tc-sub"></span></div>
+        </div>
+      </div>
+
+      <button id="remindRow" class="remind-row" type="button">🔔 <span id="remindRowText">Yaad Dehani (0)</span><span class="remind-arrow">›</span></button>
+
+      <div class="people-search-wrap">
+        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein — naam likhein...">
+      </div>
+
+      <p class="section-label">DOST</p>
+      <p id="peopleMsg" class="msg" role="status"></p>
+      <div id="peopleList" class="people"></div>
+      <button id="addPersonBtn" class="btn btn-black btn-block" type="button">+ Dost add karein</button>
+
+      <div class="actions-row">
+        <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Apna balance share karein</button>
+      </div>
+
+      <div id="monthStats" class="month-stats" hidden></div>
+      <div id="insightStats" class="month-stats" hidden></div>
+
+      <div class="card accent" id="txnFormCard">
+        <h2 id="txnFormTitle">Naya record</h2>
+        <form id="txnForm">
+          <div class="field" id="txnPersonRow">
+            <label for="txnPerson">Kis ke saath?</label>
+            <select id="txnPerson"></select>
+          </div>
+          <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Dost add karein (app par nahi hain)</button></div>
+          <div id="addContactBox" hidden>
+            <div class="field"><label for="newContactName">Naam</label><input id="newContactName" type="text" maxlength="80" placeholder="Example: Maha Chaudhary"></div>
+            <div class="field"><label for="newContactPhone">Phone number (optional — this number will link to their account later)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
+            <div class="row">
+              <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Choose from contacts</button>
+              <button id="saveContactBtn" class="btn btn-primary" type="button">Save karein</button>
+            </div>
+            <p id="contactMsg" class="msg" role="status"></p>
+          </div>
+          <div class="field" id="txnDirRow">
+            <label>Kisam</label>
+            <div class="seg seg-dir">
+              <label class="seg-opt opt-given"><input type="radio" name="txnDir" value="given" checked> ↑ Mainey Diye</label>
+              <label class="seg-opt opt-taken"><input type="radio" name="txnDir" value="taken"> ↓ Mainey Liye</label>
+            </div>
+          </div>
+          <div class="field">
+            <label class="check"><input id="txnSplit" type="checkbox"> Aik khana, kai dost — barabar baant lein</label>
+          </div>
+          <div id="splitBox" class="field" hidden>
+            <label>Dost chunein (baantne ke liye)</label>
+            <div id="splitList" class="split-list"></div>
+            <p id="splitHint" class="muted"></p>
+          </div>
+          <div class="field">
+            <label for="txnAmount">Raqam (Rs)</label>
+            <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500" required>
+          </div>
+          <div class="field">
+            <label for="txnNote">Kis liye? (khana, chai, lunch...)</label>
+            <input id="txnNote" type="text" placeholder="Example: Lunch — biryani" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="txnDate">Tareekh</label>
+            <input id="txnDate" type="date" required>
+          </div>
+          <p id="txnMsg" class="msg" role="status"></p>
+          <button class="btn btn-primary btn-block" type="submit">Save karein</button>
+          <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Cancel karein</button>
+        </form>
+      </div>
+
+      <div class="card" id="ledgerCard">
+        <div class="list-head">
+          <h2>Poora hisaab</h2>
+          <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh karein</button>
+        </div>
+        <p class="muted">Saare records — naye pehle.</p>
+        <div class="toolbar">
+          <input id="txnSearch" type="search" placeholder="Naam, khana ya raqam dhoondhein...">
+          <select id="txnFilterPerson"><option value="">Sab</option></select>
+          <label class="date-wrap"><span>Se</span><input id="txnFrom" type="date" title="From (date)"></label>
+          <label class="date-wrap"><span>Tak</span><input id="txnTo" type="date" title="To (date)"></label>
+          <button id="clearFilterBtn" class="btn btn-ghost" type="button">Filter saaf karein</button>
+          <button id="exportCsvBtn" class="btn btn-soft" type="button">CSV download karein</button>
+        </div>
+        <div id="txnList" class="txns"></div>
+      </div>
+    </section>
+
+    <!-- Person detail -->
+    <section id="personDetailView" hidden>
+      <div class="detail-head">
+        <button id="detailBackBtn" class="icon-btn light" type="button" title="Back">←</button>
+        <div class="detail-title">
+          <strong id="detailName">—</strong>
+          <span id="detailSince" class="muted">—</span>
+        </div>
+        <span id="detailAvatar" class="avatar">?</span>
+      </div>
+      <div id="detailBanner" class="detail-banner"></div>
+      <div class="detail-actions-row">
+        <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span>Share</span></button>
+        <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span>WhatsApp</span></button>
+        <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span>Hisaab barabar</span></button>
+      </div>
+      <p class="section-label">LEN-DEN</p>
+      <div id="detailTxns" class="dtable"></div>
+      <div class="detail-bottom">
+        <button id="detailDiyeBtn" class="btn btn-diye" type="button">↑ Mainey Diye</button>
+        <button id="detailLiyeBtn" class="btn btn-liye" type="button">↓ Mainey Liye</button>
+      </div>
+      <button id="detailRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden>Dost ko remove karein</button>
+    </section>
+
+    <!-- Account -->
+    <section id="accountView" hidden>
+      <h2 class="page-title">Account</h2>
+      <div class="card acct-card">
+        <span id="acctAvatar" class="avatar big">?</span>
+        <div class="acct-info">
+          <strong id="acctName">—</strong>
+          <span id="acctPhone" class="muted">—</span>
+        </div>
+        <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit">✎</button>
+      </div>
+      <div id="acctPhoneBox" class="card" hidden>
+        <div class="field">
+          <label for="myPhone">Mera WhatsApp number</label>
+          <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
+          <button id="savePhoneBtn" class="btn btn-primary" type="button" style="margin-top:8px">Save karein</button>
+          <p id="phoneMsg" class="msg" role="status"></p>
+        </div>
+        <button id="changePassBtn" class="btn btn-soft" type="button">🔑 Password badlein</button>
+        <div id="changePassBox" hidden>
+          <div class="field">
+            <label for="newPass1">Naya password</label>
+            <div class="pw-wrap">
+              <input id="newPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+              <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="newPass2">Naya password dobara</label>
+            <div class="pw-wrap">
+              <input id="newPass2" type="password" autocomplete="new-password" placeholder="Type again">
+              <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <button id="savePassBtn" class="btn btn-primary" type="button">Save karein</button>
+          <p id="passMsg" class="msg" role="status"></p>
+        </div>
+      </div>
+
+      <div class="acct-shortcuts">
+        <button id="acctShareBtn" class="shortcut" type="button"><span class="sc-ico">📤</span><span>Share Easy Khata</span></button>
+        <button id="acctLedgerBtn" class="shortcut" type="button"><span class="sc-ico">📒</span><span>Poora hisaab</span></button>
+        <button id="acctNotifBtn" class="shortcut" type="button"><span class="sc-ico">🔔</span><span>Yaad Dehani</span></button>
+      </div>
+
+      <div class="menu-list">
+        <button id="themeBtn" class="menu-item" type="button"><span class="mi-ico">🌙</span><span>Dark mode</span><span id="themeIcon" class="menu-right">🌙</span></button>
+        <button id="pushToggleBtn" class="menu-item" type="button">🔔 Notifications: Off</button>
+        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
+        <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
+        <div id="privacyBox" class="menu-note" hidden>
+          <p>Aap ka hisaab sirf aap ke account mein hai. Har record aap ke apne Supabase account mein save hota hai — koi aur aap ke records nahi dekh sakta. App aap ka data kisi teesri party ko nahi bechta aur na hi share karta hai.</p>
+        </div>
+        <button id="acctShareMenuBtn" class="menu-item" type="button"><span class="mi-ico">📤</span><span>Share Easy Khata</span><span class="menu-right">›</span></button>
+        <button id="acctRateBtn" class="menu-item" type="button"><span class="mi-ico">⭐</span><span>Rate Easy Khata</span><span class="menu-right">›</span></button>
+        <button id="acctWaBtn" class="menu-item" type="button"><span class="mi-ico">💬</span><span>WhatsApp helpline</span><span class="menu-right">›</span></button>
+        <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
+        <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
+      </div>
+      <p class="version">Easy Khata — App version 18</p>
+    </section>
+
+    <section id="notifView" hidden>
+      <div class="card">
+        <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+        <h2 style="margin-top:10px">Yaad Dehani</h2>
+        <p class="muted">Jab koi aap ke saath record save kare, to yahan message aayega.</p>
+        <button id="markAllReadBtn" class="btn btn-soft" type="button">Sab parha hua karein</button>
+        <div id="notifList" class="notifs" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <section id="adminView" hidden>
+      <div class="card">
+        <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+        <h2 style="margin-top:10px">Admin Panel — Users</h2>
+        <p class="muted">Only the admin (Asad) can see this. Click a user — their full balance, edit, password, block and delete are all here.</p>
+        <p id="adminStats" class="muted"></p>
+        <p id="adminMsg" class="msg" role="status"></p>
+        <div id="adminUserList" class="people"></div>
+      </div>
+    </section>
+
+    <section id="adminUserView" hidden>
+      <div class="card">
+        <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+        <h2 id="adminUserTitle" style="margin-top:10px"></h2>
+        <p id="adminUserBadges"></p>
+        <dl class="kv">
+          <dt>Email</dt><dd id="adminUserEmail"></dd>
+          <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
+          <dt>Joined</dt><dd id="adminUserJoined"></dd>
+          <dt>User ID</dt><dd id="adminUserId"></dd>
+        </dl>
+        <div id="adminUserSummary" class="summary"></div>
+        <div class="detail-actions">
+          <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
+          <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
+          <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
+          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
+        </div>
+        <div id="adminEditBox" hidden>
+          <div class="field"><label for="adminEditName">Name</label><input id="adminEditName" type="text" maxlength="80"></div>
+          <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
+          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save</button>
+          <p id="adminEditMsg" class="msg" role="status"></p>
+        </div>
+        <div id="adminPassBox" hidden>
+          <div class="field"><label for="adminNewPass1">New password</label>
+            <div class="pw-wrap">
+              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+              <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <div class="field"><label for="adminNewPass2">New password again</label>
+            <div class="pw-wrap">
+              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Type again">
+              <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Save password</button>
+          <p id="adminPassMsg" class="msg" role="status"></p>
+        </div>
+        <h3 style="margin-top:16px">Set amount (admin)</h3>
+        <p class="muted">Create a record for this user — an opening balance or a correction. The record will be between you and this user, and they will also get a notification.</p>
+        <div class="field"><label for="adminSetAmount">Amount (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
+        <div class="field"><label>Direction</label>
+          <div class="seg">
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> To receive from user</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> To pay to user</label>
+          </div>
+        </div>
+        <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
+        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Set amount</button>
+        <p id="adminSetMsg" class="msg" role="status"></p>
+        <h3 style="margin-top:16px">This user's ledger</h3>
+        <div id="adminUserTxns" class="txns"></div>
+        <p id="adminUserMsg" class="msg" role="status"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bottomnav">
+    <button id="navKhata" class="nav-btn active" type="button"><span class="nav-ico">📒</span><span>Khata</span></button>
+    <button id="navAccount" class="nav-btn" type="button"><span class="nav-ico">👤</span><span>Account</span></button>
+  </nav>
+</div>
 
 <button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js?v=3"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -352,6 +391,6 @@
     </div>
   </div>
 
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

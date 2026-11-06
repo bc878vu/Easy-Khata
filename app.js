@@ -139,6 +139,8 @@
   var txnToDate = "";
   var splitMode = false;
   var myPhone = "";
+  var detailPersonId = null;
+  var peopleSearchText = "";
 
   function profileName(id) {
     for (var i = 0; i < profiles.length; i++) {
@@ -148,6 +150,51 @@
       if (myContacts[j].id === id) return myContacts[j].name || "Unknown";
     }
     return id === myId() ? myName() : "Private contact";
+  }
+
+  function initials(name) {
+    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    var a = parts[0].charAt(0);
+    var b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+    return (a + b).toUpperCase();
+  }
+  function fmtTime(ts) {
+    try {
+      var d = new Date(ts);
+      if (isNaN(d.getTime())) return "";
+      var h = d.getHours(), m = String(d.getMinutes()).padStart(2, "0");
+      var ap = h >= 12 ? "PM" : "AM";
+      var hh = h % 12; if (hh === 0) hh = 12;
+      return hh + ":" + m + " " + ap;
+    } catch (e) { return ""; }
+  }
+  function peopleMap() {
+    // Shared per-person totals (given/taken + first/last transaction date).
+    var me = myId();
+    var map = {};
+    profiles.forEach(function (p) {
+      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", given: 0, taken: 0, first: null, last: null };
+    });
+    myContacts.forEach(function (c) {
+      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", given: 0, taken: 0, manual: true, first: null, last: null };
+    });
+    function bump(p, d) {
+      if (!d) return;
+      if (!p.first || d < p.first) p.first = d;
+      if (!p.last || d > p.last) p.last = d;
+    }
+    txns.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      var d = String(t.txn_date || "");
+      if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].given += a; bump(map[t.receiver_id], d); }
+      if (t.receiver_id === me && map[t.payer_id]) { map[t.payer_id].taken += a; bump(map[t.payer_id], d); }
+    });
+    return map;
+  }
+  function personTxns(id) {
+    // This person's records, newest first (txns are already sorted desc).
+    return txns.filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
   }
 
   /* ---------- auth UI ---------- */
@@ -172,16 +219,11 @@
     setAuthMsg("");
   }
   function showAuth() {
-    closeDrawer();
+    teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
-    $("notifBtn").hidden = true;
-    $("notifView").hidden = true;
+    $("authWrap").hidden = false;
+    $("appShell").hidden = true;
     $("authBox").hidden = false;
-    $("appBox").hidden = true;
-    $("adminView").hidden = true;
-    $("adminUserView").hidden = true;
-    $("avatarBtn").hidden = true;
-    $("menuBtn").hidden = true;
     $("fabAdd").hidden = true;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
@@ -189,22 +231,14 @@
     renderAuthMode();
   }
   function showApp() {
-    $("authBox").hidden = true;
-    $("adminView").hidden = true;
-    $("adminUserView").hidden = true;
-    $("appBox").hidden = false;
-    var initial = (myName() || "?").trim().charAt(0).toUpperCase() || "?";
-    $("avatarBtn").textContent = initial;
-    $("drawerAvatar").textContent = initial;
-    $("drawerName").textContent = myName();
-    $("drawerEmail").textContent = (session.user && session.user.email) || "";
-    $("avatarBtn").hidden = false;
-    $("menuBtn").hidden = false;
-    $("notifBtn").hidden = false;
-    $("fabAdd").hidden = false;
+    $("authWrap").hidden = true;
+    $("appShell").hidden = false;
+    renderAccount();
+    showView("khata");
     $("txnDate").value = todayLocal();
     loadNotifs();
     refreshPushState().then(function () { maybeAskPushPermission(); });
+    setupRealtime();
     try {
       var view = new URLSearchParams(window.location.search).get("view");
       if (view === "notifs") {
@@ -215,29 +249,28 @@
     if (notifTimer) clearInterval(notifTimer);
     notifTimer = setInterval(function () { if (session) loadNotifs(); }, 30000);
   }
+  /* ---------- views (bottom nav: Khata | Account) ---------- */
+  var currentView = "khata";
+  function showView(name) {
+    currentView = name;
+    $("khataView").hidden = name !== "khata";
+    $("personDetailView").hidden = name !== "detail";
+    $("accountView").hidden = name !== "account";
+    $("notifView").hidden = name !== "notifs";
+    $("adminView").hidden = name !== "admin";
+    $("adminUserView").hidden = name !== "adminUser";
+    $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser");
+    $("fabAdd").hidden = name !== "khata";
+    window.scrollTo(0, 0);
+  }
   function showAppView() {
-    closeDrawer();
-    showApp();
+    showView("khata");
   }
   function showAdminView() {
     if (!isAdmin()) return;
-    closeDrawer();
-    $("authBox").hidden = true;
-    $("appBox").hidden = true;
-    $("adminUserView").hidden = true;
-    $("fabAdd").hidden = true;
-    $("adminView").hidden = false;
+    showView("admin");
     renderAdmin();
-    window.scrollTo(0, 0);
-  }
-  function openDrawer() {
-    renderAdmin();
-    $("drawer").hidden = false;
-    $("drawerOverlay").hidden = false;
-  }
-  function closeDrawer() {
-    $("drawer").hidden = true;
-    $("drawerOverlay").hidden = true;
   }
 
   function authErrorText(res) {
@@ -513,8 +546,8 @@
         if (tableMissing(res)) {
           dbReady = false;
           $("setupBox").hidden = false;
-          $("authBox").hidden = true;
-          $("appBox").hidden = true;
+          $("authWrap").hidden = true;
+          $("appShell").hidden = true;
           return null;
         }
         throw new Error("profiles load failed");
@@ -527,6 +560,7 @@
       if (!res) return;
       if (!res.ok) throw new Error("txns load failed");
       txns = res.body || [];
+      rtLastFetch = Date.now();
       renderAll();
       loadNotifs();
       loadContacts();
@@ -544,12 +578,68 @@
     renderTxnFilterOptions();
     renderTxns();
     fillMyPhone();
+    renderAccount();
     renderAdmin();
   }
 
   /* ---------- notifications ---------- */
   var notifs = [];
   var notifTimer = null;
+
+  /* ---------- realtime (live updates, like Gmail) ----------
+     Supabase Realtime over the supabase-js CDN build. The app's own data
+     calls stay on raw PostgREST (sb()); Realtime is only a "something
+     changed" signal that triggers a quiet re-fetch. If the CDN fails to
+     load (offline) or Realtime is unavailable, everything still works
+     with the manual Refresh button + the visibility re-fetch below. */
+  var rtChannel = null;
+  var rtTimer = null;
+  var rtLastFetch = 0;
+  function liveReload() {
+    // Quiet background refresh: no messages, no error popups.
+    var ind = $("liveUpdating");
+    var slowTimer = setTimeout(function () { if (ind) ind.hidden = false; }, 800);
+    var done = function () {
+      clearTimeout(slowTimer);
+      if (ind) ind.hidden = true;
+      rtLastFetch = Date.now();
+    };
+    refreshTxns().then(function () { loadNotifs(); loadContacts(); done(); }).catch(function () { done(); });
+  }
+  function scheduleLiveReload() {
+    if (rtTimer) clearTimeout(rtTimer);
+    rtTimer = setTimeout(function () { rtTimer = null; liveReload(); }, 300);
+  }
+  function setupRealtime() {
+    try {
+      if (!window.supabase || !window.supabase.createClient) return; // CDN failed / offline
+      if (rtChannel) return; // already subscribed
+      var client = window.supabase.createClient(API, ANON);
+      try {
+        // Authenticate the realtime connection with the user's token so RLS
+        // lets the channel see their own rows.
+        if (session && session.access_token && client.realtime && client.realtime.setAuth) {
+          client.realtime.setAuth(session.access_token);
+        }
+      } catch (e) {}
+      rtChannel = client.channel("easy-khata-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions" }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications" }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts" }, function () { scheduleLiveReload(); })
+        .subscribe();
+    } catch (e) { rtChannel = null; }
+  }
+  function teardownRealtime() {
+    try {
+      if (rtTimer) { clearTimeout(rtTimer); rtTimer = null; }
+      if (rtChannel) { rtChannel.unsubscribe(); rtChannel = null; }
+    } catch (e) { rtChannel = null; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    // Re-fetch when the tab becomes visible again (catches changes made
+    // elsewhere while the tab was hidden). Throttled: at most once per 30s.
+    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) scheduleLiveReload();
+  });
   function fmtNotifTime(ts) {
     try {
       var d = new Date(ts);
@@ -602,6 +692,8 @@
     var b = $("notifBadge");
     b.textContent = n > 99 ? "99+" : String(n);
     b.hidden = n === 0;
+    var rr = $("remindRowText");
+    if (rr) rr.textContent = "Yaad Dehani (" + n + ")";
   }
   function renderNotifList() {
     if (!notifs.length) {
@@ -626,15 +718,8 @@
       .then(function () { loadNotifs(); }).catch(function () {});
   }
   function showNotifView() {
-    closeDrawer();
-    $("authBox").hidden = true;
-    $("appBox").hidden = true;
-    $("adminView").hidden = true;
-    $("adminUserView").hidden = true;
-    $("fabAdd").hidden = true;
-    $("notifView").hidden = false;
+    showView("notifs");
     loadNotifs();
-    window.scrollTo(0, 0);
   }
 
   /* ---------- manual contacts ---------- */
@@ -690,7 +775,7 @@
       }).catch(function () { return false; });
   }
   function refreshTxns() {
-    sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500")
+    return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500")
       .then(function (res) {
         if (!res.ok) return;
         txns = res.body || [];
@@ -705,7 +790,7 @@
   function addContact() {
     var name = $("newContactName").value.trim();
     var phoneRaw = $("newContactPhone").value.trim();
-    if (!name) { setContactMsg("Enter the contact's name.", false); return; }
+    if (!name) { setContactMsg("Dost ka naam likhein.", false); return; }
     var phone = phoneRaw ? normPhone(phoneRaw) : "";
     if (phoneRaw && !phone) { setContactMsg("Enter a valid phone number (example: 0300 1234567).", false); return; }
     var dupProfile = null;
@@ -720,15 +805,15 @@
       owner_id: myId(), name: name, phone: phone || null
     } }).then(function (res) {
       btn.disabled = false;
-      if (!res.ok) { setContactMsg("Contact couldn't be saved — please try again.", false); return; }
+      if (!res.ok) { setContactMsg("Dost save nahi hua — dobara try karein.", false); return; }
       var created = res.body && res.body[0];
       if (created) { created.manual = true; myContacts.push(created); }
       $("newContactName").value = "";
       $("newContactPhone").value = "";
-      setContactMsg("Contact added!", true);
+      setContactMsg("Dost add ho gaya!", true);
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       if (created) $("txnPerson").value = created.id;
-    }).catch(function () { btn.disabled = false; setContactMsg("Can't reach the internet or server.", false); });
+    }).catch(function () { btn.disabled = false; setContactMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function deleteContact(id) {
     var c = null;
@@ -739,9 +824,9 @@
     var count = 0;
     txns.forEach(function (t) { if (t.payer_id === id || t.receiver_id === id) count++; });
     var text = count > 0
-      ? "'" + (c.name || "") + "' — remove from contacts? Their " + count + " records will also be deleted — this can't be undone."
-      : "Remove '" + (c.name || "") + "' from contacts?";
-    askConfirm("Remove contact?", text, "Remove", function () {
+      ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records bhi delete ho jayenge — ye wapas nahi hoga."
+      : "'" + (c.name || "") + "' ko contacts se remove karein?";
+    askConfirm("Dost remove karein?", text, "Remove karein", function () {
       var deleteRow = function () {
         sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
           .then(function (res) {
@@ -926,8 +1011,7 @@
         setAdminMsg("User deleted.", true);
         if (adminCurrentUser && adminCurrentUser.id === id) {
           adminCurrentUser = null;
-          $("adminUserView").hidden = true;
-          $("adminView").hidden = false;
+          showView("admin");
         }
         loadAll();
       }).catch(function () { setAdminMsg("Can't reach the internet or server.", false); });
@@ -994,10 +1078,7 @@
       });
       $("adminUserTxns").innerHTML = html;
     }
-    $("adminView").hidden = true;
-    $("adminUserView").hidden = false;
-    $("fabAdd").hidden = true;
-    window.scrollTo(0, 0);
+    showView("adminUser");
   }
   function saveAdminEdit() {
     if (!isAdmin() || !adminCurrentUser) return;
@@ -1107,7 +1188,7 @@
     });
     if (!txns.length) { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = "This month (<strong>" + esc(monthName(now + "-01")) + "</strong>): gave <strong>" + esc(fmtRs(given)) + "</strong> · took <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " records";
+    el.innerHTML = "Is mahine (<strong>" + esc(monthName(now + "-01")) + "</strong>): diye <strong>" + esc(fmtRs(given)) + "</strong> · liye <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " records";
   }
 
   function renderInsights() {
@@ -1128,9 +1209,9 @@
     Object.keys(counts).forEach(function (id) { if (counts[id] > topN) { topN = counts[id]; topId = id; } });
     var avg = Math.round(total / mine.length * 100) / 100;
     el.hidden = false;
-    el.innerHTML = "Biggest meal: <strong>" + esc(fmtRs(biggest.amount)) + "</strong> (" + esc(biggest.note || "Food") + ", " + esc(fmtDate(biggest.txn_date)) + ") · " +
-      "Most transactions: <strong>" + esc(profileName(topId)) + "</strong> (" + topN + " times) · " +
-      "Average meal: <strong>" + esc(fmtRs(avg)) + "</strong>";
+    el.innerHTML = "Sab se bara khana: <strong>" + esc(fmtRs(biggest.amount)) + "</strong> (" + esc(biggest.note || "Food") + ", " + esc(fmtDate(biggest.txn_date)) + ") · " +
+      "Sab se zyada len-den: <strong>" + esc(profileName(topId)) + "</strong> (" + topN + " dafa) · " +
+      "Aosat khana: <strong>" + esc(fmtRs(avg)) + "</strong>";
   }
 
   function fillMyPhone() {
@@ -1183,27 +1264,19 @@
   }
 
   function renderSummary() {
-    var me = myId(), given = 0, taken = 0, gc = 0, tc = 0;
-    txns.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === me) { given += a; gc++; }
-      if (t.receiver_id === me) { taken += a; tc++; }
+    // TOTAL BALANCE: two cards — what I have to receive (lene hain, green)
+    // and what I have to give (dene hain, red). Per-person nets, not totals.
+    var map = peopleMap();
+    var toReceive = 0, toPay = 0, rc = 0, pc = 0;
+    Object.keys(map).forEach(function (id) {
+      var net = map[id].given - map[id].taken;
+      if (net > 0) { toReceive += net; rc++; }
+      else if (net < 0) { toPay += -net; pc++; }
     });
-    $("sumGiven").textContent = fmtRs(given);
-    $("sumGivenCount").textContent = gc ? gc + " times given" : "Nothing yet";
-    $("sumTaken").textContent = fmtRs(taken);
-    $("sumTakenCount").textContent = tc ? tc + " times taken" : "Nothing yet";
-    var net = given - taken; // +: to receive, -: to pay
-    if (net > 0) {
-      $("sumNet").textContent = fmtRs(net);
-      $("sumNetSub").textContent = "To receive";
-    } else if (net < 0) {
-      $("sumNet").textContent = fmtRs(-net);
-      $("sumNetSub").textContent = "To pay";
-    } else {
-      $("sumNet").textContent = "Rs 0";
-      $("sumNetSub").textContent = "Settled up";
-    }
+    $("sumReceive").textContent = fmtRs(toReceive);
+    $("sumReceiveCount").textContent = rc ? rc + (rc === 1 ? " dost se" : " doston se") : "Koi nahi";
+    $("sumPay").textContent = fmtRs(toPay);
+    $("sumPayCount").textContent = pc ? pc + (pc === 1 ? " dost ko" : " doston ko") : "Koi nahi";
   }
 
   function personStats(id) {
@@ -1345,8 +1418,8 @@
     var s = personStats(id);
     if (!s.net) return;
     var amt = Math.abs(s.net);
-    var who = s.net > 0 ? (p.name || p.email) + " will give me " + fmtRs(amt) : "I will give " + (p.name || p.email) + " " + fmtRs(amt);
-    askConfirm("Settle up?", who + " — a settlement record of " + fmtRs(amt) + " will be created.", "Confirm", function () {
+    var who = s.net > 0 ? (p.name || p.email) + " mujhe " + fmtRs(amt) + " denge" : "Main " + (p.name || p.email) + " ko " + fmtRs(amt) + " dunga";
+    askConfirm("Hisaab barabar karein?", who + " — " + fmtRs(amt) + " ka settlement record ban jayega.", "Confirm karein", function () {
     var me = myId();
     var body = {
       payer_id: s.net > 0 ? id : me,
@@ -1358,12 +1431,12 @@
     };
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
-        if (!res.ok) { setPeopleMsg("Settlement couldn't be saved — please try again.", false); return; }
+        if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara try karein.", false); return; }
         var created = res.body && res.body[0];
         if (created) { sendNotif(id, "settle", created); triggerPush(id, "Balance settled", notifBodyFor(created, id)); }
-        setPeopleMsg("Settled up!", true);
+        setPeopleMsg("Hisaab barabar ho gaya!", true);
         loadAll();
-      }).catch(function () { setPeopleMsg("Can't reach the internet or server.", false); });
+      }).catch(function () { setPeopleMsg("Internet ya server se rabta nahi ho raha.", false); });
     });
   }
   function shareAll() {
@@ -1389,22 +1462,19 @@
   }
 
   function renderPeople() {
-    var me = myId();
-    var map = {};
-    profiles.forEach(function (p) {
-      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", given: 0, taken: 0 };
-    });
-    myContacts.forEach(function (c) {
-      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", given: 0, taken: 0, manual: true };
-    });
-    txns.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === me && map[t.receiver_id]) map[t.receiver_id].given += a;
-      if (t.receiver_id === me && map[t.payer_id]) map[t.payer_id].taken += a;
-    });
+    var map = peopleMap();
+    var total = Object.keys(map).length;
     var ids = Object.keys(map);
+    var q = peopleSearchText.trim().toLowerCase();
+    if (q) {
+      ids = ids.filter(function (id) { return String(map[id].name || "").toLowerCase().indexOf(q) !== -1; });
+    }
+    if (!total) {
+      $("peopleList").innerHTML = '<p class="empty">Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.</p>';
+      return;
+    }
     if (!ids.length) {
-      $("peopleList").innerHTML = '<p class="empty">No other users yet — friends will appear here once they create an account.</p>';
+      $("peopleList").innerHTML = '<p class="empty">Is naam ka koi dost nahi mila.</p>';
       return;
     }
     var html = "";
@@ -1412,17 +1482,116 @@
       var p = map[id];
       var net = p.given - p.taken; // +: they owe me, -: I owe them
       var cls = net > 0 ? "pos" : net < 0 ? "neg" : "zero";
-      var netText = net > 0 ? fmtRs(net) + " to receive"
-        : net < 0 ? fmtRs(-net) + " to pay" : "Settled";
-      html += '<div class="person"><div><div class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</div>' +
-        '<div class="p-detail">Gave ' + fmtRs(p.given) + ' · Took ' + fmtRs(p.taken) + '</div></div>' +
-        '<div class="p-actions"><span class="p-net ' + cls + '">' + esc(netText) + '</span>' +
-        '<span><button class="btn-mini" type="button" data-share="' + esc(id) + '">Share</button> ' +
-        '<button class="btn-mini wa" type="button" data-remind="' + esc(id) + '">Remind</button>' +
-        (net !== 0 ? ' <button class="btn-mini" type="button" data-settle="' + esc(id) + '">Settle up</button>' : '') +
-        (p.manual ? ' <button class="btn-mini" type="button" data-del-contact="' + esc(id) + '">Remove</button>' : '') + '</span></div></div>';
+      var netText = net > 0 ? "+ " + fmtRs(net) : net < 0 ? "− " + fmtRs(-net) : "Settled";
+      var last = p.last ? "Aakhri len-den: " + fmtDateLong(p.last) : "Abhi koi len-den nahi";
+      html += '<button class="person" type="button" data-person="' + esc(id) + '">' +
+        '<span class="p-avatar">' + esc(initials(p.name)) + '</span>' +
+        '<span class="p-main"><span class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</span>' +
+        '<span class="p-last">' + esc(last) + '</span></span>' +
+        '<span class="p-net ' + cls + '">' + esc(netText) + '</span></button>';
     });
     $("peopleList").innerHTML = html;
+    if (detailPersonId) renderPersonDetail();
+  }
+
+  function renderAccount() {
+    var name = myName() || "";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+    $("headerAvatar").textContent = initial;
+    $("headerName").textContent = name || "Easy Khata";
+    $("acctAvatar").textContent = initial;
+    $("acctName").textContent = name || "—";
+    $("acctPhone").textContent = myPhone || "Number nahi diya";
+  }
+  function openPersonDetail(id) {
+    if (!findPerson(id)) return;
+    detailPersonId = id;
+    renderPersonDetail();
+    showView("detail");
+  }
+  function renderPersonDetail() {
+    var id = detailPersonId;
+    var p = findPerson(id);
+    if (!p) { detailPersonId = null; showView("khata"); return; }
+    var s = personStats(id);
+    var list = personTxns(id);
+    var first = null;
+    list.forEach(function (t) { var d = String(t.txn_date || ""); if (d && (!first || d < first)) first = d; });
+    $("detailAvatar").textContent = initials(p.name || p.email);
+    $("detailName").textContent = p.name || p.email;
+    $("detailSince").textContent = first ? "Pehla len-den: " + fmtDateLong(first) : "Abhi koi len-den nahi";
+    var banner = $("detailBanner");
+    if (s.net > 0) {
+      banner.className = "detail-banner receive";
+      banner.innerHTML = '<span class="db-icon">↓</span><strong>' + esc(fmtRs(s.net)) + '</strong><span>Maine lene hain</span>';
+    } else if (s.net < 0) {
+      banner.className = "detail-banner give";
+      banner.innerHTML = '<span class="db-icon">↑</span><strong>' + esc(fmtRs(-s.net)) + '</strong><span>Maine dene hain</span>';
+    } else {
+      banner.className = "detail-banner settled";
+      banner.innerHTML = '<span class="db-icon">✓</span><strong>Settled</strong><span>Koi balance nahi</span>';
+    }
+    $("detailSettleBtn").hidden = !s.net;
+    var isManual = false;
+    myContacts.forEach(function (c) { if (c.id === id) isManual = true; });
+    $("detailRemoveBtn").hidden = !isManual;
+    renderDetailTxns(list);
+  }
+  function renderDetailTxns(list) {
+    var me = myId();
+    if (!list.length) {
+      $("detailTxns").innerHTML = '<p class="empty">Abhi koi len-den nahi — neeche se pehla record add karein.</p>';
+      return;
+    }
+    // Running balance, oldest first, then show newest first.
+    var asc = list.slice().reverse();
+    var run = 0;
+    var balById = {};
+    asc.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === me) run += a;
+      else if (t.receiver_id === me) run -= a;
+      balById[t.id] = run;
+    });
+    var html = '<div class="dtable-head"><span>TIME</span><span>DIYE</span><span>LIYE</span></div>';
+    list.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      var iGave = t.payer_id === me;
+      var bal = balById[t.id];
+      var balCls = bal > 0 ? "pos" : bal < 0 ? "neg" : "zero";
+      var balText = bal > 0 ? "Bal: " + fmtRs(bal) + " · lene hain"
+        : bal < 0 ? "Bal: " + fmtRs(-bal) + " · dene hain" : "Bal: Rs 0 · settled";
+      var timeStr = fmtTime(t.created_at);
+      var btns = "";
+      if (t.created_by === me) {
+        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
+          '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      } else if (isAdmin()) {
+        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      }
+      html += '<div class="drow">' +
+        '<div class="d-time"><span class="d-ico ' + (iGave ? "up" : "down") + '">' + (iGave ? "↑" : "↓") + '</span>' +
+        '<div><div class="d-date">' + esc(fmtDateLong(t.txn_date)) + (timeStr ? " · " + esc(timeStr) : "") + '</div>' +
+        '<div class="d-note">' + esc(t.note || "Food") + '</div>' +
+        '<div class="d-bal ' + balCls + '">' + esc(balText) + '</div>' + btns + '</div></div>' +
+        '<div class="d-amt ' + (iGave ? "diye" : "") + '">' + (iGave ? esc(fmtRs(a)) : "") + '</div>' +
+        '<div class="d-amt ' + (!iGave ? "liye" : "") + '">' + (!iGave ? esc(fmtRs(a)) : "") + '</div>' +
+        '</div>';
+    });
+    $("detailTxns").innerHTML = html;
+  }
+  function openAddFor(personId, dir) {
+    // From the detail screen: open the add form, pre-filled for this person + direction.
+    resetTxnForm();
+    showView("khata");
+    var sel = $("txnPerson");
+    if (sel) sel.value = personId;
+    var radio = document.querySelector('input[name="txnDir"][value="' + dir + '"]');
+    if (radio) radio.checked = true;
+    var card = $("txnFormCard");
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    var amt = $("txnAmount");
+    if (amt) setTimeout(function () { amt.focus({ preventScroll: true }); }, 400);
   }
 
   function renderPersonSelect() {
@@ -1435,20 +1604,20 @@
       if (p.id === me) return;
       real += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
-    if (real) html += '<optgroup label="App users">' + real + '</optgroup>';
+    if (real) html += '<optgroup label="App par dost">' + real + '</optgroup>';
     var manual = "";
     myContacts.forEach(function (c) {
       manual += '<option value="' + esc(c.id) + '">' + esc(c.name || "Unknown") + '</option>';
     });
-    if (manual) html += '<optgroup label="My contacts (manual)">' + manual + '</optgroup>';
-    sel.innerHTML = html || '<option value="">(no other user)</option>';
+    if (manual) html += '<optgroup label="Mere contacts (manual)">' + manual + '</optgroup>';
+    sel.innerHTML = html || '<option value="">(koi dost nahi)</option>';
     if (prev) sel.value = prev;
   }
 
   function renderTxnFilterOptions() {
     var sel = $("txnFilterPerson");
     var prev = sel.value;
-    var html = '<option value="">Everyone</option>';
+    var html = '<option value="">Sab</option>';
     profiles.forEach(function (p) {
       html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
@@ -1492,11 +1661,11 @@
     var me = myId();
     var list = filteredTxns();
     if (!txns.length) {
-      $("txnList").innerHTML = '<p class="empty">No records yet — add your first record above.</p>';
+      $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
       return;
     }
     if (!list.length) {
-      $("txnList").innerHTML = '<p class="empty">No records match this search/filter.</p>';
+      $("txnList").innerHTML = '<p class="empty">Is search/filter se koi record nahi mila.</p>';
       return;
     }
     var html = "";
@@ -1524,8 +1693,8 @@
   function resetTxnForm() {
     setSplitMode(false);
     editingId = null;
-    $("txnFormTitle").textContent = "Add a new record";
-    $("txnForm").querySelector('button[type="submit"]').textContent = "Save record";
+    $("txnFormTitle").textContent = "Naya record";
+    $("txnForm").querySelector('button[type="submit"]').textContent = "Save karein";
     $("cancelEditBtn").hidden = true;
     $("txnAmount").value = "";
     $("txnNote").value = "";
@@ -1536,6 +1705,7 @@
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t || t.created_by !== myId()) return;
+    showView("khata");
     setSplitMode(false);
     var me = myId();
     var other = t.payer_id === me ? t.receiver_id : t.payer_id;
@@ -1547,8 +1717,8 @@
     $("txnAmount").value = t.amount;
     $("txnNote").value = t.note || "";
     $("txnDate").value = String(t.txn_date || "").slice(0, 10);
-    $("txnFormTitle").textContent = "Edit record";
-    $("txnForm").querySelector('button[type="submit"]').textContent = "Save edit";
+    $("txnFormTitle").textContent = "Record badlein";
+    $("txnForm").querySelector('button[type="submit"]').textContent = "Save karein";
     $("cancelEditBtn").hidden = false;
     $("txnForm").scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -1588,18 +1758,18 @@
   }
   function addSplitTxns(amount, note, date, btn) {
     var ids = selectedSplitIds();
-    if (!ids.length) { setTxnMsg("Choose at least one friend to split equally.", false); return; }
+    if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
     var me = myId();
     var people = ids.length + 1; // friends + you — the total splits equally across everyone, including your share
     var share = Math.floor(amount / people * 100) / 100;
-    if (share <= 0) { setTxnMsg("The amount is too small to split.", false); return; }
+    if (share <= 0) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
     btn.disabled = true;
     var done = 0, failed = 0, i = 0;
     function next() {
       if (i >= ids.length) {
         btn.disabled = false;
-        if (failed) setTxnMsg(done + " records saved, " + failed + " failed — please check again.", false);
-        else { setTxnMsg(ids.length + " records saved (split equally)!", true); resetTxnForm(); }
+        if (failed) setTxnMsg(done + " records save ho gaye, " + failed + " fail — dobara check karein.", false);
+        else { setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); }
         loadAll();
         return;
       }
@@ -1626,9 +1796,9 @@
     var amount = parseFloat($("txnAmount").value);
     var note = $("txnNote").value.trim();
     var date = $("txnDate").value;
-    if (!splitMode && !person) { setTxnMsg("Choose a friend first (they must have an account).", false); return; }
-    if (!amount || amount <= 0) { setTxnMsg("Enter a valid amount.", false); return; }
-    if (!date) { setTxnMsg("Enter the date.", false); return; }
+    if (!splitMode && !person) { setTxnMsg("Pehle dost chunein.", false); return; }
+    if (!amount || amount <= 0) { setTxnMsg("Sahi raqam likhein.", false); return; }
+    if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
     if (splitMode && !editingId) {
       addSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]'));
       return;
@@ -1649,34 +1819,34 @@
       sb("khata_transactions?id=eq." + encodeURIComponent(editId), { method: "PATCH", prefer: "return=minimal", body: body })
         .then(function (res) {
           btn.disabled = false;
-          if (!res.ok) { setTxnMsg("Edit couldn't be saved — please try again.", false); return; }
+          if (!res.ok) { setTxnMsg("Edit save nahi hui — dobara try karein.", false); return; }
           resetTxnForm();
-          setTxnMsg("Record updated!", true);
+          setTxnMsg("Record update ho gaya!", true);
           loadAll();
         }).catch(function () {
           btn.disabled = false;
-          setTxnMsg("Can't reach the internet or server.", false);
+          setTxnMsg("Internet ya server se rabta nahi ho raha.", false);
         });
       return;
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         btn.disabled = false;
-        if (!res.ok) { setTxnMsg("Record couldn't be saved — please try again.", false); return; }
+        if (!res.ok) { setTxnMsg("Record save nahi hua — dobara try karein.", false); return; }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " added a record", notifBodyFor(created, person)); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
-        setTxnMsg("Record saved!", true);
+        setTxnMsg("Record save ho gaya!", true);
         loadAll();
       }).catch(function () {
         btn.disabled = false;
-        setTxnMsg("Can't reach the internet or server.", false);
+        setTxnMsg("Internet ya server se rabta nahi ho raha.", false);
       });
   }
 
   function deleteTxn(id) {
-    askConfirm("Delete record?", "This record will be deleted forever.", "Delete", function () {
+    askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
     sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
       .then(function (res) {
         if (!res.ok) { setTxnMsg("Couldn't be deleted.", false); return; }
@@ -1702,13 +1872,45 @@
   $("resetBtn").addEventListener("click", doReset);
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
   $("logoutBtn").addEventListener("click", function () { saveSession(null); showAuth(); });
-  $("menuBtn").addEventListener("click", openDrawer);
-  $("avatarBtn").addEventListener("click", openDrawer);
-  $("drawerCloseBtn").addEventListener("click", closeDrawer);
-  $("drawerOverlay").addEventListener("click", closeDrawer);
-  $("navKhataBtn").addEventListener("click", showAppView);
+  $("navKhata").addEventListener("click", function () { showView("khata"); });
+  $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
-  $("adminBackBtn").addEventListener("click", showAppView);
+  $("adminBackBtn").addEventListener("click", function () { showView("account"); });
+  $("remindRow").addEventListener("click", showNotifView);
+  $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); });
+  $("addPersonBtn").addEventListener("click", function () {
+    showView("khata");
+    var card = $("txnFormCard");
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    var b = $("addContactBox");
+    b.hidden = false;
+    $("newContactName").focus();
+  });
+  $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
+  $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
+  $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
+  $("detailSettleBtn").addEventListener("click", function () { if (detailPersonId) settlePerson(detailPersonId); });
+  $("detailRemoveBtn").addEventListener("click", function () { if (detailPersonId) deleteContact(detailPersonId); });
+  $("detailDiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "given"); });
+  $("detailLiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "taken"); });
+  $("acctEditBtn").addEventListener("click", function () { var b = $("acctPhoneBox"); b.hidden = !b.hidden; });
+  $("acctShareBtn").addEventListener("click", shareAll);
+  $("acctShareMenuBtn").addEventListener("click", shareAll);
+  $("acctLedgerBtn").addEventListener("click", function () {
+    showView("khata");
+    var card = $("ledgerCard");
+    if (card) setTimeout(function () { card.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
+  });
+  $("acctNotifBtn").addEventListener("click", showNotifView);
+  $("acctBackupBtn").addEventListener("click", exportCsv);
+  $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
+  $("acctRateBtn").addEventListener("click", function () {
+    shareText("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL);
+  });
+  $("acctWaBtn").addEventListener("click", function () {
+    // No support number exists — open WhatsApp with the app link to share.
+    openWaLink("https://wa.me/?text=" + encodeURIComponent("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL));
+  });
   $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
   $("savePassBtn").addEventListener("click", doChangePass);
   $("txnForm").addEventListener("submit", addTxn);
@@ -1730,16 +1932,16 @@
   $("txnAmount").addEventListener("input", function () { if (splitMode) updateSplitHint(); });
   $("splitList").addEventListener("change", function () { updateSplitHint(); });
   $("peopleList").addEventListener("click", function (e) {
-    var st = e.target.closest ? e.target.closest("[data-settle]") : null;
-    if (st) { settlePerson(st.getAttribute("data-settle")); return; }
-    var s = e.target.closest ? e.target.closest("[data-share]") : null;
-    if (s) { sharePerson(s.getAttribute("data-share")); return; }
-    var r = e.target.closest ? e.target.closest("[data-remind]") : null;
-    if (r) { remindPerson(r.getAttribute("data-remind")); return; }
-    var d = e.target.closest ? e.target.closest("[data-del-contact]") : null;
-    if (d) deleteContact(d.getAttribute("data-del-contact"));
+    var row = e.target.closest ? e.target.closest("[data-person]") : null;
+    if (row) openPersonDetail(row.getAttribute("data-person"));
   });
   $("txnList").addEventListener("click", function (e) {
+    var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
+    if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
+    var b = e.target.closest ? e.target.closest("[data-del]") : null;
+    if (b) deleteTxn(b.getAttribute("data-del"));
+  });
+  $("detailTxns").addEventListener("click", function (e) {
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
@@ -1751,7 +1953,7 @@
     var o = e.target.closest ? e.target.closest("[data-admin-open]") : null;
     if (o) openAdminUser(o.getAttribute("data-admin-open"));
   });
-  $("adminUserBackBtn").addEventListener("click", function () { $("adminUserView").hidden = true; $("adminView").hidden = false; renderAdmin(); });
+  $("adminUserBackBtn").addEventListener("click", function () { showView("admin"); renderAdmin(); });
   $("adminEditToggleBtn").addEventListener("click", function () { var b = $("adminEditBox"); b.hidden = !b.hidden; });
   $("adminPassToggleBtn").addEventListener("click", function () { var b = $("adminPassBox"); b.hidden = !b.hidden; });
   $("adminEditSaveBtn").addEventListener("click", saveAdminEdit);
@@ -1782,6 +1984,7 @@
     if (row) markNotifRead(row.getAttribute("data-notif"));
   });
   $("fabAdd").addEventListener("click", function () {
+    showView("khata");
     var card = $("txnFormCard");
     if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
     var amt = $("txnAmount");
@@ -1863,7 +2066,7 @@
 
   if (!API || !ANON) {
     $("setupBox").hidden = false;
-    $("authBox").hidden = true;
+    $("authWrap").hidden = true;
     return;
   }
   if (!handleAuthHash()) authValidate();
