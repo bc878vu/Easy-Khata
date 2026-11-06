@@ -304,11 +304,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .date-cell input{width:100%;min-width:0}
 .toolbar .btn{padding:8px 10px;min-height:38px;font-size:.88rem}
 .filter-count{grid-column:1/-1;margin:0;font-size:.78rem;color:var(--muted)}
-/* Scrollable history box (v21): Poora hisaab + LEN-DEN sirf ~5-7 rows dikhate
-   hain, baaki andar scroll hota hai — lambi list ab FAB/bottom-nav ke peeche
-   nahi jaati, aur filters box ke upar hamesha nazar aate hain. */
+/* Scrollable history box (v21, fixed v21.1): Poora hisaab + LEN-DEN sirf ~5-7 rows
+   dikhate hain, baaki andar scroll hota hai. v21.1: (1) overscroll-behavior:auto
+   (contain NAHI) — box ke end par scroll page ko chain karta hai, is liye jab
+   history upar jaye to app page bhi scroll hota hai; contain scroll ko box
+   mein qaid kar deta tha, page kabhi nahi hilta tha (video wala masla).
+   (2) max-height viewport-relative — box + button ke neeche nahi jata, is liye
+   aakhri row ka Delete hamesha tappable rehta hai. */
 .scroll-box{
-  max-height:600px;overflow-y:auto;overscroll-behavior:contain;
+  max-height:calc(100dvh - 380px);overflow-y:auto;overscroll-behavior:auto;
   border:1px solid var(--line);border-radius:12px;padding:8px;
   background:var(--bg);
   scrollbar-width:thin;scrollbar-color:var(--muted) transparent;
