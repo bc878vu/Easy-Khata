@@ -1083,7 +1083,7 @@
   function submitWorkspaceInvite(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
     var email=$("workspaceInviteEmail").value.trim(),role=$("workspaceInviteRole").value;
-    if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$/i.test(email)){setTxnMsg("Valid email address likhein.",false);return;}
+    if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)){setTxnMsg("Valid email address likhein.",false);return;}
     workspaceInviteBusy=true;$("workspaceInviteSubmit").disabled=true;
     sb("rpc/khata_create_workspace_invite",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_email:email,p_role:role}}).then(function(res){
       workspaceInviteBusy=false;$("workspaceInviteSubmit").disabled=false;
