@@ -136,7 +136,8 @@
 
   /* ---------- state ---------- */
   var profiles = [];   // {id, name, email, phone}
-  var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
+  var txns = [];       // shared transaction rows
+  var hiddenIds = {};
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
   var adminCurrentUser = null;
   var dbReady = false;
@@ -262,7 +263,7 @@
     if (!profiles || !profiles.length) return;
     try {
       window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, savedAt: Date.now()
+        profiles: profiles, txns: txns, hiddenIds: hiddenIds, contacts: myContacts, notifs: notifs, savedAt: Date.now()
       }));
     } catch (e) {}
   }
@@ -272,8 +273,13 @@
       if (!raw) return null;
       var c = JSON.parse(raw);
       if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
+      c.hiddenIds = c.hiddenIds && typeof c.hiddenIds === "object" ? c.hiddenIds : {};
       return c;
     } catch (e) { return null; }
+  }
+  function visibleTxns() {
+    if (guestMode) return txns.slice();
+    return txns.filter(function (t) { return !hiddenIds[t.id]; });
   }
   // Pending insert hata dein (server par kabhi gaya hi nahi) — delete/update op nahi chahiye.
   function removePendingInsert(table, id) {
@@ -332,7 +338,7 @@
       if (!p.first || d < p.first) p.first = d;
       if (!p.last || d > p.last) p.last = d;
     }
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       var d = String(t.txn_date || "");
       if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].given += a; bump(map[t.receiver_id], d); }
@@ -342,7 +348,7 @@
   }
   function personTxns(id) {
     // This person's records, newest first (txns are already sorted desc).
-    return txns.filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
+    return visibleTxns().filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
   }
 
   /* ---------- settled-history lock ----------
@@ -457,6 +463,7 @@
     showView("khata");
     $("txnDate").value = todayLocal();
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
+    notifFirstLoad = true;
     loadNotifs();
     refreshPushState().then(function () { maybeAskPushPermission(); });
     setupRealtime();
@@ -480,6 +487,7 @@
     $("notifView").hidden = name !== "notifs";
     $("adminView").hidden = name !== "admin";
     $("adminUserView").hidden = name !== "adminUser";
+    if ($("hiddenView")) $("hiddenView").hidden = name !== "hidden";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser");
     $("fabAdd").hidden = name !== "khata";
@@ -488,6 +496,7 @@
     // baaki views par sirf hidden karna kaafi hai (koi fixed bar nahi).
     var vf = $("versionFooter");
     if (vf) vf.hidden = name !== "account";
+    if (name === "hidden") renderHiddenTxns();
     window.scrollTo(0, 0);
   }
   function showAppView() {
@@ -821,6 +830,10 @@
         p = sb(op.table, { method: "POST", prefer: "return=representation", body: op.body });
       } else if (op.op === "update") {
         p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "PATCH", prefer: "return=minimal", body: op.body });
+      } else if (op.op === "hide") {
+        p = sb("khata_hidden?on_conflict=user_id,txn_id", { method: "POST", prefer: "resolution=ignore-duplicates,return=minimal", body: { user_id: myId(), txn_id: op.id } });
+      } else if (op.op === "unhide") {
+        p = sb("khata_hidden?user_id=eq." + encodeURIComponent(myId()) + "&txn_id=eq." + encodeURIComponent(op.id), { method: "DELETE" });
       } else {
         p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "DELETE" });
       }
@@ -847,7 +860,7 @@
           return Promise.resolve(false);
         }
         var errMsg = (res.body && res.body.message) || "";
-        if (op.op === "insert" && (res.status === 409 || errMsg.indexOf("duplicate") !== -1)) {
+        if ((op.op === "insert" || op.op === "hide") && (res.status === 409 || errMsg.indexOf("duplicate") !== -1)) {
           done++; // record pehle hi server par hai (lost response ke baad retry) — duplicate nahi
           dropOp(op.key);
           return next(i + 1);
@@ -976,13 +989,10 @@
       if (!res) return;
       if (!res.ok) throw new Error("txns load failed");
       txns = res.body || [];
-      rtLastFetch = Date.now();
-      offlineMode = false;
-      renderAll();
-      loadNotifs();
-      loadContacts();
-      saveCache();
-      flushOutbox();
+      return sb("khata_hidden?select=txn_id&user_id=eq." + encodeURIComponent(myId()), {}).then(function (hiddenRes) {
+        if (hiddenRes.ok) { hiddenIds = {}; (hiddenRes.body || []).forEach(function (row) { hiddenIds[row.txn_id] = true; }); }
+        rtLastFetch = Date.now(); offlineMode = false; renderAll(); loadNotifs(); loadContacts(); saveCache(); flushOutbox();
+      });
     }).catch(function () {
       // Offline: aakhri save hua data dikhayein (agar cache hai).
       var c = loadCache();
@@ -991,6 +1001,7 @@
         dbReady = true;
         profiles = c.profiles || [];
         txns = c.txns || [];
+        hiddenIds = c.hiddenIds || {};
         myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
         notifs = c.notifs || [];
         renderAll();
@@ -1164,12 +1175,31 @@
       title: title, body: notifBodyFor(txn, userId)
     } }).catch(function () {});
   }
+  var notifAudioCtx = null, notifAudioUnlocked = false, notifFirstLoad = true, seenNotifIds = {};
+  function unlockNotifAudio() {
+    try { var Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return; if (!notifAudioCtx) notifAudioCtx = new Ctx(); if (notifAudioCtx.state === "suspended") { var resumeResult = notifAudioCtx.resume(); if (resumeResult && resumeResult.then) resumeResult.then(function () { notifAudioUnlocked = notifAudioCtx.state === "running"; }); } notifAudioUnlocked = true; } catch (e) { notifAudioUnlocked = false; }
+  }
+  function playNotifSound() {
+    if (!notifAudioUnlocked || !notifAudioCtx || notifAudioCtx.state !== "running") return;
+    try { var ctx = notifAudioCtx, now = ctx.currentTime; [880, 1174].forEach(function (hz, i) { var osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = "sine"; osc.frequency.value = hz; gain.gain.setValueAtTime(0.0001, now + i * 0.13); gain.gain.exponentialRampToValueAtTime(0.12, now + i * 0.13 + 0.015); gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.13 + 0.11); osc.connect(gain); gain.connect(ctx.destination); osc.start(now + i * 0.13); osc.stop(now + i * 0.13 + 0.12); }); } catch (e) {}
+  }
+  document.addEventListener("pointerdown", unlockNotifAudio, { passive: true });
+  document.addEventListener("keydown", unlockNotifAudio);
   function loadNotifs() {
     if (!session || !session.access_token) return;
     sb("khata_notifications?select=*&user_id=eq." + encodeURIComponent(myId()) + "&order=created_at.desc&limit=50")
       .then(function (res) {
         if (!res.ok) return;
-        notifs = Array.isArray(res.body) ? res.body : [];
+        var incoming = Array.isArray(res.body) ? res.body : [];
+        var fresh = incoming.filter(function (n) { return n.id && !seenNotifIds[n.id]; });
+        if (notifFirstLoad) { incoming.forEach(function (n) { if (n.id) seenNotifIds[n.id] = true; }); notifFirstLoad = false; }
+        else if (fresh.length) {
+          fresh.forEach(function (n) { seenNotifIds[n.id] = true; }); playNotifSound();
+          if (document.visibilityState === "visible" && window.Notification && Notification.permission === "granted") {
+            fresh.slice(0, 3).forEach(function (n) { try { new Notification(n.title || "Easy Khata", { body: n.body || "Nayi notification aayi hai.", icon: "icons/icon.svg", tag: "easy-khata-" + n.id }); } catch (e) {} });
+          }
+        }
+        notifs = incoming;
         renderNotifBadge();
         syncAppBadge(); // v24.4: icon badge = asal unread count
         if (!$("notifView").hidden) renderNotifList();
@@ -1846,6 +1876,43 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
+  var adminHiddenByTxn = {};
+  function renderAdminUserTxnRows(u, mine) {
+    if (!mine.length) { $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>'; return; }
+    var html = "";
+    mine.forEach(function (t) {
+      var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
+      var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
+      var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
+      var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : '<div class="t-sub">Visible in both histories</div>';
+      var controls = lock ? '<span class="t-lock">🔒 Settled</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
+      html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
+    });
+    $("adminUserTxns").innerHTML = html;
+  }
+  function adminEditTxn(id) {
+    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin edit ke liye internet chahiye.", false); return; }
+    var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
+    if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
+    var amount = window.prompt("Nayi raqam (Rs):", String(t.amount)); if (amount === null) return;
+    var note = window.prompt("Note:", t.note || "Food"); if (note === null) return;
+    var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !note.trim()) { setAdminUserMsg("Raqam, note ya date sahi nahi.", false); return; }
+    sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
+      if (!res.ok) { setAdminUserMsg("Admin edit reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      loadAll(); setAdminUserMsg("Record update ho gaya; audit log save ho gaya.", true);
+    }).catch(function (e) { setAdminUserMsg("Admin edit request fail: " + e.message, false); });
+  }
+  function adminDeleteTxn(id) {
+    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin delete ke liye internet chahiye.", false); return; }
+    var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
+    if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
+    if (!window.confirm("Ye record permanently dono users ki history aur database se delete hoga. Ye wapas nahi hoga. Continue?")) return;
+    sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
+      if (!res.ok) { setAdminUserMsg("Delete reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      loadAll(); setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
+    }).catch(function (e) { setAdminUserMsg("Admin delete request fail: " + e.message, false); });
+  }
   function openAdminUser(id) {
     if (!isAdmin()) return;
     var u = null;
@@ -1880,20 +1947,13 @@
       '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
       '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
       '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
-    if (!mine.length) {
-      $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>';
-    } else {
-      var html = "";
-      mine.forEach(function (t) {
-        var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
-        var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
-        var lock = isTxnLocked(t) ? ' <span class="t-lock">🔒 Settled</span>' : "";
-        html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div>' +
-          '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
-          '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + lock + '</div></div>';
-      });
-      $("adminUserTxns").innerHTML = html;
-    }
+    renderAdminUserTxnRows(u, mine);
+    sb("rpc/admin_list_txn_hides", { method: "POST", body: {} }).then(function (res) {
+      if (!res.ok) return;
+      adminHiddenByTxn = {};
+      (res.body || []).forEach(function (row) { if (!adminHiddenByTxn[row.txn_id]) adminHiddenByTxn[row.txn_id] = []; adminHiddenByTxn[row.txn_id].push(row.user_name || row.user_id); });
+      if (adminCurrentUser && adminCurrentUser.id === u.id) renderAdminUserTxnRows(u, mine);
+    }).catch(function () {});
     showView("adminUser");
   }
   function saveAdminEdit() {
@@ -1998,7 +2058,7 @@
     var el = $("monthStats");
     var now = todayLocal().slice(0, 7);
     var given = 0, taken = 0, count = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
       if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
       var a = Number(t.amount) || 0;
@@ -2014,7 +2074,7 @@
   function renderInsights() {
     var el = $("insightStats");
     var me = myId();
-    var mine = txns.filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
+    var mine = visibleTxns().filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
     if (!mine.length) { el.hidden = true; return; }
     var biggest = mine[0], total = 0;
     var counts = {};
@@ -2089,32 +2149,25 @@
     setPhoneMsg("");
   }
   function downscaleImage(file) {
-    // Phone photos 5MB+ hote hain — 512px JPEG (0.85) bana kar upload tez + sasta.
-    // Canvas na mile (purana browser) to original file hi upload hogi.
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
+      var url = null, settled = false;
+      function fail(message, cause) { if (settled) return; settled = true; if (url) URL.revokeObjectURL(url); var err = new Error(message); err.cause = cause || null; reject(err); }
       try {
-        var img = new Image();
-        var url = URL.createObjectURL(file);
+        var img = new Image(); url = URL.createObjectURL(file);
         img.onload = function () {
           try {
-            var max = 512;
             var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-            if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
-            var s = Math.min(1, max / Math.max(w, h));
-            var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
-            var cv = document.createElement("canvas");
-            cv.width = cw; cv.height = ch;
-            var ctx = cv.getContext("2d");
-            if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
-            ctx.drawImage(img, 0, 0, cw, ch);
-            URL.revokeObjectURL(url);
-            if (cv.toBlob) cv.toBlob(function (b) { resolve(b || file); }, "image/jpeg", 0.85);
-            else resolve(file);
-          } catch (e) { try { URL.revokeObjectURL(url); } catch (e2) {} resolve(file); }
+            if (!w || !h) { fail("photo-decode"); return; }
+            var scale = Math.min(1, 512 / Math.max(w, h));
+            var cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(w * scale)); cv.height = Math.max(1, Math.round(h * scale));
+            var ctx = cv.getContext("2d"); if (!ctx) { fail("photo-canvas"); return; }
+            ctx.drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); url = null;
+            if (!cv.toBlob) { fail("photo-canvas"); return; }
+            cv.toBlob(function (blob) { if (!blob) { fail("photo-encode"); return; } if (settled) return; settled = true; resolve(blob); }, "image/jpeg", 0.85);
+          } catch (e) { fail("photo-process", e); }
         };
-        img.onerror = function () { try { URL.revokeObjectURL(url); } catch (e) {} resolve(file); };
-        img.src = url;
-      } catch (e) { resolve(file); }
+        img.onerror = function () { fail("photo-format"); }; img.src = url;
+      } catch (e) { fail("photo-process", e); }
     });
   }
   function uploadAvatar(file) {
@@ -2125,9 +2178,9 @@
         headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "image/jpeg", "x-upsert": "true" },
         body: blob
       }).then(function (r) {
-        if (!r.ok) throw new Error("upload failed " + r.status);
+        if (!r.ok) return r.text().then(function (body) { var err = new Error("avatar-upload:" + r.status + ":" + body); err.step = "upload"; err.status = r.status; err.serverBody = body; throw err; });
         return API + "/storage/v1/object/public/avatars/" + path;
-      });
+      }).catch(function (err) { if (!err.step) err.step = "upload-network"; throw err; });
     });
   }
   function saveProfile() {
@@ -2141,14 +2194,15 @@
     // v24.8: offline — profile save + avatar upload server ka kaam hai;
     // seedha saaf refusal, fetch timeout ka wait nahi. (Guest naam alag
     // local flow hai — saveProfile sirf logged-in mode mein chalta hai.)
-    if (isOffline()) { setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false); return; }
+    if (isOffline()) { setPhoneMsg("Profile save nahi hui — app offline mode mein hai. Internet reconnect karke dobara try karein.", false); return; }
     var btn = $("savePhoneBtn");
     btn.disabled = true;
     setPhoneMsg("Profile save ho rahi hai…", true);
     var checkUsername = username
       ? sb("khata_profiles?select=id&username=ilike." + encodeURIComponent(username.replace(/%/g, "\\%").replace(/_/g, "\\_")) + "&id=neq." + encodeURIComponent(myId()), {})
         .then(function (res) {
-          if (res.ok && res.body && res.body.length) throw new Error("username-taken");
+          if (!res.ok) { var err = new Error("username-check:" + res.status + ":" + ((res.body && (res.body.message || res.body.details)) || res.raw || "request failed")); err.step = "username-check"; err.status = res.status; throw err; }
+          if (res.body && res.body.length) throw new Error("username-taken");
         })
       : Promise.resolve();
     checkUsername.then(function () {
@@ -2164,7 +2218,7 @@
         prefer: "return=representation",
         body: body
       }).then(function (res) {
-        if (!res.ok) throw new Error("profile-save-failed");
+        if (!res.ok) { var err = new Error("profile-save:" + res.status + ":" + ((res.body && (res.body.message || res.body.details || res.body.hint)) || res.raw || "request failed")); err.step = "profile-save"; err.status = res.status; throw err; }
         if (res.body && res.body.length) return res.body[0];
         // No profile row exists — PATCH silently does nothing, so create it.
         var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
@@ -2174,7 +2228,7 @@
           prefer: "resolution=merge-duplicates,return=minimal",
           body: up
         }).then(function (res2) {
-          if (!res2.ok) throw new Error("profile-save-failed");
+          if (!res2.ok) { var err = new Error("profile-upsert:" + res2.status + ":" + ((res2.body && (res2.body.message || res2.body.details || res2.body.hint)) || res2.raw || "request failed")); err.step = "profile-upsert"; err.status = res2.status; throw err; }
           return up;
         });
       }).then(function (saved) {
@@ -2205,8 +2259,13 @@
     }).catch(function (e) {
       btn.disabled = false;
       if (e && e.message === "username-taken") setPhoneMsg("Ye username kisi aur ne liya hua hai — koi aur chunein.", false);
-      else if (e && /^upload failed/.test(e.message || "")) setPhoneMsg("Photo upload nahi hui — internet check kar ke dobara try karein.", false);
-      else setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false);
+      else if (e && e.message === "photo-format") setPhoneMsg("Ye photo format browser mein decode nahi hua — JPG ya PNG screenshot try karein.", false);
+      else if (e && /^photo-/.test(e.message || "")) setPhoneMsg("Photo process nahi hui (" + e.message + "). Doosri JPG/PNG photo try karein.", false);
+      else if (e && e.step === "upload") setPhoneMsg("Photo upload reject hui — HTTP " + e.status + ": " + String(e.serverBody || "").slice(0, 180), false);
+      else if (e && e.step === "upload-network") setPhoneMsg("Photo upload ke waqt network request fail hui — " + (e.message || "connection error"), false);
+      else if (e && e.step) setPhoneMsg("Profile save ka step '" + e.step + "' fail hua — HTTP " + (e.status || "N/A") + ": " + (e.message || "unknown error").slice(0, 180), false);
+      else setPhoneMsg("Profile save fail hui: " + ((e && e.message) || "unknown error"), false);
+      try { console.error("Easy Khata profile save failed", { message: e && e.message, step: e && e.step, status: e && e.status, serverBody: e && e.serverBody, cause: e && e.cause }); } catch (logError) {}
     });
   }
   function setPhoneMsg(text, ok) {
@@ -2238,7 +2297,7 @@
 
   function personStats(id) {
     var given = 0, taken = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId() && t.receiver_id === id) given += a;
       if (t.receiver_id === myId() && t.payer_id === id) taken += a;
@@ -2248,7 +2307,7 @@
   function latestTxnWith(id) {
     // Most recent record between me and this person (by date, then by creation time).
     var me = myId(), best = null;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var mine = (t.payer_id === me && t.receiver_id === id) || (t.receiver_id === me && t.payer_id === id);
       if (!mine) return;
       if (!best) { best = t; return; }
@@ -2260,7 +2319,7 @@
   function latestTxn() {
     // Most recent record involving me (any person).
     var me = myId(), best = null;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var mine = t.payer_id === me || t.receiver_id === me;
       if (!mine) return;
       if (!best) { best = t; return; }
@@ -2416,7 +2475,7 @@
   }
   function shareAll() {
     var given = 0, taken = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId()) given += a;
       if (t.receiver_id === myId()) taken += a;
@@ -2576,11 +2635,9 @@
       var btns = "";
       if (isTxnLocked(t)) {
         btns = '<span class="t-lock">🔒 Settled</span>';
-      } else if (t.created_by === me) {
-        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
-          '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
-      } else if (isAdmin()) {
-        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      } else if (t.payer_id === me || t.receiver_id === me || t.created_by === me) {
+        btns = '<span class="t-btns">' + (t.created_by === me ? '<button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' : '') +
+          '<button class="btn-danger" type="button" data-hide="' + esc(t.id) + '">Remove from my history</button></span>';
       }
       html += '<div class="drow">' +
         '<div class="d-time"><span class="d-ico ' + (iGave ? "up" : "down") + '">' + (iGave ? "↑" : "↓") + '</span>' +
@@ -2644,7 +2701,7 @@
 
   function filteredTxns() {
     var q = txnSearchText.trim().toLowerCase();
-    return txns.filter(function (t) {
+    return visibleTxns().filter(function (t) {
       if (txnFilterPerson && t.payer_id !== txnFilterPerson && t.receiver_id !== txnFilterPerson) return false;
       if (txnFromDate && String(t.txn_date || "") < txnFromDate) return false;
       if (txnToDate && String(t.txn_date || "") > txnToDate) return false;
@@ -2688,7 +2745,7 @@
   function fullReportData() {
     var me = myId();
     var given = 0, taken = 0;
-    var list = txns.slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
+    var list = visibleTxns().slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
     list.forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === me) given += a;
@@ -3360,11 +3417,9 @@
       var btns = "";
       if (locked) {
         btns = '<span class="t-lock">🔒 Settled</span>';
-      } else if (t.created_by === me) {
-        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
-          '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
-      } else if (isAdmin()) {
-        btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
+      } else if (t.payer_id === me || t.receiver_id === me || t.created_by === me) {
+        btns = '<span class="t-btns">' + (t.created_by === me ? '<button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' : '') +
+          '<button class="btn-danger" type="button" data-hide="' + esc(t.id) + '">Remove from my history</button></span>';
       }
       html += '<div class="txn"><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
         '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
@@ -3629,35 +3684,44 @@
       });
   }
 
-  function deleteTxn(id) {
-    var t = null;
-    txns.forEach(function (x) { if (x.id === id) t = x; });
+  function hideTxn(id) {
+    var t = null; txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t) return;
-    if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
-    if (t.created_by !== myId() && !isAdmin()) return;
-    askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
-    if (guestMode) {
-      // v24: guest record — sirf local delete, koi server call nahi.
-      txns = txns.filter(function (x) { return x.id !== id; });
-      saveGuestStore();
-      renderAll();
-      setTxnMsg("Record delete ho gaya.", true);
-      return;
-    }
-    if (isOffline()) {
-      offlineTxnDelete(id);
-      setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
-      return;
-    }
-    sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
-      .then(function (res) {
-        if (!res.ok) { setTxnMsg("Delete nahi hua.", false); return; }
-        loadAll();
-      }).catch(function () {
-        offlineTxnDelete(id);
-        setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
-      });
+    if (guestMode) { txns = txns.filter(function (x) { return x.id !== id; }); saveGuestStore(); renderAll(); return; }
+    if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; }
+    if (t.payer_id !== myId() && t.receiver_id !== myId() && t.created_by !== myId()) return;
+    if (hiddenIds[id]) return;
+    askConfirm("History se hatayein?", "Ye record sirf aap ki history se hat jayega. Doosre dost ke account par koi fark nahi parega.", "Remove karein", function () {
+      hiddenIds[id] = true; saveCache(); renderAll();
+      if (!navigator.onLine) { queueOp({ key: newUuid(), op: "hide", table: "khata_hidden", id: id, ts: Date.now() }); setTxnMsg("Record hide ho gaya — sync pending.", true); return; }
+      sb("khata_hidden?on_conflict=user_id,txn_id", { method: "POST", prefer: "resolution=ignore-duplicates,return=minimal", body: { user_id: myId(), txn_id: id } })
+        .then(function (res) {
+          if (!res.ok) {
+            if (res.status >= 500) queueOp({ key: newUuid(), op: "hide", table: "khata_hidden", id: id, ts: Date.now() });
+            else { delete hiddenIds[id]; saveCache(); renderAll(); }
+            setTxnMsg("History update nahi hui (" + res.status + ") — " + ((res.body && (res.body.message || res.body.details)) || "server error"), false); return;
+          }
+          setTxnMsg("Record sirf aap ki history se hat gaya.", true);
+        }).catch(function () { queueOp({ key: newUuid(), op: "hide", table: "khata_hidden", id: id, ts: Date.now() }); setTxnMsg("Record hide ho gaya — sync pending.", true); });
     });
+  }
+  function renderHiddenTxns() {
+    var list = txns.filter(function (t) { return !!hiddenIds[t.id]; });
+    if (!list.length) { $("hiddenTxnList").innerHTML = '<p class="empty">Koi hidden record nahi.</p>'; return; }
+    var html = "";
+    list.forEach(function (t) {
+      var other = t.payer_id === myId() ? t.receiver_id : t.payer_id;
+      html += '<div class="txn"><div class="t-main">' + esc(profileName(other)) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div><div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span><button class="btn btn-soft" type="button" data-restore-hidden="' + esc(t.id) + '">Restore</button></div></div>';
+    });
+    $("hiddenTxnList").innerHTML = html;
+  }
+  function restoreHiddenTxn(id) {
+    if (!hiddenIds[id] || guestMode) return;
+    delete hiddenIds[id]; saveCache(); renderAll(); renderHiddenTxns();
+    if (!navigator.onLine) { queueOp({ key: newUuid(), op: "unhide", table: "khata_hidden", id: id, ts: Date.now() }); return; }
+    sb("khata_hidden?user_id=eq." + encodeURIComponent(myId()) + "&txn_id=eq." + encodeURIComponent(id), { method: "DELETE" })
+      .then(function (res) { if (!res.ok) { hiddenIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Restore nahi hua (" + res.status + ").", false); } })
+      .catch(function () { queueOp({ key: newUuid(), op: "unhide", table: "khata_hidden", id: id, ts: Date.now() }); });
   }
 
   /* ---------- wire up ---------- */
@@ -3803,13 +3867,24 @@
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
-    if (b) deleteTxn(b.getAttribute("data-del"));
+    var h = e.target.closest ? e.target.closest("[data-hide]") : null;
+    if (h) { hideTxn(h.getAttribute("data-hide")); return; }
+    if (b) hideTxn(b.getAttribute("data-del"));
   });
+  $("hiddenTxnList").addEventListener("click", function (e) { var b = e.target.closest ? e.target.closest("[data-restore-hidden]") : null; if (b) restoreHiddenTxn(b.getAttribute("data-restore-hidden")); });
   $("detailTxns").addEventListener("click", function (e) {
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
-    if (b) deleteTxn(b.getAttribute("data-del"));
+    var h = e.target.closest ? e.target.closest("[data-hide]") : null;
+    if (h) { hideTxn(h.getAttribute("data-hide")); return; }
+    if (b) hideTxn(b.getAttribute("data-del"));
+  });
+  $("adminUserTxns").addEventListener("click", function (e) {
+    var edit = e.target.closest ? e.target.closest("[data-admin-txn-edit]") : null;
+    if (edit) { adminEditTxn(edit.getAttribute("data-admin-txn-edit")); return; }
+    var del = e.target.closest ? e.target.closest("[data-admin-txn-del]") : null;
+    if (del) adminDeleteTxn(del.getAttribute("data-admin-txn-del"));
   });
   $("adminUserList").addEventListener("click", function (e) {
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
@@ -3842,6 +3917,8 @@
   });
   if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
   $("notifBtn").addEventListener("click", showNotifView);
+  $("acctHiddenBtn").addEventListener("click", function () { showView("hidden"); renderHiddenTxns(); });
+  $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
   $("notifList").addEventListener("click", function (e) {

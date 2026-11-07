@@ -383,6 +383,7 @@
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
+        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
         <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
         <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
         <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
@@ -410,6 +411,7 @@
       <p class="version" id="versionFooter" hidden><span>Developed by Asad</span></p>
     </section>
 
+    <section id="hiddenView" hidden><div class="card"><button id="hiddenBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Hidden records</h2><p class="muted">Yahan se record apni history mein restore karein.</p><div id="hiddenTxnList" class="txns"></div></div></section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
@@ -538,6 +540,6 @@
     </div>
   </div>
 
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
