@@ -1437,7 +1437,7 @@
     delete hiddenTxnIds[id]; saveCache(); renderAll(); renderHiddenTxns();
     sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" })
       .then(function (res) {
-        if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Restore nahi hua (" + res.status + ").", false); }
+        if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Record wapas nahi aa saka. " + res.status + ").", false); }
       }).catch(function () {
         queueOp({ key: newUuid(), op: "unhide", table: "khata_txn_hidden", id: id, ts: Date.now() });
       });
@@ -2623,7 +2623,7 @@
     if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
-    if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band hoga aur workspace access suspend hoga. Ledger records aur history mehfooz rahenge.")) return;
+    if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur community ka access ruk jayega. Purane hisaab mehfooz rahenge.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
         if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
@@ -2714,7 +2714,7 @@
     var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim()) { setAdminUserMsg("Raqam 2 decimal places tak, note aur date sahi likhein.", false); return; }
     sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
-      if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. " + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. Dobara koshish karein.", false); return; }
       t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record update ho gaya; audit log save ho gaya.", true);
@@ -2724,9 +2724,9 @@
     if (!isAdmin()) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
-    if (!window.confirm("Ye record permanently dono users ki history aur database se delete hoga. Ye wapas nahi hoga. Continue?")) return;
+    if (!window.confirm("Ye record dono users ki history se hamesha ke liye delete ho jayega. Isay wapas nahi la sakenge. Kya aap jari rakhna chahte hain?")) return;
     sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
-      if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. " + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. Dobara koshish karein.", false); return; }
       txns = txns.filter(function (x) { return x.id !== id; });
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
@@ -3355,7 +3355,7 @@
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Connection issue — settlement offline queue mein save ho gayi; sync baad mein hogi.",true);return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Internet nahi hai. Hisaab phone mein save ho gaya; internet aate hi update ho jayega.",true);return;}
           setPeopleMsg("Settlement save nahi hua ("+res.status+") — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
