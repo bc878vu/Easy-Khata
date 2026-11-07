@@ -922,6 +922,7 @@
     workspaces.forEach(function(w){var o=document.createElement("option");o.value=w.id;o.textContent=(w.type==="personal"?"Personal · ":"Business · ")+w.name;sel.appendChild(o);if(w.id===currentWorkspaceId)active=w;});
     sel.value=currentWorkspaceId;
     $("workspaceInviteBtn").hidden=!active||active.type!=="business";
+    $("workspaceMembersBtn").hidden=!active||active.type!=="business";
   }
   function loadWorkspaces(){
     return sb("khata_workspaces?select=id,name,type,created_by,status&status=eq.active&order=created_at.asc").then(function(res){
@@ -951,6 +952,37 @@
       if(!id){setTxnMsg("Workspace bana, lekin ID receive nahi hui. Refresh karein.",false);return;}
       sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(sw){if(sw.ok){currentWorkspaceId=id;teardownRealtime();loadAll();}else setTxnMsg("Workspace bana lekin switch nahi hua. Refresh karein.",false);});
     }).catch(function(){setTxnMsg("Workspace create nahi hua — internet check karein.",false);});
+  }
+  function manageWorkspaceMembers(){
+    if(!currentWorkspaceId)return;
+    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
+      if(!res.ok){setTxnMsg("Members load nahi hue.",false);return;}
+      var members=Array.isArray(res.body)?res.body:[];
+      var lines=members.map(function(m,i){
+        var p=null;profiles.forEach(function(x){if(x.id===m.user_id)p=x;});
+        return (i+1)+". "+(p?(p.name||p.email):m.user_id)+" — "+m.role+(m.user_id===myId()?" (You)":"");
+      });
+      window.alert("Workspace members:\n\n"+(lines.join("\n")||"Koi member nahi."));
+      if(!members.some(function(m){return m.user_id!==myId();}))return;
+      var pick=window.prompt("Member number likhein jiska role change ya access remove karna hai (Cancel = band):");
+      if(pick===null||!pick.trim())return;
+      var target=members[Number(pick)-1];
+      if(!target||target.user_id===myId()){setTxnMsg("Member number sahi nahi.",false);return;}
+      var action=window.prompt("Action likhein: role ya remove","role");
+      if(action===null)return;
+      if(action.trim().toLowerCase()==="remove"){
+        if(!window.confirm("Is member ka workspace access remove karein? Un ke purane ledger records mehfooz rahenge."))return;
+        sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id}})
+          .then(function(r){setTxnMsg(r.ok?"Member access remove ho gaya. Ledger history mehfooz hai.":"Member remove nahi hua — owner/admin permission check karein.",r.ok);});
+        return;
+      }
+      var role=window.prompt("Naya role: admin, accountant, staff, viewer",target.role);
+      if(role===null)return;
+      role=role.trim().toLowerCase();
+      if(["admin","accountant","staff","viewer"].indexOf(role)<0){setTxnMsg("Role sahi nahi hai.",false);return;}
+      sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id,p_role:role}})
+        .then(function(r){setTxnMsg(r.ok?"Member role update ho gaya.":"Role update nahi hua — owner/admin permission check karein.",r.ok);});
+    }).catch(function(){setTxnMsg("Members load nahi hue.",false);});
   }
   function inviteWorkspaceMember(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
@@ -4399,6 +4431,7 @@
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceCreateBtn").addEventListener("click", createBusinessWorkspace);
   $("workspaceInviteBtn").addEventListener("click", inviteWorkspaceMember);
+  $("workspaceMembersBtn").addEventListener("click", manageWorkspaceMembers);
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {
     var b = $("addContactBox");
