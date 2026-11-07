@@ -1272,3 +1272,25 @@ input,select,textarea,button{max-width:100%}
 .community-invite-row .btn{font-size:11px;padding:8px}
 .member-role-select{flex:1}
 @media(max-width:520px){.community-invite-row{grid-template-columns:minmax(0,1fr) 105px}.community-invite-row .btn{grid-column:1/-1;width:100%}}
+
+
+/* Platform admin: community + member management */
+.admin-community-card,.admin-community-member-card{display:flex;flex-direction:column;gap:10px}
+.admin-community-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.admin-community-head>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.admin-community-head strong{font-size:15px;overflow-wrap:anywhere}
+.admin-community-head small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.admin-community-add-member{display:grid;grid-template-columns:minmax(0,1fr) 112px auto;gap:7px;padding-top:10px;border-top:1px solid var(--line)}
+.admin-community-add-member input,.admin-community-add-member select,.admin-community-member-controls select{min-width:0;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);padding:9px;font:inherit;font-size:12px}
+.admin-community-member-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:7px}
+.admin-community-member-controls .btn{white-space:nowrap}
+#adminCommunityEditOverlay{position:fixed;inset:0;z-index:1000;background:rgba(10,18,32,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+#adminCommunityEditOverlay[hidden]{display:none}
+#adminCommunityEditOverlay .community-modal{width:min(560px,100%);max-height:90dvh;overflow:auto;padding:20px}
+.admin-community-card .admin-user-meta{flex-wrap:wrap}
+@media(max-width:600px){
+ .admin-community-add-member{grid-template-columns:minmax(0,1fr) 105px}
+ .admin-community-add-member .btn{grid-column:1/-1;width:100%}
+ .admin-community-member-controls{grid-template-columns:1fr 1fr}
+ .admin-community-member-controls .btn{width:100%}
+}
