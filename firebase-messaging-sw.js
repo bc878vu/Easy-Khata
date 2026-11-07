@@ -26,6 +26,8 @@ messaging.onBackgroundMessage(function (payload) {
   var title = d.title || "Easy Khata";
   var options = {
     body: d.body || "A new record arrived.",
+    vibrate: [180, 90, 180, 90, 260],
+    renotify: true,
     icon: "icons/icon.svg",
     badge: "icons/icon.svg",
     tag: d.tag || "easy-khata",
