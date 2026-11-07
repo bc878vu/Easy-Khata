@@ -1577,57 +1577,78 @@
      with the manual Refresh button + the visibility re-fetch below. */
   var rtChannel = null;
   var rtTimer = null;
+  var rtRetryTimer = null;
   var rtLastFetch = 0;
+  var rtGeneration = 0;
   function liveReload() {
-    // Quiet background refresh: no messages, no error popups.
     var ind = $("liveUpdating");
     var slowTimer = setTimeout(function () { if (ind) ind.hidden = false; }, 800);
-    var done = function () {
-      clearTimeout(slowTimer);
-      if (ind) ind.hidden = true;
-      rtLastFetch = Date.now();
-    };
+    var done = function () { clearTimeout(slowTimer); if (ind) ind.hidden = true; rtLastFetch = Date.now(); };
     refreshTxns().then(function () { loadNotifs(); loadContacts(); done(); }).catch(function () { done(); });
   }
   function scheduleLiveReload() {
     if (rtTimer) clearTimeout(rtTimer);
     rtTimer = setTimeout(function () { rtTimer = null; liveReload(); }, 300);
   }
+  function scheduleRealtimeRetry() {
+    if (guestMode || !session || !navigator.onLine || rtRetryTimer) return;
+    rtRetryTimer = setTimeout(function () {
+      rtRetryTimer = null;
+      if (!rtChannel && session && !guestMode && navigator.onLine) setupRealtime();
+    }, 5000);
+  }
   function setupRealtime() {
     try {
-      if (!window.supabase || !window.supabase.createClient || !currentWorkspaceId) return; // CDN failed / offline / workspace not loaded
-      if (rtChannel) return; // already subscribed
+      if (!window.supabase || !window.supabase.createClient || !currentWorkspaceId || guestMode || !session) return;
+      if (rtChannel) return;
+      var generation = ++rtGeneration;
       var client = window.supabase.createClient(API, ANON);
-      try {
-        // Authenticate the realtime connection with the user's token so RLS
-        // lets the channel see their own rows.
-        if (session && session.access_token && client.realtime && client.realtime.setAuth) {
-          client.realtime.setAuth(session.access_token);
+      if (session.access_token && client.realtime && client.realtime.setAuth) client.realtime.setAuth(session.access_token);
+      var channel = client.channel("easy-khata-live-" + currentWorkspaceId + "-" + generation)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, scheduleLiveReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, scheduleLiveReload);
+      rtChannel = channel;
+      channel.subscribe(function(status) {
+        if (status === "SUBSCRIBED") { rtLastFetch = Date.now(); return; }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          if (rtChannel === channel) rtChannel = null;
+          try { channel.unsubscribe(); } catch(e) {}
+          scheduleRealtimeRetry();
         }
-      } catch (e) {}
-      rtChannel = client.channel("easy-khata-live-" + currentWorkspaceId)
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
-        .subscribe();
-    } catch (e) { rtChannel = null; }
+      });
+    } catch (e) {
+      rtChannel = null;
+      scheduleRealtimeRetry();
+    }
   }
-  // Realtime CDN loads asynchronously so it cannot delay first paint.
-  window.EASY_KHATA_ON_SUPABASE_READY = function () {
-    if (session && !guestMode) setupRealtime();
-  };
+  window.EASY_KHATA_ON_SUPABASE_READY = function () { if (session && !guestMode) setupRealtime(); };
   function teardownRealtime() {
     try {
+      rtGeneration++;
       if (rtTimer) { clearTimeout(rtTimer); rtTimer = null; }
-      if (rtChannel) { rtChannel.unsubscribe(); rtChannel = null; }
+      if (rtRetryTimer) { clearTimeout(rtRetryTimer); rtRetryTimer = null; }
+      if (rtChannel) { var old=rtChannel; rtChannel=null; old.unsubscribe(); }
     } catch (e) { rtChannel = null; }
   }
   document.addEventListener("visibilitychange", function () {
-    // Re-fetch when the tab becomes visible again (catches changes made
-    // elsewhere while the tab was hidden). Throttled: at most once per 30s.
-    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) scheduleLiveReload();
+    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) {
+      scheduleLiveReload();
+      if (!rtChannel) setupRealtime();
+    }
   });
+  window.addEventListener("online", function () {
+    if (session && !guestMode) { setupRealtime(); loadAll(); }
+  });
+  // Realtime is an optimization, not the only source of truth. Poll quietly
+  // while the tab is visible so a dropped socket cannot leave stale balances.
+  setInterval(function () {
+    if (session && !guestMode && !document.hidden && Date.now() - rtLastFetch > 90000) {
+      scheduleLiveReload();
+      if (!rtChannel) setupRealtime();
+    }
+  }, 30000);
   function fmtNotifTime(ts) {
     try {
       var d = new Date(ts);
