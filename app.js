@@ -733,16 +733,18 @@
     });
   }
 
-  function afterAuth(res) {
-    // Signup with email confirmation on: no session is returned.
-    // GoTrue's confirmation-pending response is a bare user object (top-level id/email),
-    // NOT wrapped as {user: ...} — so check both shapes, otherwise even a successful
-    // signup showed "Something went wrong" (2026-11-05, Yasir case).
+  function communityOnboardingKey(email) {
+    return "easykhata_community_onboarding_v1_" + String(email || "").trim().toLowerCase();
+  }
+  function afterAuth(res, isSignup) {
     var body = res.body || {};
     if (!body.access_token) {
       var pendingUser = body.user || (body.id && body.email ? body : null);
       if (pendingUser) {
-        setAuthMsg("Account ban gaya! Confirmation link aap ke email par bhej diya hai — us par click karein, phir login karein.", true);
+        if (isSignup) {
+          try { window.localStorage.setItem(communityOnboardingKey(pendingUser.email), "1"); } catch(e) {}
+        }
+        setAuthMsg("Account ban gaya! Confirmation link email par bheja hai. Confirm karke login karein; phir Personal Space ke saath Create Community aur Find/Join Community options khul jayenge.", true);
         authMode = "login";
         renderAuthMode();
         return;
@@ -755,7 +757,18 @@
     ensureProfile().catch(function () {}).then(function () {
       showApp();
       loadAll();
-      maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
+      maybeOfferGuestMigration();
+      var email = (session && session.user && session.user.email) || "";
+      var needsCommunitySetup = !!isSignup;
+      try {
+        if (window.localStorage.getItem(communityOnboardingKey(email))) needsCommunitySetup = true;
+        if (needsCommunitySetup) window.localStorage.removeItem(communityOnboardingKey(email));
+      } catch(e) {}
+      if (needsCommunitySetup) {
+        setTimeout(function () {
+          if (session && !guestMode) openCommunityModal("join");
+        }, 900);
+      }
     });
   }
 
@@ -769,8 +782,9 @@
     if (authMode === "signup" && phone && !normPhone(phone)) { setAuthMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
     if (password.length < 6) { setAuthMsg("Password kam se kam 6 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
+    var isSignup = authMode === "signup";
     btn.disabled = true;
-    var p = authMode === "signup"
+    var p = isSignup
       ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "", app: "easy-khata" } })
       : authCall("/token?grant_type=password", { email: email, password: password });
     p.then(function (res) {
@@ -786,7 +800,7 @@
         }
         return;
       }
-      afterAuth(res);
+      afterAuth(res, isSignup);
     }).catch(function () {
       btn.disabled = false;
       setAuthMsg("Internet ya server se rabta nahi ho raha.", false);
