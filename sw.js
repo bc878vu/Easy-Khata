@@ -7,7 +7,7 @@ var CACHE = "easy-khata-v47-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=47",
+  "styles.css?v=48",
   "config.js?v=4",
   "app.js?v=57",
   "firebase-messaging-sw.js",
