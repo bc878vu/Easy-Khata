@@ -504,8 +504,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    THEEK UPAR (body.has-nav offset), auth page par viewport ke bilkul neeche.
    Text EXACTLY wahi — "Developed by Asad", koi version string nahi. Gradient
    + 3D drop-shadow wahi (neeche @supports block). Compact strip (.95rem),
-   aik line (nowrap), background taake scroll karta content peeche se na dikhe. */
-.version{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);z-index:35;text-align:center;color:var(--accent);font-size:.95rem;font-weight:800;letter-spacing:.03em;margin:0;padding:6px 10px 8px;background:var(--bg);white-space:nowrap;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
+   aik line (nowrap), background taake scroll karta content peeche se na dikhe.
+   v24.6: gradient + drop-shadow BAR se hatakar .version span par — @supports
+   block pehle .version ki background ko gradient se REPLACE karta tha, is liye
+   fixed bar transparent ho jata tha aur scroll karta Privacy text peeche se
+   dikhta tha (screenshot 2026-11-07 09:17 PKT). Ab .version par opaque
+   background:var(--bg) + border-top separator rehta hai; gradient/3D shadow
+   sirf span (text) par. Position/size/text/scope wahi. */
+.version{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);z-index:35;text-align:center;color:var(--accent);font-size:.95rem;font-weight:800;letter-spacing:.03em;margin:0;padding:6px 10px 8px;background:var(--bg);border-top:1px solid var(--line);white-space:nowrap}
 /* v24.4: footer sirf Account view par — hidden attribute hamesha jeete
    (fixed element par bhi display:none laagu ho). */
 .version[hidden]{display:none}
@@ -513,7 +519,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    upar; +1px clearance taake nav ka top border kabhi cover na ho. */
 body.has-nav .version{bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
-  .version{background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .version span{display:inline-block;background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
 }
 
 /* ---------- notifications / admin ---------- */
