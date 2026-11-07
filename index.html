@@ -666,6 +666,14 @@ window.addEventListener("error", function () {
         <div><span class="eyebrow">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle">Members & requests</h2></div>
         <button id="membersModalClose" class="modal-close" type="button" aria-label="Close">×</button>
       </header>
+      <div class="community-invite-box">
+        <h3>Invite by email</h3>
+        <div class="community-invite-row">
+          <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address">
+          <select id="workspaceInviteRole" aria-label="Invite role"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+          <button id="workspaceInviteSubmit" class="btn btn-primary" type="button">Copy invite link</button>
+        </div>
+      </div>
       <h3>Pending join requests</h3>
       <div id="communityRequestsList" class="community-list"></div>
       <h3 class="members-section-title">Active members</h3>
