@@ -78,7 +78,14 @@
     if (stored) session = JSON.parse(stored);
   } catch (e) { session = null; }
   function saveSession(s) {
+    var previousId = session && session.user ? session.user.id : "";
     session = s || null;
+    var nextId = session && session.user ? session.user.id : "";
+    setUserScopedStorage(nextId);
+    if (previousId !== nextId) {
+      workspaces = []; currentWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
+      try { teardownRealtime(); } catch (e) {}
+    }
     try {
       if (s) window.localStorage.setItem(SESSION_KEY, JSON.stringify(s));
       else window.localStorage.removeItem(SESSION_KEY);
@@ -159,7 +166,10 @@
   }
 
   /* ---------- state ---------- */
-  var profiles = [];   // {id, name, email, phone}
+  var profiles = [];   // Current workspace people only (RLS scoped)
+  var workspaces = [];
+  var currentWorkspaceId = "";
+  var workspaceInviteBusy = false;
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
   // v24.11: per-user hidden records — Delete kabhi real DELETE nahi karta.
   // Har user ke apne hidden ids (khata_txn_hidden table) — sirf us ki apni
@@ -193,8 +203,34 @@
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
   var offlineMode = false;   // true jab cache se dikhaya ja raha ho
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
-  var CACHE_KEY = "easykhata_cache_v1";
-  var OUTBOX_KEY = "easykhata_outbox_v1";
+  var CACHE_KEY = "easykhata_cache_v1_anonymous";
+  var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
+  function setUserScopedStorage(userId) {
+    var uid = userId || "anonymous";
+    CACHE_KEY = "easykhata_cache_v1_" + uid;
+    OUTBOX_KEY = "easykhata_outbox_v1_" + uid;
+    if (!userId) return;
+    try {
+      if (!window.localStorage.getItem(CACHE_KEY)) {
+        var legacy = window.localStorage.getItem("easykhata_cache_v1");
+        var parsed = legacy ? JSON.parse(legacy) : null;
+        if (parsed && Array.isArray(parsed.profiles) && parsed.profiles.some(function (p) { return p.id === userId; })) {
+          window.localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
+        }
+      }
+      if (!window.localStorage.getItem(OUTBOX_KEY)) {
+        var oldOps = JSON.parse(window.localStorage.getItem("easykhata_outbox_v1") || "[]");
+        if (Array.isArray(oldOps) && oldOps.length) {
+          var mine = oldOps.filter(function (o) {
+            var b = o && o.body || {};
+            return b.created_by === userId || b.owner_id === userId || b.user_id === userId;
+          });
+          if (mine.length) window.localStorage.setItem(OUTBOX_KEY, JSON.stringify(mine));
+        }
+      }
+    } catch (e) {}
+  }
+  setUserScopedStorage(session && session.user ? session.user.id : "");
   var OUTBOX_MAX = 200;
   /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
      Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
@@ -300,7 +336,7 @@
     if (!profiles || !profiles.length) return;
     try {
       window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now()
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
       }));
     } catch (e) {}
   }
@@ -355,7 +391,7 @@
     name = name.trim();
     if (!name) { setTxnMsg("Naam khali nahi ho sakta.", false); return; }
     if (name.length > 80) { setTxnMsg("Naam 80 haroof se chhota rakhein.", false); return; }
-    var contact = { id: id, owner_id: myId(), name: name, phone: null, manual: true, created_at: new Date().toISOString() };
+    var contact = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null, manual: true, created_at: new Date().toISOString() };
     if (guestMode) {
       myContacts = myContacts.filter(function (x) { return x.id !== id; });
       myContacts.push(contact);
@@ -372,12 +408,12 @@
       setTxnMsg("Naam save ho gaya — ab har record mein yehi naam nazar aayega.", true);
     }
     if (isOffline()) {
-      queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: id, body: { id: id, owner_id: myId(), name: name, phone: null }, ts: Date.now() });
+      queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: id, body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null }, ts: Date.now() });
       applyName();
       setTxnMsg("Naam offline save ho gaya — internet aate hi sync hoga.", true);
       return;
     }
-    sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), name: name, phone: null } })
+    sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null } })
       .then(function (res) {
         if (!res.ok) { setTxnMsg("Naam save nahi hua (" + res.status + ") — dobara try karein.", false); return; }
         applyName();
@@ -540,6 +576,7 @@
     // v24.1: bada banner hata diya — header mein chhota Guest badge dikhta hai (renderAccount).
     $("notifBtn").hidden = guestMode;
     renderAccount();
+    renderWorkspaceBar();
     showView("khata");
     $("txnDate").value = todayLocal();
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
@@ -875,7 +912,103 @@
     // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
     // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
     // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
-    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username" + (withPhone ? ",phone" : "") + "&order=name.asc");
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id" + (withPhone ? ",phone" : "") + "&order=name.asc");
+  }
+
+  function renderWorkspaceBar() {
+    var bar=$("workspaceBar"); if(!bar)return;
+    bar.hidden=guestMode||!session; if(bar.hidden)return;
+    var sel=$("workspaceSelect"), active=null; sel.innerHTML="";
+    workspaces.forEach(function(w){var o=document.createElement("option");o.value=w.id;o.textContent=(w.type==="personal"?"Personal · ":"Business · ")+w.name;sel.appendChild(o);if(w.id===currentWorkspaceId)active=w;});
+    sel.value=currentWorkspaceId;
+    $("workspaceInviteBtn").hidden=!active||active.type!=="business";
+    $("workspaceMembersBtn").hidden=!active||active.type!=="business";
+  }
+  function loadWorkspaces(){
+    return sb("khata_workspaces?select=id,name,type,created_by,status&status=eq.active&order=created_at.asc").then(function(res){
+      if(!res.ok)throw new Error("workspaces load failed");
+      workspaces=Array.isArray(res.body)?res.body:[];
+      if(!workspaces.some(function(w){return w.id===currentWorkspaceId;}))throw new Error("active workspace inaccessible");
+      renderWorkspaceBar();return workspaces;
+    });
+  }
+  function switchWorkspace(id){
+    if(!id||id===currentWorkspaceId)return;
+    if(loadOutbox().length){setTxnMsg("Workspace badalne se pehle pending records sync karein.",false);renderWorkspaceBar();return;}
+    $("workspaceSelect").disabled=true;
+    sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
+      $("workspaceSelect").disabled=false;
+      if(!res.ok){setTxnMsg("Workspace switch nahi hua — access verify karein.",false);renderWorkspaceBar();return;}
+      currentWorkspaceId=id;profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
+    }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
+  }
+  function createBusinessWorkspace(){
+    var name=window.prompt("Business / office ka naam likhein:");if(name===null)return;name=name.trim();
+    if(name.length<2||name.length>100){setTxnMsg("Workspace name 2 se 100 characters ka hona chahiye.",false);return;}
+    sb("rpc/khata_create_business_workspace",{method:"POST",body:{p_name:name}}).then(function(res){
+      if(!res.ok){setTxnMsg("Business workspace create nahi hua.",false);return;}
+      var id=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);
+      if(id&&typeof id==="object")id=id.khata_create_business_workspace;
+      if(!id){setTxnMsg("Workspace bana, lekin ID receive nahi hui. Refresh karein.",false);return;}
+      sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(sw){if(sw.ok){currentWorkspaceId=id;teardownRealtime();loadAll();}else setTxnMsg("Workspace bana lekin switch nahi hua. Refresh karein.",false);});
+    }).catch(function(){setTxnMsg("Workspace create nahi hua — internet check karein.",false);});
+  }
+  function manageWorkspaceMembers(){
+    if(!currentWorkspaceId)return;
+    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
+      if(!res.ok){setTxnMsg("Members load nahi hue.",false);return;}
+      var members=Array.isArray(res.body)?res.body:[];
+      var lines=members.map(function(m,i){
+        var p=null;profiles.forEach(function(x){if(x.id===m.user_id)p=x;});
+        return (i+1)+". "+(p?(p.name||p.email):m.user_id)+" — "+m.role+(m.user_id===myId()?" (You)":"");
+      });
+      window.alert("Workspace members:\n\n"+(lines.join("\n")||"Koi member nahi."));
+      if(!members.some(function(m){return m.user_id!==myId();}))return;
+      var pick=window.prompt("Member number likhein jiska role change ya access remove karna hai (Cancel = band):");
+      if(pick===null||!pick.trim())return;
+      var target=members[Number(pick)-1];
+      if(!target||target.user_id===myId()){setTxnMsg("Member number sahi nahi.",false);return;}
+      var action=window.prompt("Action likhein: role ya remove","role");
+      if(action===null)return;
+      if(action.trim().toLowerCase()==="remove"){
+        if(!window.confirm("Is member ka workspace access remove karein? Un ke purane ledger records mehfooz rahenge."))return;
+        sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id}})
+          .then(function(r){setTxnMsg(r.ok?"Member access remove ho gaya. Ledger history mehfooz hai.":"Member remove nahi hua — owner/admin permission check karein.",r.ok);});
+        return;
+      }
+      var role=window.prompt("Naya role: admin, accountant, staff, viewer",target.role);
+      if(role===null)return;
+      role=role.trim().toLowerCase();
+      if(["admin","accountant","staff","viewer"].indexOf(role)<0){setTxnMsg("Role sahi nahi hai.",false);return;}
+      sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id,p_role:role}})
+        .then(function(r){setTxnMsg(r.ok?"Member role update ho gaya.":"Role update nahi hua — owner/admin permission check karein.",r.ok);});
+    }).catch(function(){setTxnMsg("Members load nahi hue.",false);});
+  }
+  function inviteWorkspaceMember(){
+    if(!currentWorkspaceId||workspaceInviteBusy)return;
+    var email=window.prompt("Invite bhejne ke liye member ka email likhein:");if(email===null||!email.trim())return;
+    var role=window.prompt("Role likhein: admin, accountant, staff, viewer","staff");if(role===null)return;
+    role=role.trim().toLowerCase();if(["admin","accountant","staff","viewer"].indexOf(role)<0){setTxnMsg("Role sahi nahi hai.",false);return;}
+    workspaceInviteBusy=true;
+    sb("rpc/khata_create_workspace_invite",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_email:email.trim(),p_role:role}}).then(function(res){
+      workspaceInviteBusy=false;if(!res.ok||!res.body){setTxnMsg("Invite create nahi hua. Aap ke role ya email ko check karein.",false);return;}
+      var token=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);if(token&&typeof token==="object")token=token.khata_create_workspace_invite;
+      var link=window.location.origin+window.location.pathname+"?invite="+encodeURIComponent(token);
+      copyText(link).then(function(){window.alert("Invite link copy ho gaya. Isay "+email.trim()+" ko bhej dein. Link 7 din tak valid hai.");}).catch(function(){window.prompt("Invite link copy karein:",link);});
+    }).catch(function(){workspaceInviteBusy=false;setTxnMsg("Invite create nahi hua.",false);});
+  }
+  var inviteAccepting=false;
+  function acceptInviteFromUrl(){
+    if(inviteAccepting||!session||!session.access_token)return Promise.resolve(false);
+    var token="";try{token=new URLSearchParams(window.location.search).get("invite")||"";}catch(e){}
+    if(!token)return Promise.resolve(false);inviteAccepting=true;
+    return sb("rpc/khata_accept_workspace_invite",{method:"POST",body:{p_token:token}}).then(function(res){
+      inviteAccepting=false;if(!res.ok){setTxnMsg("Invite accept nahi hua. Email, login aur expiry check karein.",false);return false;}
+      try{window.history.replaceState(null,"",window.location.pathname);}catch(e){}
+      var id=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);if(id&&typeof id==="object")id=id.khata_accept_workspace_invite;
+      if(!id)return false;
+      return sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(sw){if(sw.ok)currentWorkspaceId=id;return sw.ok;});
+    }).catch(function(){inviteAccepting=false;return false;});
   }
 
   // Outbox sync: pending ops ko order mein server par bhejein.
@@ -885,6 +1018,11 @@
     if (guestMode) return Promise.resolve(false); // v24: guest ka koi outbox nahi — kuch sync nahi hota
     if (syncing) return Promise.resolve(false);
     var ops = loadOutbox();
+    // Older queued operations did not store a tenant id. Existing accounts
+    // were on the legacy office ledger, so pin these before syncing.
+    ops.forEach(function (o) {
+      if (o.body && !o.body.workspace_id && (o.table === "khata_transactions" || o.table === "khata_contacts")) o.body.workspace_id = currentWorkspaceId;
+    });
     // v24.11: purane version se queued khata_transactions delete ops — real
     // DELETE kabhi nahi bhejte; hide (khata_txn_hidden insert) mein badal dein.
     var converted = false;
@@ -1093,7 +1231,7 @@
   function loadAllTransactions() {
     var pageSize = 500, offset = 0, rows = [];
     function loadPage() {
-      return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc", {
+      return sb("khata_transactions?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&order=txn_date.desc&order=created_at.desc", {
         range: offset + "-" + (offset + pageSize - 1)
       }).then(function (res) {
         if (!res.ok) throw new Error("txns load failed");
@@ -1119,7 +1257,9 @@
       return;
     }
     setTxnMsg("");
-    profilesQuery(true).then(function (res) {
+    acceptInviteFromUrl().then(function (accepted) {
+      if (accepted) { teardownRealtime(); loadAll(); return; }
+      profilesQuery(true).then(function (res) {
       // If a column doesn't exist yet (purana SQL), load with the minimal
       // columns — warna 42703 retry bhi wahi columns mangta.
       if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
@@ -1138,7 +1278,11 @@
       dbReady = true;
       $("setupBox").hidden = true;
       profiles = res.body || [];
-      return loadAllTransactions();
+      var selfProfile = null;
+      profiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
+      currentWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
+      if (!currentWorkspaceId) throw new Error("active workspace missing");
+      return loadWorkspaces().then(function () { return loadAllTransactions(); });
     }).then(function (rows) {
       if (!rows) return;
       txns = rows;
@@ -1147,6 +1291,7 @@
       return loadHiddenIds().then(function () {
         renderAll();
         if (currentView === "admin") renderAdminDashboard();
+        setupRealtime();
         loadNotifs();
         loadContacts();
         saveCache();
@@ -1159,6 +1304,7 @@
         offlineMode = true;
         dbReady = true;
         profiles = c.profiles || [];
+        currentWorkspaceId = c.workspaceId || currentWorkspaceId;
         txns = c.txns || [];
         hiddenTxnIds = {};
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
@@ -1172,6 +1318,7 @@
       }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
       renderAll(); // v24.8: cache na ho to bhi khaali state saaf render ho (blank screen nahi)
+    });
     });
   }
 
@@ -1203,7 +1350,7 @@
     var guestMe = (g.me && g.me.id) || "";
     var contactJobs = (g.contacts || []).map(function (ct) {
       return sb("khata_contacts", { method: "POST", prefer: "return=representation", body: {
-        id: ct.id, owner_id: me, name: ct.name, phone: ct.phone || null
+        id: ct.id, owner_id: me, workspace_id: currentWorkspaceId, name: ct.name, phone: ct.phone || null
       } });
     });
     Promise.all(contactJobs).then(function () {
@@ -1213,7 +1360,7 @@
           payer_id: t.payer_id === guestMe ? me : t.payer_id,
           receiver_id: t.receiver_id === guestMe ? me : t.receiver_id,
           amount: t.amount, note: t.note, txn_date: t.txn_date,
-          created_by: me, created_at: t.created_at || new Date().toISOString()
+          created_by: me, workspace_id: currentWorkspaceId, created_at: t.created_at || new Date().toISOString()
         } });
       });
       return Promise.all(txnJobs);
@@ -1275,7 +1422,7 @@
   }
   function setupRealtime() {
     try {
-      if (!window.supabase || !window.supabase.createClient) return; // CDN failed / offline
+      if (!window.supabase || !window.supabase.createClient || !currentWorkspaceId) return; // CDN failed / offline / workspace not loaded
       if (rtChannel) return; // already subscribed
       var client = window.supabase.createClient(API, ANON);
       try {
@@ -1285,11 +1432,11 @@
           client.realtime.setAuth(session.access_token);
         }
       } catch (e) {}
-      rtChannel = client.channel("easy-khata-live")
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions" }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications" }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts" }, function () { scheduleLiveReload(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden" }, function () { scheduleLiveReload(); })
+      rtChannel = client.channel("easy-khata-live-" + currentWorkspaceId)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
         .subscribe();
     } catch (e) { rtChannel = null; }
   }
@@ -1465,7 +1612,7 @@
   var myContacts = [];
   function loadContacts() {
     if (!session || !session.access_token) return Promise.resolve(0);
-    return sb("khata_contacts?select=*&owner_id=eq." + encodeURIComponent(myId()) + "&order=created_at.asc")
+    return sb("khata_contacts?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&order=created_at.asc")
       .then(function (res) {
         if (!res.ok) return 0;
         myContacts = (Array.isArray(res.body) ? res.body : []).map(function (c) { c.manual = true; return c; });
@@ -1579,7 +1726,7 @@
     }
     var btn = $("saveContactBtn");
     btn.disabled = true;
-    var contactBody = { id: newUuid(), owner_id: myId(), name: name, phone: phone || null };
+    var contactBody = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: phone || null };
     if (isOffline()) {
       var createdOffline = offlineContactInsert(contactBody);
       $("newContactName").value = "";
@@ -2093,11 +2240,11 @@
     if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
     if (!navigator.onLine) { setAdminMsg("Admin kaam ke liye internet chahiye.", false); return; }
-    if (!window.confirm("'" + (p.name || p.email) + "' — delete karein?\n\nUn ka account, profile aur saare records delete ho jayenge. Ye wapas nahi hoga.")) return;
+    if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band hoga aur workspace access suspend hoga. Ledger records aur history mehfooz rahenge.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
         if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
-        setAdminMsg("User delete ho gaya.", true);
+        setAdminMsg("User deactivate ho gaya. Un ka ledger data mehfooz hai.", true);
         if (adminCurrentUser && adminCurrentUser.id === id) {
           adminCurrentUser = null;
           showView("admin");
@@ -2324,7 +2471,7 @@
     var body = {
       payer_id: dir === "take" ? u.id : me,
       receiver_id: dir === "take" ? me : u.id,
-      amount: amount, note: note, txn_date: todayLocal(), created_by: me
+      amount: amount, note: note, txn_date: todayLocal(), created_by: me, workspace_id: currentWorkspaceId
     };
     var btn = $("adminSetSaveBtn");
     btn.disabled = true;
@@ -2807,7 +2954,8 @@
       amount: amt,
       note: "Settled up — settlement",
       txn_date: todayLocal(),
-      created_by: me
+      created_by: me,
+      workspace_id: currentWorkspaceId
     };
     if (guestMode) {
       // v24: guest settlement — sirf local; settled-lock yahan bhi lagta hai.
@@ -2926,6 +3074,7 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
+    renderWorkspaceBar();
   }
   function openPersonDetail(id) {
     if (!findPerson(id)) return;
@@ -3916,7 +4065,7 @@
       var id = ids[i++];
       var amt = (i === ids.length) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
       var recBody = {
-        id: newUuid(),
+        id: newUuid(), workspace_id: currentWorkspaceId,
         payer_id: me, receiver_id: id, amount: amt,
         note: note, txn_date: date, created_by: me
       };
@@ -3967,7 +4116,8 @@
       amount: amount,
       note: note,
       txn_date: date,
-      created_by: me
+      created_by: me,
+      workspace_id: currentWorkspaceId
     };
     var btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -4278,6 +4428,10 @@
   $("confirmCancelBtn").addEventListener("click", closeConfirm);
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
   $("saveContactBtn").addEventListener("click", addContact);
+  $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
+  $("workspaceCreateBtn").addEventListener("click", createBusinessWorkspace);
+  $("workspaceInviteBtn").addEventListener("click", inviteWorkspaceMember);
+  $("workspaceMembersBtn").addEventListener("click", manageWorkspaceMembers);
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {
     var b = $("addContactBox");

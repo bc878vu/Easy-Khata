@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v44-0";
+var CACHE = "easy-khata-v45-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=46",
+  "styles.css?v=47",
   "config.js?v=4",
-  "app.js?v=54",
+  "app.js?v=55",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg"
@@ -89,14 +89,10 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
 
   if (url.host === API_HOST) {
-    // Ledger data: network first, last-synced cache when offline.
-    if (url.pathname.indexOf("/rest/v1/khata_") === 0) {
-      e.respondWith(fetch(req).then(function (res) {
-        if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
-        return res;
-      }).catch(function () { return caches.match(req); }));
-    }
-    return; // other API calls (auth etc.): network-only
+    // Tenant API responses are private and user/active-workspace dependent.
+    // Never put them in the shared service-worker cache: app.js maintains a
+    // per-device localStorage cache for offline use instead.
+    return;
   }
 
   if (CDN_LIBS.indexOf(req.url) !== -1) {
