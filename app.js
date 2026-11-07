@@ -923,9 +923,10 @@
     sel.value=currentWorkspaceId;
     $("workspaceInviteBtn").hidden=!active||active.type!=="business";
     $("workspaceMembersBtn").hidden=!active||active.type!=="business";
+    $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed;
   }
   function loadWorkspaces(){
-    return sb("khata_workspaces?select=id,name,type,created_by,status&status=eq.active&order=created_at.asc").then(function(res){
+    return sb("khata_workspaces?select=id,name,type,created_by,status,community_username,community_listed&status=eq.active&order=created_at.asc").then(function(res){
       if(!res.ok)throw new Error("workspaces load failed");
       workspaces=Array.isArray(res.body)?res.body:[];
       if(!workspaces.some(function(w){return w.id===currentWorkspaceId;}))throw new Error("active workspace inaccessible");
@@ -942,47 +943,128 @@
       currentWorkspaceId=id;profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
     }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
   }
-  function createBusinessWorkspace(){
-    var name=window.prompt("Business / office ka naam likhein:");if(name===null)return;name=name.trim();
-    if(name.length<2||name.length>100){setTxnMsg("Workspace name 2 se 100 characters ka hona chahiye.",false);return;}
-    sb("rpc/khata_create_business_workspace",{method:"POST",body:{p_name:name}}).then(function(res){
-      if(!res.ok){setTxnMsg("Business workspace create nahi hua.",false);return;}
-      var id=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);
-      if(id&&typeof id==="object")id=id.khata_create_business_workspace;
-      if(!id){setTxnMsg("Workspace bana, lekin ID receive nahi hui. Refresh karein.",false);return;}
-      sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(sw){if(sw.ok){currentWorkspaceId=id;teardownRealtime();loadAll();}else setTxnMsg("Workspace bana lekin switch nahi hua. Refresh karein.",false);});
-    }).catch(function(){setTxnMsg("Workspace create nahi hua — internet check karein.",false);});
+  function createBusinessWorkspace(){ openCommunityModal("create"); }
+  function openCommunityModal(tab){
+    var modal=$("communityOverlay");if(!modal)return;
+    modal.hidden=false;
+    ["create","join","setup"].forEach(function(k){$("communityPanel"+k.charAt(0).toUpperCase()+k.slice(1)).hidden=(k!==tab);});
+    $("communityTabCreate").classList.toggle("active",tab==="create");
+    $("communityTabJoin").classList.toggle("active",tab==="join");
+    $("communityModalTitle").textContent=tab==="create"?"Create a business community":tab==="setup"?"Secure your community":"Explore communities";
+    if(tab==="join")loadCommunityDirectory("");
+    if(tab==="setup"){
+      var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
+      $("communitySetupUsername").textContent=active&&active.community_username?"@"+active.community_username:"Username not set";
+    }
+  }
+  function closeCommunityModal(){ $("communityOverlay").hidden=true; }
+  function showCommunityMessage(msg,ok){
+    var el=$("communityMsg");el.textContent=msg;el.className="msg "+(ok?"success":"error");el.hidden=false;
+  }
+  function loadCommunityDirectory(search){
+    var list=$("communityDirectory");list.innerHTML='<p class="muted">Communities load ho rahi hain…</p>';
+    sb("rpc/khata_list_communities",{method:"POST",body:{p_search:search||""}}).then(function(res){
+      if(!res.ok)throw new Error("directory");
+      var rows=Array.isArray(res.body)?res.body:[];
+      list.innerHTML="";
+      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Abhi koi public community nahi mili. Username se search karein.";list.appendChild(empty);return;}
+      rows.forEach(function(w){
+        var card=document.createElement("article");card.className="community-card";
+        var title=document.createElement("strong");title.textContent=w.community_name;
+        var handle=document.createElement("span");handle.className="community-handle";handle.textContent="@"+w.community_username;
+        var meta=document.createElement("small");meta.textContent=(w.member_count||0)+" members"+(w.description?" · "+w.description:"");
+        var btn=document.createElement("button");btn.type="button";btn.className="btn btn-primary community-join-pick";btn.textContent="Join request";
+        btn.addEventListener("click",function(){
+          $("joinCommunityUsername").value=w.community_username;
+          $("joinCommunityPassword").focus();
+          $("joinCommunityPassword").scrollIntoView({behavior:"smooth",block:"center"});
+        });
+        card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(btn);list.appendChild(card);
+      });
+    }).catch(function(){list.innerHTML='<p class="community-empty">Community list load nahi hui. Internet check karein.</p>';});
+  }
+  function submitCommunityCreate(){
+    var name=$("newCommunityName").value.trim(),username=$("newCommunityUsername").value.trim().toLowerCase(),password=$("newCommunityPassword").value,description=$("newCommunityDescription").value.trim();
+    if(name.length<2||name.length>100){showCommunityMessage("Community name 2-100 characters ka hona chahiye.",false);return;}
+    if(!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)){showCommunityMessage("Username 3-30 characters: a-z, 0-9, dot, underscore ya hyphen.",false);return;}
+    if(password.length<10){showCommunityMessage("Password kam az kam 10 characters ka rakhein.",false);return;}
+    $("communityCreateSubmit").disabled=true;
+    sb("rpc/khata_create_business_community",{method:"POST",body:{p_name:name,p_username:username,p_password:password,p_description:description}}).then(function(res){
+      $("communityCreateSubmit").disabled=false;
+      if(!res.ok){showCommunityMessage((res.body&&res.body.message)||"Community create nahi hui. Username availability check karein.",false);return;}
+      closeCommunityModal();$("newCommunityPassword").value="";currentWorkspaceId=(typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body));
+      if(currentWorkspaceId&&typeof currentWorkspaceId==="object")currentWorkspaceId=currentWorkspaceId.khata_create_business_community;
+      teardownRealtime();loadAll();
+    }).catch(function(){$("communityCreateSubmit").disabled=false;showCommunityMessage("Community create nahi hui. Internet check karein.",false);});
+  }
+  function submitCommunityJoin(){
+    var username=$("joinCommunityUsername").value.trim().toLowerCase(),password=$("joinCommunityPassword").value;
+    if(!username||!password){showCommunityMessage("Community username aur password dono likhein.",false);return;}
+    $("communityJoinSubmit").disabled=true;
+    sb("rpc/khata_request_community_join",{method:"POST",body:{p_username:username,p_password:password}}).then(function(res){
+      $("communityJoinSubmit").disabled=false;
+      if(!res.ok){showCommunityMessage((res.body&&res.body.message)||"Username ya password sahi nahi.",false);return;}
+      var status=Array.isArray(res.body)?res.body[0]:res.body;
+      if(status&&typeof status==="object")status=status.khata_request_community_join;
+      $("joinCommunityPassword").value="";
+      showCommunityMessage(status==="already_member"?"Aap pehle se is community ke member hain.":status==="pending"?"Request owner ko bhej di gayi hai. Approval ke baad community aapki list mein aa jayegi.":"Join request submit ho gayi.",true);
+    }).catch(function(){$("communityJoinSubmit").disabled=false;showCommunityMessage("Request submit nahi hui. Internet check karein.",false);});
+  }
+  function submitCommunityPassword(){
+    var password=$("communitySetupPassword").value;
+    if(password.length<10){showCommunityMessage("Password kam az kam 10 characters ka hona chahiye.",false);return;}
+    $("communitySetupSubmit").disabled=true;
+    sb("rpc/khata_set_community_password",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_password:password,p_listed:true}}).then(function(res){
+      $("communitySetupSubmit").disabled=false;
+      if(!res.ok){showCommunityMessage("Password save nahi hua. Sirf community owner change kar sakta hai.",false);return;}
+      $("communitySetupPassword").value="";closeCommunityModal();loadAll();
+    }).catch(function(){$("communitySetupSubmit").disabled=false;showCommunityMessage("Password save nahi hua.",false);});
   }
   function manageWorkspaceMembers(){
     if(!currentWorkspaceId)return;
-    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
-      if(!res.ok){setTxnMsg("Members load nahi hue.",false);return;}
-      var members=Array.isArray(res.body)?res.body:[];
-      var lines=members.map(function(m,i){
-        var p=null;profiles.forEach(function(x){if(x.id===m.user_id)p=x;});
-        return (i+1)+". "+(p?(p.name||p.email):m.user_id)+" — "+m.role+(m.user_id===myId()?" (You)":"");
+    $("membersOverlay").hidden=false;
+    loadCommunityJoinRequests();
+    loadWorkspaceMemberCards();
+  }
+  function loadCommunityJoinRequests(){
+    var box=$("communityRequestsList");box.innerHTML='<p class="muted">Requests load ho rahi hain…</p>';
+    sb("rpc/khata_list_community_join_requests",{method:"POST",body:{p_workspace_id:currentWorkspaceId}}).then(function(res){
+      if(!res.ok)throw new Error("requests");
+      var rows=Array.isArray(res.body)?res.body:[];box.innerHTML="";
+      if(!rows.length){var p=document.createElement("p");p.className="community-empty";p.textContent="Koi pending join request nahi.";box.appendChild(p);return;}
+      rows.forEach(function(r){
+        var card=document.createElement("article");card.className="community-request-card";
+        var who=document.createElement("strong");who.textContent=r.user_name||"New member";
+        var email=document.createElement("small");email.textContent=r.user_email||"";
+        var actions=document.createElement("div");actions.className="community-request-actions";
+        [["Approve",true],["Reject",false]].forEach(function(pair){
+          var b=document.createElement("button");b.type="button";b.className="btn "+(pair[1]?"btn-primary":"btn-neutral");b.textContent=pair[0];
+          b.addEventListener("click",function(){b.disabled=true;sb("rpc/khata_review_community_join_request",{method:"POST",body:{p_request_id:r.request_id,p_approve:pair[1]}}).then(function(out){if(!out.ok){b.disabled=false;setTxnMsg("Request update nahi hui.",false);return;}loadCommunityJoinRequests();loadWorkspaceMemberCards();});});
+          actions.appendChild(b);
+        });
+        card.appendChild(who);card.appendChild(email);card.appendChild(actions);box.appendChild(card);
       });
-      window.alert("Workspace members:\n\n"+(lines.join("\n")||"Koi member nahi."));
-      if(!members.some(function(m){return m.user_id!==myId();}))return;
-      var pick=window.prompt("Member number likhein jiska role change ya access remove karna hai (Cancel = band):");
-      if(pick===null||!pick.trim())return;
-      var target=members[Number(pick)-1];
-      if(!target||target.user_id===myId()){setTxnMsg("Member number sahi nahi.",false);return;}
-      var action=window.prompt("Action likhein: role ya remove","role");
-      if(action===null)return;
-      if(action.trim().toLowerCase()==="remove"){
-        if(!window.confirm("Is member ka workspace access remove karein? Un ke purane ledger records mehfooz rahenge."))return;
-        sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id}})
-          .then(function(r){setTxnMsg(r.ok?"Member access remove ho gaya. Ledger history mehfooz hai.":"Member remove nahi hua — owner/admin permission check karein.",r.ok);});
-        return;
-      }
-      var role=window.prompt("Naya role: admin, accountant, staff, viewer",target.role);
-      if(role===null)return;
-      role=role.trim().toLowerCase();
-      if(["admin","accountant","staff","viewer"].indexOf(role)<0){setTxnMsg("Role sahi nahi hai.",false);return;}
-      sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:target.user_id,p_role:role}})
-        .then(function(r){setTxnMsg(r.ok?"Member role update ho gaya.":"Role update nahi hua — owner/admin permission check karein.",r.ok);});
-    }).catch(function(){setTxnMsg("Members load nahi hue.",false);});
+    }).catch(function(){box.innerHTML='<p class="community-empty">Requests load nahi ho sakin.</p>';});
+  }
+  function loadWorkspaceMemberCards(){
+    var box=$("workspaceMemberCards");box.innerHTML='<p class="muted">Members load ho rahe hain…</p>';
+    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
+      if(!res.ok)throw new Error("members");var rows=Array.isArray(res.body)?res.body:[];box.innerHTML="";
+      rows.forEach(function(m){
+        var p=profiles.filter(function(x){return x.id===m.user_id;})[0]||{};
+        var card=document.createElement("article");card.className="community-member-card";
+        var name=document.createElement("strong");name.textContent=p.name||p.email||"Member";
+        var role=document.createElement("small");role.textContent=(m.role||"staff")+(m.user_id===myId()?" · You":"");
+        card.appendChild(name);card.appendChild(role);
+        if(m.user_id!==myId()&&["owner","admin"].indexOf((myRole()||""))>=0){
+          var actions=document.createElement("div");actions.className="community-request-actions";
+          var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
+          remove.addEventListener("click",function(){if(!window.confirm("Member ka access remove karein? Purana ledger record mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
+          actions.appendChild(remove);card.appendChild(actions);
+        }
+        box.appendChild(card);
+      });
+    }).catch(function(){box.innerHTML='<p class="community-empty">Members load nahi ho sake.</p>';});
   }
   function inviteWorkspaceMember(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
@@ -4430,6 +4512,18 @@
   $("saveContactBtn").addEventListener("click", addContact);
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceCreateBtn").addEventListener("click", createBusinessWorkspace);
+  $("workspaceExploreBtn").addEventListener("click", function(){openCommunityModal("join");});
+  $("workspaceSetupBtn").addEventListener("click", function(){openCommunityModal("setup");});
+  $("communityModalClose").addEventListener("click",closeCommunityModal);
+  $("communityOverlay").addEventListener("click",function(e){if(e.target===$("communityOverlay"))closeCommunityModal();});
+  $("communityTabCreate").addEventListener("click",function(){openCommunityModal("create");});
+  $("communityTabJoin").addEventListener("click",function(){openCommunityModal("join");});
+  $("communityCreateSubmit").addEventListener("click",submitCommunityCreate);
+  $("communityJoinSubmit").addEventListener("click",submitCommunityJoin);
+  $("communitySetupSubmit").addEventListener("click",submitCommunityPassword);
+  $("communitySearch").addEventListener("input",function(){var value=this.value;clearTimeout(window._communitySearchTimer);window._communitySearchTimer=setTimeout(function(){loadCommunityDirectory(value);},250);});
+  $("membersModalClose").addEventListener("click",function(){$("membersOverlay").hidden=true;});
+  $("membersOverlay").addEventListener("click",function(e){if(e.target===$("membersOverlay"))$("membersOverlay").hidden=true;});
   $("workspaceInviteBtn").addEventListener("click", inviteWorkspaceMember);
   $("workspaceMembersBtn").addEventListener("click", manageWorkspaceMembers);
   $("pickContactBtn").addEventListener("click", pickContact);
