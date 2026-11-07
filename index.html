@@ -262,7 +262,7 @@ window.addEventListener("error", function () {
           </div>
           <div class="field">
             <label for="txnAmount">Raqam (Rs)</label>
-            <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500" required>
+            <input id="txnAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500" required>
           </div>
           <div class="field">
             <label for="txnNote">Detail / category <span class="optional-label">Optional</span></label>
@@ -576,7 +576,7 @@ window.addEventListener("error", function () {
         </div>
         <h3 style="margin-top:16px">Raqam set karein (admin)</h3>
         <p class="muted">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
-        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
+        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500"></div>
         <div class="field"><label>Kisam</label>
           <div class="seg">
             <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
@@ -692,6 +692,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>
