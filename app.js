@@ -754,7 +754,8 @@
         var pick=document.createElement("button");pick.type="button";pick.className="btn btn-primary community-join-pick";pick.textContent="Select community";
         pick.addEventListener("click",function(){
           saveSignupCommunityIntent("join",w.community_username);
-          $("signupCommunityChoice").textContent="Selected: "+w.community_name+" (@"+w.community_username+"). Account banne ke baad password verify karke join request bhejein.";
+          $("signupCommunityChoice").textContent="Selected: "+w.community_name+" (@"+w.community_username+"). Account create hone ke baad community password enter karke join request bhej dein.";
+          $("signupCommunityChoice").className="msg ok";
           $("signupCommunityChoice").className="msg ok";
         });
         card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(pick);list.appendChild(card);
@@ -4614,13 +4615,23 @@
   $("tabLogin").addEventListener("click", function () { authMode = "login"; renderAuthMode(); });
   $("tabSignup").addEventListener("click", function () { authMode = "signup"; renderAuthMode(); });
   $("signupJoinCommunityBtn").addEventListener("click",function(){
-    $("signupJoinCommunityPanel").hidden=false;$("signupCommunityCreateHint").hidden=true;
-    saveSignupCommunityIntent("join","");
-    loadSignupCommunityDirectory($("signupCommunitySearch").value||"");
-    $("signupCommunitySearch").focus();
+    var opening=$("signupJoinCommunityPanel").hidden;
+    $("signupJoinCommunityPanel").hidden=!opening;
+    $("signupCommunityCreateHint").hidden=true;
+    $("signupJoinCommunityBtn").setAttribute("aria-expanded",String(opening));
+    $("signupCreateCommunityBtn").setAttribute("aria-expanded","false");
+    if(opening){
+      saveSignupCommunityIntent("join","");
+      loadSignupCommunityDirectory($("signupCommunitySearch").value||"");
+      $("signupCommunitySearch").focus();
+    }else{saveSignupCommunityIntent("join","");}
   });
   $("signupCreateCommunityBtn").addEventListener("click",function(){
-    $("signupJoinCommunityPanel").hidden=true;$("signupCommunityCreateHint").hidden=false;
+    var opening=$("signupCommunityCreateHint").hidden;
+    $("signupJoinCommunityPanel").hidden=true;
+    $("signupCommunityCreateHint").hidden=!opening;
+    $("signupJoinCommunityBtn").setAttribute("aria-expanded","false");
+    $("signupCreateCommunityBtn").setAttribute("aria-expanded",String(opening));
     saveSignupCommunityIntent("create","");
   });
   $("signupCommunitySearch").addEventListener("input",function(){
