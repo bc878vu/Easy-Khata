@@ -1048,6 +1048,7 @@
       offlineMode = false;
       return loadHiddenIds().then(function () {
         renderAll();
+        if (currentView === "admin") renderAdminDashboard();
         loadNotifs();
         loadContacts();
         saveCache();
