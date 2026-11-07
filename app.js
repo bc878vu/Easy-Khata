@@ -1652,6 +1652,10 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
+        // Join approval/invite acceptance should update the workspace switcher too.
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_workspace_members", filter: "user_id=eq." + myId() }, function () {
+          setTimeout(function () { if (session && !guestMode) loadAll(); }, 350);
+        })
         .subscribe();
     } catch (e) { rtChannel = null; }
   }
