@@ -1150,3 +1150,43 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   .contact-add-wrap{margin-bottom:14px}
   .contact-add-trigger{min-height:56px}
 }
+
+
+/* v45 — compact, responsive ledger overview cards */
+.month-stats{
+  margin-top:8px;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card);
+  color:var(--ink);
+  min-width:0;
+  box-shadow:0 2px 8px rgba(20,35,60,.035);
+}
+.khata-stat-head{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:8px}
+.khata-stat-icon{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:9px;background:var(--soft);font-size:1rem}
+.khata-stat-head>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.khata-stat-head strong{font-size:.82rem;line-height:1.25;color:var(--ink)}
+.khata-stat-head small{font-size:.68rem;color:var(--muted);line-height:1.3}
+.khata-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.khata-stat-cell,.khata-insight-cell{min-width:0;padding:8px;border-radius:10px;background:var(--soft);display:flex;flex-direction:column;gap:3px}
+.khata-stat-cell span,.khata-insight-cell>span{font-size:.67rem;color:var(--muted);line-height:1.25}
+.khata-stat-cell strong{font-size:.88rem;line-height:1.2;color:var(--ink);overflow-wrap:anywhere}
+.khata-stat-cell.is-given strong{color:var(--green,#16804a)}
+.khata-stat-cell.is-taken strong{color:var(--red,#b83232)}
+.khata-insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.khata-insight-cell strong{font-size:.82rem;line-height:1.2;color:var(--ink);overflow-wrap:anywhere}
+.khata-insight-cell small{font-size:.64rem;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}
+@media(max-width:380px){
+  .month-stats{padding:9px}
+  .khata-stat-grid,.khata-insight-grid{gap:5px}
+  .khata-stat-cell,.khata-insight-cell{padding:7px 6px}
+  .khata-stat-cell strong,.khata-insight-cell strong{font-size:.77rem}
+  .khata-stat-cell span,.khata-insight-cell>span{font-size:.62rem}
+  .khata-insight-cell small{font-size:.59rem}
+}
+@media(min-width:700px){
+  .month-stats{padding:12px 14px}
+  .khata-stat-grid,.khata-insight-grid{gap:9px}
+  .khata-stat-cell,.khata-insight-cell{padding:10px 12px}
+}
