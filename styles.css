@@ -1058,3 +1058,54 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   #personDetailView .detail-top-actions{gap:7px}
   #personDetailView .detail-top-actions .btn{font-size:.82rem;padding:10px 5px}
 }
+
+
+/* v29 — compact quick-entry layout: retain polish without oversized controls */
+.txn-form-card{padding:14px;border-radius:17px;box-shadow:0 4px 15px rgba(25,45,80,.055)}
+.txn-form-heading{gap:10px;margin-bottom:12px;padding:0 0 10px}
+.txn-form-mark{width:40px;height:40px;flex-basis:40px;border-radius:12px;font-size:1.65rem}
+.txn-form-eyebrow{font-size:.59rem;letter-spacing:.12em}
+.txn-form-heading h2{font-size:1.08rem}
+.txn-form-subtitle{margin-top:1px;font-size:.74rem}
+#txnForm{gap:9px}
+#txnForm .field>label:not(.check){margin-bottom:5px;font-size:.8rem}
+#txnForm input:not([type="checkbox"]):not([type="radio"]),
+#txnForm select{min-height:44px;padding:9px 11px;border-radius:11px;font-size:.91rem}
+#txnDirRow .seg{padding:4px;border-radius:12px;gap:4px}
+#txnDirRow .seg-opt{min-height:42px;border-radius:9px;font-size:.83rem}
+#txnForm .check{gap:8px;padding:8px 10px;border-radius:11px;font-size:.78rem}
+#txnForm .check input{width:17px;height:17px;flex-basis:17px}
+#txnAmount{font-size:1.04rem!important}
+#txnNote{font-size:.9rem}
+#txnForm .contact-field-hint{padding:6px 8px;margin-top:5px;border-radius:8px;font-size:.69rem;line-height:1.35}
+#txnForm .optional-label{padding:2px 6px;font-size:.64rem}
+#txnForm .btn-primary{min-height:46px;border-radius:12px;font-size:.93rem;box-shadow:0 4px 11px rgba(37,99,235,.15)}
+#txnForm #cancelEditBtn{min-height:40px}
+.contact-add-wrap{margin-bottom:10px}
+.contact-add-trigger{min-height:56px;gap:9px;padding:8px 11px;border-radius:13px}
+.contact-add-icon{width:35px;height:35px;flex-basis:35px;border-radius:10px;font-size:1.35rem}
+.contact-add-copy{gap:2px}
+.contact-add-copy strong{font-size:.88rem}
+.contact-add-copy small{font-size:.71rem}
+.contact-add-chevron{font-size:1.1rem}
+.contact-add-panel{margin-top:7px;padding:11px;border-radius:13px}
+.contact-add-heading{gap:8px;margin-bottom:10px}
+.contact-add-avatar{width:33px;height:33px;border-radius:10px;font-size:1rem}
+.contact-add-panel .field{margin-bottom:9px}
+.contact-add-panel .field label{font-size:.79rem;margin-bottom:4px}
+.contact-add-panel input{min-height:42px!important;padding:8px 10px!important;border-radius:10px!important}
+.contact-field-hint{font-size:.69rem}
+.contact-add-actions{gap:7px}
+.contact-add-actions .btn{min-height:40px;padding:8px 10px;font-size:.81rem}
+@media(max-width:420px){
+  .txn-form-card{padding:13px;border-radius:16px}
+  .txn-form-heading{margin-bottom:10px;padding-bottom:9px}
+  .txn-form-mark{width:38px;height:38px;flex-basis:38px}
+  #txnForm{gap:8px}
+  #txnForm input:not([type="checkbox"]):not([type="radio"]),
+  #txnForm select{min-height:43px;padding:8px 10px}
+  #txnDirRow .seg-opt{min-height:40px}
+  #txnForm .btn-primary{min-height:44px}
+  .contact-add-actions{flex-direction:row}
+  .contact-add-actions .btn{min-height:39px}
+}
