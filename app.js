@@ -1062,26 +1062,39 @@
         card.appendChild(name);card.appendChild(role);
         if(m.user_id!==myId()&&["owner","admin"].indexOf((workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0]||{}).current_role)>=0){
           var actions=document.createElement("div");actions.className="community-request-actions";
+          var roleSelect=document.createElement("select");roleSelect.className="member-role-select";
+          ["admin","accountant","staff","viewer"].forEach(function(r){var op=document.createElement("option");op.value=r;op.textContent=r.charAt(0).toUpperCase()+r.slice(1);roleSelect.appendChild(op);});
+          roleSelect.value=m.role==="owner"?"staff":m.role;
+          var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
+          saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
           var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
           remove.addEventListener("click",function(){if(!window.confirm("Member ka access remove karein? Purana ledger record mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-          actions.appendChild(remove);card.appendChild(actions);
+          actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
         }
         box.appendChild(card);
       });
     }).catch(function(){box.innerHTML='<p class="community-empty">Members load nahi ho sake.</p>';});
   }
   function inviteWorkspaceMember(){
+    $("membersOverlay").hidden=false;
+    loadCommunityJoinRequests();loadWorkspaceMemberCards();
+    $("workspaceInviteEmail").focus();
+  }
+  function submitWorkspaceInvite(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
-    var email=window.prompt("Invite bhejne ke liye member ka email likhein:");if(email===null||!email.trim())return;
-    var role=window.prompt("Role likhein: admin, accountant, staff, viewer","staff");if(role===null)return;
-    role=role.trim().toLowerCase();if(["admin","accountant","staff","viewer"].indexOf(role)<0){setTxnMsg("Role sahi nahi hai.",false);return;}
-    workspaceInviteBusy=true;
-    sb("rpc/khata_create_workspace_invite",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_email:email.trim(),p_role:role}}).then(function(res){
-      workspaceInviteBusy=false;if(!res.ok||!res.body){setTxnMsg("Invite create nahi hua. Aap ke role ya email ko check karein.",false);return;}
-      var token=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);if(token&&typeof token==="object")token=token.khata_create_workspace_invite;
+    var email=$("workspaceInviteEmail").value.trim(),role=$("workspaceInviteRole").value;
+    if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$/i.test(email)){setTxnMsg("Valid email address likhein.",false);return;}
+    workspaceInviteBusy=true;$("workspaceInviteSubmit").disabled=true;
+    sb("rpc/khata_create_workspace_invite",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_email:email,p_role:role}}).then(function(res){
+      workspaceInviteBusy=false;$("workspaceInviteSubmit").disabled=false;
+      if(!res.ok||!res.body){setTxnMsg("Invite create nahi hua. Owner/admin permission check karein.",false);return;}
+      var token=typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body);
+      if(token&&typeof token==="object")token=token.khata_create_workspace_invite;
       var link=window.location.origin+window.location.pathname+"?invite="+encodeURIComponent(token);
-      copyText(link).then(function(){window.alert("Invite link copy ho gaya. Isay "+email.trim()+" ko bhej dein. Link 7 din tak valid hai.");}).catch(function(){window.prompt("Invite link copy karein:",link);});
-    }).catch(function(){workspaceInviteBusy=false;setTxnMsg("Invite create nahi hua.",false);});
+      copyText(link).then(function(){setTxnMsg("7 din valid invite link copy ho gaya. Isay "+email+" ko bhej dein.",true);})
+        .catch(function(){setTxnMsg("Invite bana. Link: "+link,true);});
+      $("workspaceInviteEmail").value="";
+    }).catch(function(){workspaceInviteBusy=false;$("workspaceInviteSubmit").disabled=false;setTxnMsg("Invite create nahi hua.",false);});
   }
   var inviteAccepting=false;
   function acceptInviteFromUrl(){
@@ -4529,6 +4542,7 @@
   $("membersModalClose").addEventListener("click",function(){$("membersOverlay").hidden=true;});
   $("membersOverlay").addEventListener("click",function(e){if(e.target===$("membersOverlay"))$("membersOverlay").hidden=true;});
   $("workspaceInviteBtn").addEventListener("click", inviteWorkspaceMember);
+  $("workspaceInviteSubmit").addEventListener("click",submitWorkspaceInvite);
   $("workspaceMembersBtn").addEventListener("click", manageWorkspaceMembers);
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {
