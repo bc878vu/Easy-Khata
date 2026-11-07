@@ -4532,7 +4532,10 @@
   function hideTxnOnline(id) {
     return sb("khata_txn_hidden", { method: "POST", prefer: "return=minimal", body: { txn_id: id, user_id: myId() } })
       .then(function (res) {
-        if (!res.ok && res.status !== 409) { setTxnMsg("Record hataya nahi gaya — dobara try karein.", false); return false; }
+        if (!res.ok && res.status !== 409) {
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnHide(id);setTxnMsg("Connection issue — hide action offline queue mein save ho gayi.",true);return true;}
+          setTxnMsg("Record hataya nahi gaya — dobara try karein.", false); return false;
+        }
         hiddenTxnIds[id] = true;
         saveCache();
         renderAll();
