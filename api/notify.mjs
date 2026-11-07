@@ -77,7 +77,11 @@ export default async function handler(req, res) {
   const recipientId = String(body.recipientId || "");
   const title = String(body.title || "Easy Khata").slice(0, 80);
   const text = String(body.body || "A new record arrived.").slice(0, 200);
-  if (!recipientId || recipientId === sender.id) return json(res, 400, { error: "bad_recipient" });
+  // recipientId is interpolated into a PostgREST filter expression below.
+  // Accept only canonical UUID-shaped auth user IDs to prevent filter injection.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recipientId) || recipientId === sender.id) {
+    return json(res, 400, { error: "bad_recipient" });
+  }
 
   // Verify: a record was just created between the sender and the recipient (last 5 min).
   // This stops anyone from spamming random users through this endpoint.
