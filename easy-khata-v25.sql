@@ -11,6 +11,7 @@ create table if not exists public.khata_txn_hidden (
   primary key (txn_id, user_id)
 );
 alter table public.khata_txn_hidden enable row level security;
+create index if not exists khata_txn_hidden_user_idx on public.khata_txn_hidden(user_id);
 
 drop policy if exists khata_txn_hidden_select_own on public.khata_txn_hidden;
 create policy khata_txn_hidden_select_own on public.khata_txn_hidden

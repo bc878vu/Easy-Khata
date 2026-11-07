@@ -2632,7 +2632,7 @@
   }
   function shareAll() {
     var given = 0, taken = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId()) given += a;
       if (t.receiver_id === myId()) taken += a;
@@ -2718,6 +2718,7 @@
       if (gn) gn.value = guestMeName || "";
     }
     $("acctPushBtn").hidden = guestMode;
+    $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
   }
