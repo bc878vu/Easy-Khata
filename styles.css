@@ -862,3 +862,30 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   -webkit-text-fill-color:#ffffff;
   box-shadow:0 4px 14px rgba(0,0,0,.28);
 }
+
+
+/* v33: Friend list uses the same contained-scroll pattern as ledger history.
+   Four compact friend rows remain visible; older friends scroll inside this panel. */
+.people{
+  display:grid;
+  gap:8px;
+  max-height:324px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:auto;
+  padding:8px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--bg);
+  scrollbar-width:thin;
+  scrollbar-color:var(--muted) transparent;
+  -webkit-overflow-scrolling:touch;
+}
+.people::-webkit-scrollbar{width:6px}
+.people::-webkit-scrollbar-thumb{background:var(--muted);border-radius:4px}
+.people::-webkit-scrollbar-track{background:transparent}
+.people .person{min-width:0;margin:0}
+.people .empty{margin:0}
+@media(max-width:420px){
+  .people{max-height:316px;padding:7px;gap:7px}
+}
