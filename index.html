@@ -569,7 +569,7 @@ window.addEventListener("error", function () {
 
 <button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
-<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onload="window.EASY_KHATA_ON_SUPABASE_READY&&window.EASY_KHATA_ON_SUPABASE_READY()"></script>
 <script src="config.js?v=4"></script>
 <!-- Firebase (v23): Cloud Messaging for closed-app push notifications.
      Compat builds — plain script tags, no bundler. If the CDN fails the app
@@ -599,6 +599,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=43"></script>
+<script src="app.js?v=44"></script>
 </body>
 </html>
