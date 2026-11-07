@@ -654,3 +654,28 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   .admin-bar-label{font-size:.56rem}
   .admin-bars{gap:3px}
 }
+
+
+/* Mobile admin polish: readable chart ticks and a non-overlapping search icon. */
+.admin-bar-label-short{display:none}
+.admin-toolbar .admin-search input{
+  box-sizing:border-box;
+  width:100%;
+  padding-left:48px !important;
+  text-indent:0;
+}
+.admin-search>span{
+  left:15px;
+  width:18px;
+  text-align:center;
+  pointer-events:none;
+  line-height:1;
+  font-size:1rem;
+}
+@media(max-width:760px){
+  #adminDailyChart .admin-bar-label-full{display:none}
+  #adminDailyChart .admin-bar-label-short{display:inline}
+  #adminDailyChart .admin-bar-label{font-size:.68rem;line-height:1.2;white-space:nowrap}
+  #adminDailyChart .admin-bars{gap:4px}
+  #adminDailyChart .admin-bar-col{min-width:0}
+}
