@@ -3644,7 +3644,7 @@
       if (!people.length) { base.emptyBox("Abhi koi dost ya record nahi."); }
       people.forEach(function (p, i) {
         if (base.needPage(14)) peopleHead();
-        var b = p.given - p.taken;
+        var b = p.net;
         base.tableRow([
           { t: p.name || "Unknown", x: M, maxW: 200 },
           { t: fmtRs(p.given), x: 310, align: "right", maxW: 64 },
@@ -3945,7 +3945,7 @@
       aoa.push(["Dost", "Diye", "Liye", "Balance"]);
       var pFirst = aoa.length;
       people.forEach(function (p) {
-        aoa.push([p.name || "Unknown", p.given, p.taken, p.given - p.taken]);
+        aoa.push([p.name || "Unknown", p.given, p.taken, p.net]);
       });
       var pTotal = aoa.length;
       aoa.push(["Total", given, taken, net]);
@@ -3985,7 +3985,7 @@
         xCell(ws, col + (pHead + 1), xHeadStyle(i >= 1));
       });
       people.forEach(function (p, i) {
-        var r = pFirst + 1 + i, zebra = i % 2 === 1, bal = p.given - p.taken;
+        var r = pFirst + 1 + i, zebra = i % 2 === 1, bal = p.net;
         xCell(ws, "A" + r, xDataStyle(zebra, false, false, true));
         xCell(ws, "B" + r, xDataStyle(zebra, true, false), "#,##0");
         xCell(ws, "C" + r, xDataStyle(zebra, true, false), "#,##0");
