@@ -220,6 +220,9 @@
   // removes it from the history UI, never from balances or friend totals.
   function balanceTxns() { return txns; }
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
+  var adminWorkspaces = [];
+  var adminWorkspaceMembers = [];
+  var adminEditingWorkspace = null;
   var adminCurrentUser = null;
   var adminUserSearchText = "";
   var adminUserStatusFilter = "all";
@@ -2440,9 +2443,147 @@
         if (!res.ok) { setAdminMsg("Users load nahi hue ("+res.status+") — dobara try karein.", false); return; }
         adminUsers = Array.isArray(res.body) ? res.body : [];
         renderAdminDashboard();
+        loadAdminWorkspaceManagement();
         setAdminMsg("Dashboard updated · "+new Date().toLocaleTimeString(), true);
       }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
+  function adminSetCommunityEditMsg(message, ok) {
+    var el=$("adminCommunityEditMsg"); if(!el)return;
+    el.textContent=message||"";el.className="msg"+(ok?" ok":message?" err":"");
+  }
+  function loadAdminWorkspaceManagement() {
+    if(!isAdmin())return Promise.resolve(false);
+    return Promise.all([
+      sb("rpc/admin_list_workspaces",{method:"POST",body:{}}),
+      sb("rpc/admin_list_workspace_members",{method:"POST",body:{}})
+    ]).then(function(results){
+      if(!results[0].ok||!results[1].ok)throw new Error("Community management data could not load");
+      adminWorkspaces=Array.isArray(results[0].body)?results[0].body:[];
+      adminWorkspaceMembers=Array.isArray(results[1].body)?results[1].body:[];
+      renderAdminCommunities();renderAdminCommunityMembers();
+      return true;
+    }).catch(function(){
+      $("adminCommunityList").innerHTML='<p class="empty">Communities load nahi ho sakin. Refresh karein.</p>';
+      $("adminCommunityMemberList").innerHTML='<p class="empty">Members load nahi ho sake.</p>';
+      return false;
+    });
+  }
+  function renderAdminCommunities() {
+    var box=$("adminCommunityList");if(!box)return;
+    var q=String($("adminCommunitySearch").value||"").trim().toLowerCase();
+    var status=$("adminCommunityStatus").value||"all";
+    var rows=adminWorkspaces.filter(function(w){
+      if(w.type!=="business")return false;
+      if(status!=="all"&&w.status!==status)return false;
+      return !q||[w.name,w.community_username,w.id].join(" ").toLowerCase().indexOf(q)!==-1;
+    });
+    if(!rows.length){box.innerHTML='<p class="empty">Koi community nahi mili.</p>';return;}
+    box.innerHTML=rows.map(function(w){
+      var suspended=w.status!=="active";
+      return '<article class="admin-user-card admin-community-card">'+
+        '<div class="admin-community-head"><div><strong>'+esc(w.name)+'</strong><small>@'+esc(w.community_username||"not-set")+'</small></div><span class="admin-user-status '+(suspended?'blocked':'active')+'">'+esc(w.status)+'</span></div>'+
+        '<div class="admin-user-meta"><span>'+Number(w.member_count||0)+' members</span><span>'+Number(w.transaction_count||0)+' records</span><span>'+esc(fmtRs(w.transaction_volume||0))+'</span></div>'+
+        '<div class="admin-user-meta"><span>'+(w.password_configured?'Password protected':'Password missing')+'</span><span>'+(w.community_listed?'Directory listed':'Unlisted')+'</span><span>'+Number(w.contact_count||0)+' contacts</span></div>'+
+        '<div class="admin-user-actions"><button class="btn btn-soft btn-mini" data-admin-community-edit="'+esc(w.id)+'" type="button">Edit</button>'+
+        '<button class="btn btn-soft btn-mini" data-admin-community-status="'+esc(w.id)+'" data-next-status="'+(suspended?'active':'suspended')+'" type="button">'+(suspended?'Restore':'Suspend')+'</button>'+
+        '<button class="btn btn-danger btn-mini" data-admin-community-delete="'+esc(w.id)+'" type="button">Delete if empty</button></div>'+
+        '<div class="admin-community-add-member"><input type="email" data-admin-add-email="'+esc(w.id)+'" placeholder="Existing user email">'+
+        '<select data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
+        '<button class="btn btn-primary btn-mini" data-admin-add-member="'+esc(w.id)+'" type="button">Add member</button></div></article>';
+    }).join("");
+  }
+  function renderAdminCommunityMembers() {
+    var box=$("adminCommunityMemberList");if(!box)return;
+    var q=String($("adminMemberSearch").value||"").trim().toLowerCase();
+    var rows=adminWorkspaceMembers.filter(function(m){
+      return !q||[m.workspace_name,m.user_name,m.user_email,m.user_phone,m.role,m.member_status].join(" ").toLowerCase().indexOf(q)!==-1;
+    });
+    if(!rows.length){box.innerHTML='<p class="empty">Koi community member nahi mila.</p>';return;}
+    box.innerHTML=rows.map(function(m){
+      var owner=m.role==="owner";
+      return '<article class="admin-user-card admin-community-member-card">'+
+        '<div class="admin-community-head"><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
+        '<div class="admin-user-meta"><span>Role: '+esc(m.role)+'</span><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
+        '<div class="admin-community-member-controls"><select data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["owner","admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
+        '<select data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
+        '<button class="btn btn-primary btn-mini" data-admin-member-save="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Save</button>'+
+        (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
+        '</div></article>';
+    }).join("");
+  }
+  function editAdminCommunity(id) {
+    var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
+    adminEditingWorkspace=w;
+    $("adminCommunityName").value=w.name||"";
+    $("adminCommunityUsername").value=w.community_username||"";
+    $("adminCommunityDescription").value=w.community_description||"";
+    $("adminCommunityListed").checked=!!w.community_listed;
+    $("adminCommunityPassword").value="";
+    adminSetCommunityEditMsg("");
+    $("adminCommunityEditOverlay").hidden=false;
+  }
+  function saveAdminCommunity() {
+    if(!isAdmin()||!adminEditingWorkspace)return;
+    var name=$("adminCommunityName").value.trim();
+    var username=$("adminCommunityUsername").value.trim().toLowerCase();
+    var description=$("adminCommunityDescription").value.trim();
+    var password=$("adminCommunityPassword").value;
+    if(name.length<2||name.length>100||!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)){adminSetCommunityEditMsg("Community name ya username sahi nahi.",false);return;}
+    if(password&&password.length<10){adminSetCommunityEditMsg("Naya password kam az kam 10 characters ka ho.",false);return;}
+    var btn=$("adminCommunityEditSave");btn.disabled=true;
+    sb("rpc/admin_update_workspace",{method:"POST",body:{
+      p_workspace_id:adminEditingWorkspace.id,p_name:name,p_username:username,
+      p_description:description,p_listed:$("adminCommunityListed").checked,p_password:password||null
+    }}).then(function(res){
+      btn.disabled=false;
+      if(!res.ok){adminSetCommunityEditMsg((res.body&&res.body.message)||"Community update nahi hui.",false);return;}
+      $("adminCommunityEditOverlay").hidden=true;adminEditingWorkspace=null;
+      setAdminMsg("Community update ho gayi.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){btn.disabled=false;adminSetCommunityEditMsg("Connection issue — changes save nahi huay.",false);});
+  }
+  function setAdminCommunityStatus(id,status) {
+    var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
+    if(!window.confirm((status==="suspended"?"Community suspend":"Community restore")+" karein? Ledger history delete nahi hogi."))return;
+    sb("rpc/admin_set_workspace_status",{method:"POST",body:{p_workspace_id:id,p_status:status}}).then(function(res){
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community status update nahi hua.",false);return;}
+      setAdminMsg("Community status update ho gaya.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — status update nahi hua.",false);});
+  }
+  function deleteAdminCommunity(id) {
+    var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
+    if(!window.confirm("'"+w.name+"' permanently delete sirf tab hoga jab is mein transactions aur contacts na hon aur sirf ek active member ho. Financial data wali community delete nahi hogi. Continue?"))return;
+    sb("rpc/admin_delete_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community delete nahi hui. Data wali community ko suspend karein.",false);return;}
+      setAdminMsg("Empty community delete ho gayi.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — community delete nahi hui.",false);});
+  }
+  function adminAddCommunityMember(id) {
+    var email=$("adminCommunityList").querySelector('[data-admin-add-email="'+id+'"]').value.trim();
+    var role=$("adminCommunityList").querySelector('[data-admin-add-role="'+id+'"]').value;
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAdminMsg("Registered user ka valid email likhein.",false);return;}
+    sb("rpc/admin_add_workspace_member",{method:"POST",body:{p_workspace_id:id,p_email:email,p_role:role}}).then(function(res){
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Member add nahi hua. Email account registered hona chahiye.",false);return;}
+      setAdminMsg("User community mein add ho gaya.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — member add nahi hua.",false);});
+  }
+  function adminSaveCommunityMember(key) {
+    var parts=key.split("|"),id=parts[0],user=parts[1];
+    var role=$("adminCommunityMemberList").querySelector('[data-admin-member-role="'+key+'"]').value;
+    var status=$("adminCommunityMemberList").querySelector('[data-admin-member-status="'+key+'"]').value;
+    sb("rpc/admin_update_workspace_member",{method:"POST",body:{p_workspace_id:id,p_user_id:user,p_role:role,p_status:status}}).then(function(res){
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Member update nahi hua. Last owner ko transfer kiye baghair remove nahi kar sakte.",false);return;}
+      setAdminMsg("Community member update ho gaya.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);});
+  }
+  function adminMakeCommunityOwner(key) {
+    var parts=key.split("|");
+    if(!window.confirm("Is member ko community owner banayein? Current active owner admin ban jayega."))return;
+    sb("rpc/admin_transfer_workspace_owner",{method:"POST",body:{p_workspace_id:parts[0],p_new_owner:parts[1]}}).then(function(res){
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Ownership transfer nahi hui.",false);return;}
+      setAdminMsg("Community ownership transfer ho gayi.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — ownership transfer nahi hui.",false);});
+  }
+
   function deleteUser(id) {
     var p = null;
     adminUsers.forEach(function (x) { if (x.id === id) p = x; });
