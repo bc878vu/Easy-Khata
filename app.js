@@ -1940,7 +1940,10 @@
     var contactBody = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: phone || null };
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
-      if (!res.ok) { setContactMsg("Dost save nahi hua — dobara try karein.", false); return; }
+      if (!res.ok) {
+        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server connection issue — dost offline queue mein save ho gaya; sync baad mein hogi.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
+        setContactMsg("Dost save nahi hua ("+res.status+") — dobara try karein.", false); return;
+      }
       var created = res.body && res.body[0];
       if (created) { created.manual = true; myContacts.push(created); }
       $("newContactName").value = "";
@@ -3304,7 +3307,10 @@
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
-        if (!res.ok) { setPeopleMsg("Settlement save nahi hua — dobara try karein.", false); return; }
+        if (!res.ok) {
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Connection issue — settlement offline queue mein save ho gayi; sync baad mein hogi.",true);return;}
+          setPeopleMsg("Settlement save nahi hua ("+res.status+") — dobara try karein.", false); return;
+        }
         var created = res.body && res.body[0];
         if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
         setPeopleMsg("Hisaab barabar ho gaya!", true);
@@ -4482,7 +4488,10 @@
       sb("khata_transactions?id=eq." + encodeURIComponent(editId), { method: "PATCH", prefer: "return=minimal", body: body })
         .then(function (res) {
           btn.disabled = false;
-          if (!res.ok) { setTxnMsg("Edit save nahi hui — dobara try karein.", false); return; }
+          if (!res.ok) {
+            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Connection issue — edit offline queue mein save ho gayi; sync baad mein hogi.",true);btn.disabled=false;return;}
+            setTxnMsg("Edit save nahi hui ("+res.status+") — dobara try karein.", false); return;
+          }
           resetTxnForm();
           setTxnMsg("Record update ho gaya!", true);
           loadAll();
@@ -4497,7 +4506,10 @@
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: Object.assign({ id: recId }, body) })
       .then(function (res) {
         btn.disabled = false;
-        if (!res.ok) { setTxnMsg("Record save nahi hua — dobara try karein.", false); return; }
+        if (!res.ok) {
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Database connection issue — record offline queue mein save ho gaya; sync baad mein hogi.",true);btn.disabled=false;return;}
+          setTxnMsg("Record save nahi hua ("+res.status+") — dobara try karein.", false); return;
+        }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person)); }
         $("txnAmount").value = "";
