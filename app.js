@@ -635,6 +635,7 @@
     renderWorkspaceBar();
     showView("khata");
     $("txnDate").value = todayLocal();
+    if (!guestMode) { var communityLinkName=""; try { communityLinkName=new URLSearchParams(window.location.search).get("community")||""; } catch(e) {} if (communityLinkName) setTimeout(function(){ if(session&&!guestMode){openCommunityModal("join");$("joinCommunityUsername").value=communityLinkName.toLowerCase();} },700); }
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
     notifFirstLoad = true;
     loadNotifs();
@@ -1035,7 +1036,7 @@
     $("communityTabCreate").classList.toggle("active",tab==="create");
     $("communityTabJoin").classList.toggle("active",tab==="join");
     $("communityModalTitle").textContent=tab==="create"?"Create a business community":tab==="setup"?"Secure your community":"Explore communities";
-    if(tab==="join")loadCommunityDirectory("");
+    if(tab==="join"){loadCommunityDirectory("");var linkedUsername="";try{linkedUsername=new URLSearchParams(window.location.search).get("community")||"";}catch(e){}if(linkedUsername) $("joinCommunityUsername").value=linkedUsername.toLowerCase();}
     if(tab==="setup"){
       var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
       $("communitySetupUsername").textContent=active&&active.community_username?"@"+active.community_username:"Username not set";
@@ -1159,6 +1160,13 @@
     $("membersOverlay").hidden=false;
     loadCommunityJoinRequests();loadWorkspaceMemberCards();
     $("workspaceInviteEmail").focus();
+  }
+  function copyCommunityJoinLink(){
+    var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
+    if(!active||active.type!=="business"||!active.community_username){setTxnMsg("Community username set nahi hai. Owner se setup complete karwayein.",false);return;}
+    var link=window.location.origin+window.location.pathname+"?community="+encodeURIComponent(active.community_username);
+    copyText(link).then(function(){setTxnMsg("Community join link copy ho gaya. Link khol kar username aur password se join request bheji ja sakti hai.",true);})
+      .catch(function(){setTxnMsg("Community join link: "+link,true);});
   }
   function submitWorkspaceInvite(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
@@ -1823,7 +1831,7 @@
   var myContacts = [];
   function loadContacts() {
     if (!session || !session.access_token) return Promise.resolve(0);
-    return sb("khata_contacts?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&order=created_at.asc")
+    return sb("khata_contacts?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&owner_id=eq." + encodeURIComponent(myId()) + "&order=created_at.asc")
       .then(function (res) {
         if (!res.ok) return 0;
         myContacts = (Array.isArray(res.body) ? res.body : []).map(function (c) { c.manual = true; return c; });
@@ -4780,6 +4788,7 @@
   $("membersOverlay").addEventListener("click",function(e){if(e.target===$("membersOverlay"))$("membersOverlay").hidden=true;});
   $("workspaceInviteBtn").addEventListener("click", inviteWorkspaceMember);
   $("workspaceInviteSubmit").addEventListener("click",submitWorkspaceInvite);
+  $("workspaceCopyCommunityLinkBtn").addEventListener("click",copyCommunityJoinLink);
   $("workspaceMembersBtn").addEventListener("click", manageWorkspaceMembers);
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {
