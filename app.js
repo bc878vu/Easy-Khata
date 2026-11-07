@@ -115,6 +115,20 @@
     return m.full_name || session.user.email || "";
   }
   function authToken() { return session && session.access_token ? session.access_token : ANON; }
+  var refreshSessionPromise = null;
+  function refreshSession() {
+    if (!session || !session.refresh_token) return Promise.resolve(false);
+    if (refreshSessionPromise) return refreshSessionPromise;
+    refreshSessionPromise = authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.access_token) return false;
+        saveSession(res.body);
+        return true;
+      })
+      .catch(function () { return false; })
+      .then(function (ok) { refreshSessionPromise = null; return ok; });
+    return refreshSessionPromise;
+  }
 
   /* ---------- Supabase helpers ---------- */
   function fetchWithTimeout(url, options, timeoutMs) {
@@ -150,27 +164,53 @@
   }
   function sb(path, opts) {
     opts = opts || {};
-    var headers = {
-      "apikey": ANON,
-      "Authorization": "Bearer " + authToken(),
-      "Content-Type": "application/json"
-    };
-    if (opts.prefer) headers["Prefer"] = opts.prefer;
-    if (opts.range) {
-      headers["Range-Unit"] = "items";
-      headers["Range"] = opts.range;
-    }
-    return fetchWithTimeout(API + "/rest/v1/" + path, {
-      method: opts.method || "GET",
-      headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    }, 12000).then(function (r) {
-      return r.text().then(function (t) {
-        var j = null;
-        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
-        return { ok: r.ok, status: r.status, body: j, raw: t };
+    var method = String(opts.method || "GET").toUpperCase();
+    var bodyText = opts.body ? JSON.stringify(opts.body) : undefined;
+    function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+    function request(authRetried, transientRetried) {
+      var headers = {
+        "apikey": ANON,
+        "Authorization": "Bearer " + authToken(),
+        "Content-Type": "application/json"
+      };
+      if (opts.prefer) headers["Prefer"] = opts.prefer;
+      if (opts.range) {
+        headers["Range-Unit"] = "items";
+        headers["Range"] = opts.range;
+      }
+      return fetchWithTimeout(API + "/rest/v1/" + path, {
+        method: method,
+        headers: headers,
+        body: bodyText
+      }, 18000).then(function (r) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+          return { ok: r.ok, status: r.status, body: j, raw: t };
+        });
+      }).then(function (res) {
+        // Access tokens expire while the app is open. Refresh once and replay
+        // the request; PostgREST rejects an expired JWT before executing it.
+        if (res.status === 401 && !authRetried && session && session.refresh_token) {
+          return refreshSession().then(function (refreshed) {
+            return refreshed ? request(true, transientRetried) : res;
+          });
+        }
+        // Retry only safe reads. Never automatically replay a write/RPC after
+        // a timeout because the server may already have committed it.
+        if ((method === "GET" || method === "HEAD") && !transientRetried &&
+            (res.status === 502 || res.status === 503 || res.status === 504)) {
+          return wait(650).then(function () { return request(authRetried, true); });
+        }
+        return res;
+      }).catch(function (err) {
+        if ((method === "GET" || method === "HEAD") && !transientRetried) {
+          return wait(650).then(function () { return request(authRetried, true); });
+        }
+        throw err;
       });
-    });
+    }
+    return request(false, false);
   }
 
   /* ---------- state ---------- */
@@ -211,11 +251,16 @@
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
   var offlineMode = false;   // true jab cache se dikhaya ja raha ho
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
+  var loadSequence = 0;       // stale overlapping refreshes cannot overwrite newer workspace data
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
+  var CACHE_WORKSPACE_PREFIX = CACHE_KEY + "_workspace_";
+  var LAST_WORKSPACE_KEY = "easykhata_last_workspace_v1_anonymous";
   var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
   function setUserScopedStorage(userId) {
     var uid = userId || "anonymous";
     CACHE_KEY = "easykhata_cache_v1_" + uid;
+    CACHE_WORKSPACE_PREFIX = CACHE_KEY + "_workspace_";
+    LAST_WORKSPACE_KEY = "easykhata_last_workspace_v1_" + uid;
     OUTBOX_KEY = "easykhata_outbox_v1_" + uid;
     if (!userId) return;
     try {
@@ -342,18 +387,39 @@
     // hoti hai; loadNotifs/loadContacts loadAll se pehle chal jayein to bhi
     // cache mehfooz rehta hai.
     if (!profiles || !profiles.length) return;
+    if (!currentWorkspaceId) return;
     try {
-      window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
-      }));
+      var snapshot = JSON.stringify({
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
+        hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
+      });
+      // One independent cache per workspace prevents a failed workspace switch
+      // from showing another community's last-synced ledger.
+      window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + currentWorkspaceId, snapshot);
+      window.localStorage.setItem(LAST_WORKSPACE_KEY, currentWorkspaceId);
+      // Keep the old user-level cache as a migration source for older builds.
+      window.localStorage.setItem(CACHE_KEY, snapshot);
     } catch (e) {}
   }
-  function loadCache() {
+  function loadCache(workspaceId) {
     try {
-      var raw = window.localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      var c = JSON.parse(raw);
+      var target = workspaceId || window.localStorage.getItem(LAST_WORKSPACE_KEY) || "";
+      var raw = target ? window.localStorage.getItem(CACHE_WORKSPACE_PREFIX + target) : null;
+      var c = raw ? JSON.parse(raw) : null;
+      if (!c) {
+        var legacyRaw = window.localStorage.getItem(CACHE_KEY);
+        var legacy = legacyRaw ? JSON.parse(legacyRaw) : null;
+        // Legacy cache is usable only when its recorded tenant matches.
+        if (legacy && legacy.workspaceId && (!target || legacy.workspaceId === target)) {
+          c = legacy;
+          if (legacy.workspaceId) {
+            window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + legacy.workspaceId, JSON.stringify(legacy));
+            window.localStorage.setItem(LAST_WORKSPACE_KEY, legacy.workspaceId);
+          }
+        }
+      }
       if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
+      if (target && c.workspaceId !== target) return null;
       return c;
     } catch (e) { return null; }
   }
@@ -1151,7 +1217,7 @@
       }
     });
     if (converted) saveOutbox(ops);
-    if (!ops.length || !navigator.onLine) return Promise.resolve(false);
+    if (!ops.length) return Promise.resolve(false); // navigator.onLine can be wrong; let the real request decide
     syncing = true;
     setTxnMsg("Sync ho raha hai…", true);
     var done = 0, skipped = 0, skippedSettled = 0;
