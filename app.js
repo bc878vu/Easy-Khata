@@ -3964,11 +3964,11 @@
         hiddenTxnIds[id] = true;
         saveCache();
         renderAll();
-        setTxnMsg("Record sirf aapki history se hat gaya.", true);
+        setTxnMsg("Record history se hide ho gaya — total aur friend balance same hain.", true);
         return true;
       }).catch(function () {
         offlineTxnHide(id);
-        setTxnMsg("Record offline hat gaya — online hote hi sync hoga.", true);
+        setTxnMsg("Record history se hide ho gaya — balance same rahega. Online hote hi sync hoga.", true);
         return true;
       });
   }
@@ -3978,7 +3978,7 @@
     if (!t) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     if (t.payer_id !== myId() && t.receiver_id !== myId()) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
-    askConfirm("Record hatayein?", "Ye record sirf aapki history se hat jayega — doosre dost ko koi fark nahi parega.", "Hatayein", function () {
+    askConfirm("Record history se hatayein?", "Ye record sirf history se hide hoga. Aapka total balance aur dost ki list ka balance bilkul change nahi hoga. Doosre dost ko bhi koi fark nahi parega.", "History se hatayein", function () {
     if (guestMode) {
       // Guest history hide only: preserve the underlying transaction for balances.
       hiddenTxnIds[id] = true;
