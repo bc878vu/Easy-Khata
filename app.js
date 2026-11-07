@@ -578,6 +578,7 @@
     $("signupNameRow").hidden = authMode !== "signup";
     $("signupPhoneRow").hidden = authMode !== "signup";
     $("forgotRow").hidden = authMode !== "login";
+    if ($("signupCommunityBox")) $("signupCommunityBox").hidden = authMode !== "signup";
     $("authSubmitBtn").textContent = authMode === "signup" ? "Account banayein" : "Login karein";
     $("authPassword").setAttribute("autocomplete", authMode === "signup" ? "new-password" : "current-password");
     setAuthMsg("");
@@ -733,6 +734,34 @@
   function communityOnboardingKey(email) {
     return "easykhata_community_onboarding_v1_" + String(email || "").trim().toLowerCase();
   }
+  function signupCommunityIntentKey(email) { return "easykhata_signup_community_intent_v1_" + String(email||"").trim().toLowerCase(); }
+  function saveSignupCommunityIntent(intent, username) {
+    try { window.localStorage.setItem(signupCommunityIntentKey($("authEmail").value), JSON.stringify({intent:intent,username:username||""})); } catch(e) {}
+  }
+  function loadSignupCommunityDirectory(search) {
+    var list=$("signupCommunityDirectory"); if(!list)return;
+    list.innerHTML='<p class="muted">Communities load ho rahi hain…</p>';
+    sb("rpc/khata_list_communities",{method:"POST",body:{p_search:search||""}}).then(function(res){
+      if(!res.ok)throw new Error("directory");
+      var rows=Array.isArray(res.body)?res.body:[];
+      list.innerHTML="";
+      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Koi public community nahi mili. Aap apni community create kar sakte hain.";list.appendChild(empty);return;}
+      rows.forEach(function(w){
+        var card=document.createElement("article");card.className="community-card";
+        var title=document.createElement("strong");title.textContent=w.community_name;
+        var handle=document.createElement("span");handle.className="community-handle";handle.textContent="@"+w.community_username;
+        var meta=document.createElement("small");meta.textContent=(w.member_count||0)+" members"+(w.description?" · "+w.description:"");
+        var pick=document.createElement("button");pick.type="button";pick.className="btn btn-primary community-join-pick";pick.textContent="Select community";
+        pick.addEventListener("click",function(){
+          saveSignupCommunityIntent("join",w.community_username);
+          $("signupCommunityChoice").textContent="Selected: "+w.community_name+" (@"+w.community_username+"). Account banne ke baad password verify karke join request bhejein.";
+          $("signupCommunityChoice").className="msg ok";
+        });
+        card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(pick);list.appendChild(card);
+      });
+    }).catch(function(){list.innerHTML='<p class="community-empty">Community list load nahi hui. Internet check karein.</p>';});
+  }
+
   function afterAuth(res, isSignup) {
     var body = res.body || {};
     if (!body.access_token) {
@@ -762,8 +791,14 @@
         if (needsCommunitySetup) window.localStorage.removeItem(communityOnboardingKey(email));
       } catch(e) {}
       if (needsCommunitySetup) {
+        var signupIntent=null;
+        try { signupIntent=JSON.parse(window.localStorage.getItem(signupCommunityIntentKey(email))||"null"); window.localStorage.removeItem(signupCommunityIntentKey(email)); } catch(e) {}
         setTimeout(function () {
-          if (session && !guestMode) openCommunityModal("join");
+          if (session && !guestMode) {
+            var tab=signupIntent&&signupIntent.intent==="create"?"create":"join";
+            openCommunityModal(tab);
+            if(tab==="join"&&signupIntent&&signupIntent.username) $("joinCommunityUsername").value=String(signupIntent.username).toLowerCase();
+          }
         }, 900);
       }
     });
@@ -780,6 +815,7 @@
     if (password.length < 6) { setAuthMsg("Password kam se kam 6 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
     var isSignup = authMode === "signup";
+    if(isSignup){try{var pendingIntent=window.localStorage.getItem(signupCommunityIntentKey(email));if(!pendingIntent)saveSignupCommunityIntent("join","");}catch(e){}}
     btn.disabled = true;
     var p = isSignup
       ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "", app: "easy-khata" } })
@@ -4577,6 +4613,20 @@
   /* ---------- wire up ---------- */
   $("tabLogin").addEventListener("click", function () { authMode = "login"; renderAuthMode(); });
   $("tabSignup").addEventListener("click", function () { authMode = "signup"; renderAuthMode(); });
+  $("signupJoinCommunityBtn").addEventListener("click",function(){
+    $("signupJoinCommunityPanel").hidden=false;$("signupCommunityCreateHint").hidden=true;
+    saveSignupCommunityIntent("join","");
+    loadSignupCommunityDirectory($("signupCommunitySearch").value||"");
+    $("signupCommunitySearch").focus();
+  });
+  $("signupCreateCommunityBtn").addEventListener("click",function(){
+    $("signupJoinCommunityPanel").hidden=true;$("signupCommunityCreateHint").hidden=false;
+    saveSignupCommunityIntent("create","");
+  });
+  $("signupCommunitySearch").addEventListener("input",function(){
+    var value=this.value;clearTimeout(window._signupCommunitySearchTimer);
+    window._signupCommunitySearchTimer=setTimeout(function(){loadSignupCommunityDirectory(value);},250);
+  });
   $("authSubmitBtn").addEventListener("click", doAuth);
   // v24: guest mode — aik tap, koi email/password nahi.
   $("guestBtn").addEventListener("click", enterGuestMode);
