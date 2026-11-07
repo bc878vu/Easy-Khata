@@ -2336,7 +2336,13 @@
     });
     if (!visibleTxns().length) { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = "Is mahine (<strong>" + esc(monthName(now + "-01")) + "</strong>): diye <strong>" + esc(fmtRs(given)) + "</strong> · liye <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " records";
+    el.innerHTML =
+      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📅</span><div><strong>Is mahine ka hisaab</strong><small>' + esc(monthName(now + "-01")) + '</small></div></div>' +
+      '<div class="khata-stat-grid">' +
+        '<div class="khata-stat-cell is-given"><span>Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
+        '<div class="khata-stat-cell is-taken"><span>Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
+        '<div class="khata-stat-cell"><span>Records</span><strong>' + count + '</strong></div>' +
+      '</div>';
   }
 
   function renderInsights() {
@@ -2357,9 +2363,13 @@
     Object.keys(counts).forEach(function (id) { if (counts[id] > topN) { topN = counts[id]; topId = id; } });
     var avg = Math.round(total / mine.length * 100) / 100;
     el.hidden = false;
-    el.innerHTML = "Sab se bara khana: <strong>" + esc(fmtRs(biggest.amount)) + "</strong> (" + esc(biggest.note || "Food") + ", " + esc(fmtDate(biggest.txn_date)) + ") · " +
-      "Sab se zyada len-den: <strong>" + esc(profileName(topId)) + "</strong> (" + topN + " dafa) · " +
-      "Aosat khana: <strong>" + esc(fmtRs(avg)) + "</strong>";
+    el.innerHTML =
+      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📊</span><div><strong>Hisaab ki jhalak</strong><small>Aap ke tamam visible records</small></div></div>' +
+      '<div class="khata-insight-grid">' +
+        '<div class="khata-insight-cell"><span>Sab se bara record</span><strong>' + esc(fmtRs(biggest.amount)) + '</strong><small>' + esc(biggest.note || "Detail nahi") + ' · ' + esc(fmtDate(biggest.txn_date)) + '</small></div>' +
+        '<div class="khata-insight-cell"><span>Sab se zyada len-den</span><strong>' + esc(profileName(topId) || "—") + '</strong><small>' + topN + ' dafa</small></div>' +
+        '<div class="khata-insight-cell"><span>Aosat raqam</span><strong>' + esc(fmtRs(avg)) + '</strong><small>Har record ki average</small></div>' +
+      '</div>';
   }
 
   function fillMyPhone() {
