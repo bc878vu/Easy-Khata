@@ -1272,3 +1272,9 @@ input,select,textarea,button{max-width:100%}
 .community-invite-row .btn{font-size:11px;padding:8px}
 .member-role-select{flex:1}
 @media(max-width:520px){.community-invite-row{grid-template-columns:minmax(0,1fr) 105px}.community-invite-row .btn{grid-column:1/-1;width:100%}}
+
+
+/* First-login community onboarding */
+.community-onboarding-hint{flex:1 0 100%;margin:0;padding:4px 8px 2px;color:var(--muted);font-size:12px;line-height:1.45}
+.community-onboarding-hint[hidden]{display:none}
+@media(max-width:520px){.community-onboarding-hint{font-size:11px;padding:2px 5px}}
