@@ -385,7 +385,7 @@
     try {
       var payload = {
         profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
-        hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
+        workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
       };
       window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
       window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
@@ -1501,6 +1501,7 @@
         offlineMode = true;
         dbReady = true;
         profiles = c.profiles || [];
+        workspaces = Array.isArray(c.workspaces) ? c.workspaces : workspaces;
         currentWorkspaceId = c.workspaceId || currentWorkspaceId;
         try { if(currentWorkspaceId) window.localStorage.setItem(ACTIVE_WS_KEY,currentWorkspaceId); } catch(e) {}
         txns = c.txns || [];
@@ -1508,9 +1509,10 @@
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
         myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
         notifs = c.notifs || [];
+        renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
-        setTxnMsg("Offline — aakhri save hua data dikhaya ja raha hai.", false);
+        setTxnMsg("Connection temporarily unavailable — is community ka last synced data dikhaya ja raha hai.", false);
         renderOffline();
         return;
       }
