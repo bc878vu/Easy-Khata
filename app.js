@@ -944,18 +944,13 @@
     applyTxnUpdateLocal(id, body);
   }
   function offlineTxnHide(id) {
-    // v24.11: offline hide — pending insert hai to use hata dein (server par
-    // kabhi gaya hi nahi — hide op nahi chahiye); warna hide op queue karein
-    // (flushOutbox ki insert branch POST karti hai; 409 = pehle se hidden).
-    if (removePendingInsert("khata_transactions", id)) {
-      txns = txns.filter(function (t) { return t.id !== id; });
-    } else {
-      var ops = loadOutbox();
-      var dup = false;
-      ops.forEach(function (o) { if (o.op === "insert" && o.table === "khata_txn_hidden" && o.id === id) dup = true; });
-      if (!dup) queueOp({ key: newUuid(), op: "insert", table: "khata_txn_hidden", id: id, body: { txn_id: id, user_id: myId() }, ts: Date.now() });
-      hiddenTxnIds[id] = true;
-    }
+    // Keep a pending transaction insert: it must reach the server before its
+    // hide row (FK). Queue hide after it; restore can cancel only this hide op.
+    var ops = loadOutbox();
+    var dup = false;
+    ops.forEach(function (o) { if (o.op === "insert" && o.table === "khata_txn_hidden" && o.id === id) dup = true; });
+    if (!dup) queueOp({ key: newUuid(), op: "insert", table: "khata_txn_hidden", id: id, body: { txn_id: id, user_id: myId() }, ts: Date.now() });
+    hiddenTxnIds[id] = true;
     saveCache();
     renderAll();
   }
