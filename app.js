@@ -4764,6 +4764,24 @@
   $("adminUserSort").addEventListener("change",function(e){adminUserSortMode=e.target.value||"recent";renderAdminUserList();});
   $("adminRefreshBtn").addEventListener("click",function(){loadAll();renderAdmin();});
   $("adminExportUsersBtn").addEventListener("click",exportAdminUsers);
+  $("adminCreateCommunityBtn").addEventListener("click",function(){openCommunityModal("create");});
+  $("adminCommunitySearch").addEventListener("input",renderAdminCommunities);
+  $("adminCommunityStatus").addEventListener("change",renderAdminCommunities);
+  $("adminMemberSearch").addEventListener("input",renderAdminCommunityMembers);
+  $("adminCommunityList").addEventListener("click",function(e){
+    var edit=e.target.closest("[data-admin-community-edit]");if(edit){editAdminCommunity(edit.getAttribute("data-admin-community-edit"));return;}
+    var status=e.target.closest("[data-admin-community-status]");if(status){setAdminCommunityStatus(status.getAttribute("data-admin-community-status"),status.getAttribute("data-next-status"));return;}
+    var del=e.target.closest("[data-admin-community-delete]");if(del){deleteAdminCommunity(del.getAttribute("data-admin-community-delete"));return;}
+    var add=e.target.closest("[data-admin-add-member]");if(add){adminAddCommunityMember(add.getAttribute("data-admin-add-member"));}
+  });
+  $("adminCommunityMemberList").addEventListener("click",function(e){
+    var save=e.target.closest("[data-admin-member-save]");if(save){adminSaveCommunityMember(save.getAttribute("data-admin-member-save"));return;}
+    var owner=e.target.closest("[data-admin-member-owner]");if(owner){adminMakeCommunityOwner(owner.getAttribute("data-admin-member-owner"));}
+  });
+  $("adminCommunityEditClose").addEventListener("click",function(){$("adminCommunityEditOverlay").hidden=true;adminEditingWorkspace=null;});
+  $("adminCommunityEditOverlay").addEventListener("click",function(e){if(e.target===$("adminCommunityEditOverlay")){$("adminCommunityEditOverlay").hidden=true;adminEditingWorkspace=null;}});
+  $("adminCommunityEditSave").addEventListener("click",saveAdminCommunity);
+
   $("adminUserList").addEventListener("click", function (e) {
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
     if (d) { deleteUser(d.getAttribute("data-admin-del")); return; }
