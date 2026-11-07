@@ -213,10 +213,15 @@
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
   var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
+  var ACTIVE_WS_KEY = "easykhata_active_workspace_v1_anonymous";
+  function workspaceCacheKey(workspaceId) {
+    return CACHE_KEY + "_ws_" + String(workspaceId || "default");
+  }
   function setUserScopedStorage(userId) {
     var uid = userId || "anonymous";
     CACHE_KEY = "easykhata_cache_v1_" + uid;
     OUTBOX_KEY = "easykhata_outbox_v1_" + uid;
+    ACTIVE_WS_KEY = "easykhata_active_workspace_v1_" + uid;
     if (!userId) return;
     try {
       if (!window.localStorage.getItem(CACHE_KEY)) {
@@ -239,7 +244,9 @@
     } catch (e) {}
   }
   setUserScopedStorage(session && session.user ? session.user.id : "");
-  var OUTBOX_MAX = 200;
+  // Never discard old financial operations automatically. The queue is bounded
+  // only by browser storage; if storage is full we surface an explicit error.
+  var OUTBOX_MAX = 5000;
   /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
      Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
      Server ko kabhi kuch nahi bheja jata: na Supabase (na profiles, na
@@ -319,41 +326,50 @@
     } catch (e) { return []; }
   }
   function saveOutbox(ops) {
-    try { window.localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops || [])); } catch (e) {}
-    renderOffline();
+    try {
+      window.localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops || []));
+      renderOffline();
+      return true;
+    } catch (e) {
+      try { console.error("Easy Khata: offline queue could not be saved", e); } catch (e2) {}
+      setTxnMsg("Phone storage full hai — record sync queue mein save nahi ho saka. Storage khaali karke dobara try karein.", false);
+      renderOffline();
+      return false;
+    }
   }
   function queueOp(op) {
     var ops = loadOutbox();
-    ops.push(op);
-    if (ops.length > OUTBOX_MAX) {
-      ops = ops.slice(ops.length - OUTBOX_MAX);
-      try { console.warn("Easy Khata: outbox full — sab se purane ops hata diye."); } catch (e) {}
+    if (ops.length >= OUTBOX_MAX) {
+      setTxnMsg("Offline queue bohat bari ho gayi hai. Internet connect karke sync karein; koi purana record delete nahi kiya.", false);
+      return false;
     }
-    saveOutbox(ops);
+    ops.push(op);
+    return saveOutbox(ops);
   }
   function saveCache() {
-    // v24 SECURITY: guest mode mein kabhi logged-in cache key mein nahi
-    // likhte — guest data sirf easykhata_guest_v1 mein rehta hai, warna
-    // guest ka hisaab kisi aur ke logged-in cache mein ghus jata.
-    if (guestMode) return;
-    // Khali data se acha cache kharab na ho — sirf tab save karein jab
-    // profiles maujood hon (kamyab load ka nishan). Naya user bhi apni
-    // profile rakhta hai, is liye kamyab load par profiles hamesha non-empty
-    // hoti hai; loadNotifs/loadContacts loadAll se pehle chal jayein to bhi
-    // cache mehfooz rehta hai.
-    if (!profiles || !profiles.length) return;
+    if (guestMode || !profiles || !profiles.length || !currentWorkspaceId) return;
     try {
-      window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
-      }));
-    } catch (e) {}
+      var payload = {
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
+        hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
+      };
+      window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
+      window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
+      // Keep the legacy single-workspace cache as a one-time migration fallback.
+      window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch (e) {
+      try { console.warn("Easy Khata: workspace cache could not be saved", e); } catch (e2) {}
+    }
   }
-  function loadCache() {
+  function loadCache(workspaceId) {
     try {
-      var raw = window.localStorage.getItem(CACHE_KEY);
+      var wanted = workspaceId || window.localStorage.getItem(ACTIVE_WS_KEY) || "";
+      var raw = wanted ? window.localStorage.getItem(workspaceCacheKey(wanted)) : null;
+      if (!raw) raw = window.localStorage.getItem(CACHE_KEY); // legacy cache migration
       if (!raw) return null;
       var c = JSON.parse(raw);
       if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
+      if (wanted && c.workspaceId && c.workspaceId !== wanted) return null;
       return c;
     } catch (e) { return null; }
   }
@@ -957,7 +973,9 @@
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
       if(!res.ok){setTxnMsg("Workspace switch nahi hua — access verify karein.",false);renderWorkspaceBar();return;}
-      currentWorkspaceId=id;profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
+      currentWorkspaceId=id;
+      try { window.localStorage.setItem(ACTIVE_WS_KEY,id); } catch(e) {}
+      profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
     }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
@@ -1404,6 +1422,7 @@
       profiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
       currentWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
       if (!currentWorkspaceId) throw new Error("active workspace missing");
+      try { window.localStorage.setItem(ACTIVE_WS_KEY,currentWorkspaceId); } catch(e) {}
       return loadWorkspaces().then(function () { return loadAllTransactions(); });
     }).then(function (rows) {
       if (!rows) return;
@@ -1421,12 +1440,13 @@
       });
     }).catch(function () {
       // Offline: aakhri save hua data dikhayein (agar cache hai).
-      var c = loadCache();
+      var c = loadCache(currentWorkspaceId);
       if (c) {
         offlineMode = true;
         dbReady = true;
         profiles = c.profiles || [];
         currentWorkspaceId = c.workspaceId || currentWorkspaceId;
+        try { if(currentWorkspaceId) window.localStorage.setItem(ACTIVE_WS_KEY,currentWorkspaceId); } catch(e) {}
         txns = c.txns || [];
         hiddenTxnIds = {};
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
