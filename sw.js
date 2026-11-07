@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v24-8";
+var CACHE = "easy-khata-v24-9";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=31",
+  "styles.css?v=32",
   "config.js?v=4",
-  "app.js?v=36",
+  "app.js?v=37",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg"
@@ -23,7 +23,8 @@ var CDN_LIBS = [
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
-  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"
+  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
 ];
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
 

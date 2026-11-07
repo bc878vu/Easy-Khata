@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 </head>
 <body>
 
@@ -277,7 +277,10 @@
       </div>
       <div class="detail-len-head">
         <p class="section-label">LEN-DEN</p>
-        <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button">📄 PDF Report</button>
+        <span class="detail-report-btns">
+          <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button">📄 PDF Report</button>
+          <button id="detailXlsxBtn" class="btn btn-soft detail-pdf-btn" type="button">📊 Excel</button>
+        </span>
       </div>
       <p id="detailPdfMsg" class="msg" role="status"></p>
       <div id="detailTxns" class="dtable scroll-box"></div>
@@ -382,6 +385,7 @@
         <p id="pushMsg" class="msg" role="status"></p>
         <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
         <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
+        <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
         <p id="acctBackupMsg" class="msg" role="status"></p>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
@@ -515,6 +519,9 @@
 <!-- jsPDF (v24.5): PDF Report ke liye. Agar CDN fail ho to app phir bhi
      chalti hai — exportPdf() saaf error dikhata hai, crash nahi hota. -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<!-- SheetJS (v24.9): Excel (.xlsx) Report ke liye. jsPDF ki tarah — load na
+     ho to export functions saaf error dikhate hain, crash nahi hota. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
@@ -526,6 +533,6 @@
     </div>
   </div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>

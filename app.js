@@ -2678,111 +2678,273 @@
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
   // v24.5: PDF Report — poora hisaab ek saaf professional PDF mein (Account
-  // menu mein CSV backup ke saath). jsPDF CDN se (UMD) — load na ho to saaf
-  // error, kabhi silent fail ya crash nahi. Sirf in-memory data use hoti
-  // hai, is liye guest mode mein bhi chalta hai (koi server call nahi).
+  // menu mein CSV backup ke saath). v24.9: PROFESSIONAL REDESIGN — navy
+  // header band, 3 summary cards, navy table header + zebra rows + totals
+  // row, designed empty state. Sirf jsPDF primitives (rect/text/line) — koi
+  // extra PDF lib nahi. jsPDF CDN se (UMD) — load na ho to saaf error, kabhi
+  // silent fail ya crash nahi. Sirf in-memory data use hoti hai, is liye
+  // guest mode mein bhi chalta hai (koi server call nahi).
   // PDF mein sirf Roman Urdu/Latin text hota hai (jsPDF standard font).
-  function exportPdf() {
-    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
-    if (!PdfCtor) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
-    try {
-      var doc = new PdfCtor({ unit: "pt", format: "a4" });
-      var W = 595, M = 40, R = W - M, y = 52;
-      function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
-      function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
-      function needPage(minY) {
-        if (y + minY > 775) { doc.addPage(); y = 52; return true; }
-        return false;
-      }
-      function section(title) {
-        needPage(34);
-        y += 14;
-        doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-        doc.text(title, M, y); y += 8;
-        hline(y); y += 16;
-      }
-      var me = myId();
-      var given = 0, taken = 0;
-      var list = txns.slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
-      list.forEach(function (t) {
-        var a = Number(t.amount) || 0;
-        if (t.payer_id === me) given += a;
-        if (t.receiver_id === me) taken += a;
-      });
-      var net = given - taken;
-      // Header
-      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-      doc.text("Easy Khata — Hisaab Report", M, y); y += 22;
+  function fullReportData() {
+    var me = myId();
+    var given = 0, taken = 0;
+    var list = txns.slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
+    list.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === me) given += a;
+      if (t.receiver_id === me) taken += a;
+    });
+    var map = peopleMap();
+    var people = Object.keys(map).map(function (k) { return map[k]; }).filter(function (p) { return (p.given + p.taken) > 0; });
+    people.sort(function (a, b) { return (b.given - b.taken) - (a.given - a.taken); });
+    return { list: list, given: given, taken: taken, net: given - taken, people: people };
+  }
+  // v24.9: per-person report data (PDF + Excel dono use karte hain) —
+  // newest-first list + oldest-first running balance (renderDetailTxns logic).
+  function personReportData(personId) {
+    var me = myId();
+    var sorted = personTxns(personId).slice().sort(function (a, b) {
+      var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
+      if (d) return d;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    });
+    var asc = sorted.slice().reverse();
+    var run = 0, balById = {};
+    asc.forEach(function (t) {
+      var a = Number(t.amount) || 0;
+      if (t.payer_id === me) run += a;
+      else if (t.receiver_id === me) run -= a;
+      balById[t.id] = run;
+    });
+    return { sorted: sorted, balById: balById };
+  }
+  function netSignedTxt(net) {
+    return (net >= 0 ? "+ " : "− ") + fmtRs(Math.abs(net));
+  }
+  // v24.9: shared PDF layout — exportPdf (poora hisaab) aur exportPersonPdf
+  // (aik dost ka hisaab) dono isi factory se page banate hain.
+  function pdfBase(doc) {
+    var W = 595, M = 40, R = W - M;
+    var st = { y: 52 };
+    var C = {
+      navy: [10, 26, 47], steel: [18, 58, 95], cyan: [56, 189, 248],
+      green: [22, 163, 74], red: [220, 38, 38], blue: [37, 99, 235],
+      zebra: [245, 247, 250], box: [245, 247, 250], line: [220, 226, 235],
+      grey: [100, 116, 139], dark: [15, 23, 42]
+    };
+    function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+    function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
+    function needPage(minY) {
+      if (st.y + minY > 775) { doc.addPage(); st.y = 52; return true; }
+      return false;
+    }
+    function section(title) {
+      needPage(34);
+      st.y += 14;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+      doc.setTextColor(C.navy[0], C.navy[1], C.navy[2]);
+      doc.text(title, M, st.y); st.y += 8;
+      doc.setDrawColor(C.line[0], C.line[1], C.line[2]); doc.line(M, st.y, R, st.y); st.y += 16;
+      doc.setTextColor(0, 0, 0);
+    }
+    // Header band: poori chaudai navy band, neeche cyan accent line,
+    // "EASY KHATA" white bold + subtitle, date right-aligned.
+    function headerBand(subtitle, rightText) {
+      doc.setFillColor(C.navy[0], C.navy[1], C.navy[2]);
+      doc.rect(0, 0, W, 64, "F");
+      doc.setFillColor(C.cyan[0], C.cyan[1], C.cyan[2]);
+      doc.rect(0, 64, W, 3, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+      doc.text("EASY KHATA", M, 30);
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-      doc.text("Naam: " + myName(), M, y); y += 16;
-      doc.text("Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + list.length, M, y); y += 10;
-      hline(y); y += 18;
-      // Totals
-      doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-      doc.text("Kull hisaab", M, y); y += 18;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-      doc.text("Kull diye: " + fmtRs(given), M, y); y += 16;
-      doc.text("Kull liye: " + fmtRs(taken), M, y); y += 16;
-      var netTxt = "Net: " + fmtRs(Math.abs(net)) + (net > 0 ? " (doston se milne hain)" : net < 0 ? " (doston ko dene hain)" : " (barabar hai)");
-      doc.text(netTxt, M, y); y += 8;
-      // Per-person balances
-      section("Doston ka hisaab");
-      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-      doc.text("(+ ka matlab dost ko aap ko dene hain, − ka matlab aap ko dost ko dene hain)", M, y); y += 16;
-      var map = peopleMap();
-      var people = Object.keys(map).map(function (k) { return map[k]; }).filter(function (p) { return (p.given + p.taken) > 0; });
-      people.sort(function (a, b) { return (b.given - b.taken) - (a.given - a.taken); });
-      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-      doc.text("Dost", M, y);
-      doc.text("Diye", 300, y, { align: "right" });
-      doc.text("Liye", 390, y, { align: "right" });
-      doc.text("Balance", R, y, { align: "right" });
-      y += 6; hline(y); y += 14;
-      doc.setFont("helvetica", "normal");
-      if (!people.length) { doc.text("Abhi koi dost ya record nahi.", M, y); y += 14; }
-      people.forEach(function (p) {
-        needPage(14);
-        var b = p.given - p.taken;
-        doc.text(trunc(p.name || "Unknown", 32), M, y);
-        doc.text(fmtRs(p.given), 300, y, { align: "right" });
-        doc.text(fmtRs(p.taken), 390, y, { align: "right" });
-        doc.text((b >= 0 ? "+ " : "− ") + fmtRs(Math.abs(b)), R, y, { align: "right" });
-        y += 14;
-      });
-      // History
-      section("Record history (" + list.length + " records)");
-      function histHeader() {
-        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-        doc.text("Date", M, y);
-        doc.text("Dene wala", 105, y);
-        doc.text("Lene wala", 220, y);
-        doc.text("Amount", 350, y, { align: "right" });
-        doc.text("Note", 410, y);
-        y += 6; hline(y); y += 14;
-        doc.setFont("helvetica", "normal");
-      }
-      histHeader();
-      if (!list.length) { doc.text("Abhi koi record nahi.", M, y); y += 14; }
-      list.forEach(function (t) {
-        if (needPage(14)) histHeader();
+      doc.text(subtitle, M, 50);
+      if (rightText) {
         doc.setFontSize(10);
-        doc.text(fmtDate(t.txn_date), M, y);
-        doc.text(trunc(profileName(t.payer_id), 19), 105, y);
-        doc.text(trunc(profileName(t.receiver_id), 19), 220, y);
-        doc.text(fmtRs(t.amount), 350, y, { align: "right" });
-        doc.text(trunc(t.note || "Food", 24), 410, y);
-        y += 14;
+        doc.text(rightText, R, 30, { align: "right" });
+      }
+      doc.setTextColor(0, 0, 0);
+      st.y = 84;
+    }
+    function metaLine(text) {
+      needPage(16);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
+      doc.text(text, M, st.y); st.y += 16;
+      doc.setTextColor(0, 0, 0);
+    }
+    // 3 summary cards aik row mein: label (grey, 9pt) + bold amount (15pt),
+    // upar 4pt accent bar (Diye red / Liye green / Net blue).
+    function summaryCards(cards) {
+      needPage(68);
+      var gap = 8, bw = (R - M - gap * 2) / 3, bh = 54;
+      cards.forEach(function (c, i) {
+        var x = M + i * (bw + gap);
+        doc.setFillColor(C.box[0], C.box[1], C.box[2]);
+        doc.rect(x, st.y, bw, bh, "F");
+        doc.setFillColor(c.color[0], c.color[1], c.color[2]);
+        doc.rect(x, st.y, bw, 4, "F");
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
+        doc.text(c.label, x + 10, st.y + 20);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+        doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
+        doc.text(c.value, x + 10, st.y + 42);
+        doc.setTextColor(0, 0, 0);
       });
-      // Footer har page par
+      st.y += bh + 14;
+    }
+    // Table header: navy fill + white bold text. cols: [{t, x, align}]
+    function tableHead(cols) {
+      needPage(24);
+      doc.setFillColor(C.navy[0], C.navy[1], C.navy[2]);
+      doc.rect(M, st.y, R - M, 20, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 14, c.align ? { align: c.align } : undefined); });
+      st.y += 20;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+    }
+    // Table row: zebra fill (odd rows) + normal 10pt text. Page break ka
+    // faisla caller karta hai (needPage + header dobara) — ye sirf draw karta hai.
+    function tableRow(cols, zebra) {
+      if (zebra) {
+        doc.setFillColor(C.zebra[0], C.zebra[1], C.zebra[2]);
+        doc.rect(M, st.y, R - M, 14, "F");
+      }
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 10, c.align ? { align: c.align } : undefined); });
+      st.y += 14;
+    }
+    // Totals row: upar dark line + bold text.
+    function totalsRow(cols) {
+      needPage(18);
+      doc.setDrawColor(C.dark[0], C.dark[1], C.dark[2]);
+      doc.setLineWidth(1);
+      doc.line(M, st.y, R, st.y);
+      doc.setLineWidth(0.5);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 12, c.align ? { align: c.align } : undefined); });
+      st.y += 18;
+      doc.setFont("helvetica", "normal");
+    }
+    // Empty state: halka box + centred grey text (bare line nahi — user ki
+    // screenshot mein 0-record PDF bilkul khaali lagta tha).
+    function emptyBox(text) {
+      needPage(44);
+      doc.setFillColor(C.box[0], C.box[1], C.box[2]);
+      doc.rect(M, st.y, R - M, 34, "F");
+      doc.setDrawColor(C.line[0], C.line[1], C.line[2]);
+      doc.rect(M, st.y, R - M, 34, "S");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
+      doc.text(text, W / 2, st.y + 21, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+      st.y += 44;
+    }
+    function addFooter() {
       var pages = doc.getNumberOfPages();
       for (var i = 1; i <= pages; i++) {
         doc.setPage(i);
+        doc.setDrawColor(C.line[0], C.line[1], C.line[2]);
+        doc.line(M, 815, R, 815);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         doc.setTextColor(130, 130, 130);
         doc.text("Easy Khata — Developed by Asad", M, 822);
         doc.text("Page " + i + " / " + pages, R, 822, { align: "right" });
         doc.setTextColor(0, 0, 0);
       }
+    }
+    function fileName(name) {
+      var s = String(name || "dost").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return s || "dost";
+    }
+    return { doc: doc, st: st, W: W, M: M, R: R, C: C, trunc: trunc, hline: hline, needPage: needPage, section: section, headerBand: headerBand, metaLine: metaLine, summaryCards: summaryCards, tableHead: tableHead, tableRow: tableRow, totalsRow: totalsRow, emptyBox: emptyBox, addFooter: addFooter, fileName: fileName };
+  }
+  function exportPdf() {
+    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+    if (!PdfCtor) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+    try {
+      var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
+      var doc = base.doc, M = base.M, R = base.R, C = base.C;
+      var d = fullReportData();
+      var list = d.list, given = d.given, taken = d.taken, net = d.net, people = d.people;
+      var netSigned = netSignedTxt(net);
+      base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
+      base.metaLine("Naam: " + myName() + "  ·  Records: " + list.length);
+      base.summaryCards([
+        { label: "Diye", value: fmtRs(given), color: C.red },
+        { label: "Liye", value: fmtRs(taken), color: C.green },
+        { label: "Net", value: netSigned, color: C.blue }
+      ]);
+      // Per-person balances
+      base.section("Doston ka hisaab");
+      base.metaLine("(+ ka matlab dost ko aap ko dene hain, − ka matlab aap ko dost ko dene hain)");
+      function peopleHead() {
+        base.tableHead([
+          { t: "Dost", x: M },
+          { t: "Diye", x: 300, align: "right" },
+          { t: "Liye", x: 390, align: "right" },
+          { t: "Balance", x: R, align: "right" }
+        ]);
+      }
+      peopleHead();
+      if (!people.length) { base.emptyBox("Abhi koi dost ya record nahi."); }
+      people.forEach(function (p, i) {
+        if (base.needPage(14)) peopleHead();
+        var b = p.given - p.taken;
+        base.tableRow([
+          { t: base.trunc(p.name || "Unknown", 32), x: M },
+          { t: fmtRs(p.given), x: 300, align: "right" },
+          { t: fmtRs(p.taken), x: 390, align: "right" },
+          { t: (b >= 0 ? "+ " : "− ") + fmtRs(Math.abs(b)), x: R, align: "right" }
+        ], i % 2 === 1);
+      });
+      if (people.length) {
+        base.totalsRow([
+          { t: "Total", x: M },
+          { t: fmtRs(given), x: 300, align: "right" },
+          { t: fmtRs(taken), x: 390, align: "right" },
+          { t: netSigned, x: R, align: "right" }
+        ]);
+      }
+      // History
+      base.section("Record history (" + list.length + " records)");
+      function histHeader() {
+        base.tableHead([
+          { t: "Date", x: M },
+          { t: "Dene wala", x: 105 },
+          { t: "Lene wala", x: 220 },
+          { t: "Amount", x: 350, align: "right" },
+          { t: "Note", x: 410 }
+        ]);
+      }
+      histHeader();
+      if (!list.length) { base.emptyBox("Abhi koi record nahi."); }
+      var histTotal = 0;
+      list.forEach(function (t, i) {
+        if (base.needPage(14)) histHeader();
+        histTotal += Number(t.amount) || 0;
+        base.tableRow([
+          { t: fmtDate(t.txn_date), x: M },
+          { t: base.trunc(profileName(t.payer_id), 19), x: 105 },
+          { t: base.trunc(profileName(t.receiver_id), 19), x: 220 },
+          { t: fmtRs(t.amount), x: 350, align: "right" },
+          { t: base.trunc(t.note || "Food", 24), x: 410 }
+        ], i % 2 === 1);
+      });
+      if (list.length) {
+        base.totalsRow([
+          { t: "Total", x: M },
+          { t: "", x: 105 },
+          { t: "", x: 220 },
+          { t: fmtRs(histTotal), x: 350, align: "right" },
+          { t: "", x: 410 }
+        ]);
+      }
+      base.addFooter();
       var blob = doc.output("blob");
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -2801,48 +2963,11 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
-  // v24.7: shared PDF primitives — exportPdf (poora hisaab) aur
-  // exportPersonPdf (aik dost ka hisaab) dono isi pattern se page banate
-  // hain. exportPdf ko chheda nahi (v24.5 se tested hai) — sirf naya
-  // function is factory ko use karta hai.
-  function pdfBase(doc) {
-    var W = 595, M = 40, R = W - M;
-    var st = { y: 52 };
-    function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
-    function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
-    function needPage(minY) {
-      if (st.y + minY > 775) { doc.addPage(); st.y = 52; return true; }
-      return false;
-    }
-    function section(title) {
-      needPage(34);
-      st.y += 14;
-      doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-      doc.text(title, M, st.y); st.y += 8;
-      hline(st.y); st.y += 16;
-    }
-    function addFooter() {
-      var pages = doc.getNumberOfPages();
-      for (var i = 1; i <= pages; i++) {
-        doc.setPage(i);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-        doc.setTextColor(130, 130, 130);
-        doc.text("Easy Khata — Developed by Asad", M, 822);
-        doc.text("Page " + i + " / " + pages, R, 822, { align: "right" });
-        doc.setTextColor(0, 0, 0);
-      }
-    }
-    function fileName(name) {
-      var s = String(name || "dost").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-      return s || "dost";
-    }
-    return { doc: doc, st: st, W: W, M: M, R: R, trunc: trunc, hline: hline, needPage: needPage, section: section, addFooter: addFooter, fileName: fileName };
-  }
   // v24.7: Per-person PDF Report — detail view se (kisi bhi dost ka: profile
   // user ya manual contact). Sirf US dost ke records — baaki doston ka kuch
-  // nahi. Sirf in-memory data (guest mode mein bhi chalta hai, ZERO network
-  // calls). Locked (Settled) records bhi list mein aate hain — read-only
-  // report hai, edit/delete nahi.
+  // nahi. v24.9: professional redesign (pdfBase layout). Sirf in-memory data
+  // (guest mode mein bhi chalta hai, ZERO network calls). Locked (Settled)
+  // records bhi list mein aate hain — read-only report hai, edit/delete nahi.
   function exportPersonPdf(personId) {
     var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
     if (!PdfCtor) { setDetailPdfMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
@@ -2850,67 +2975,55 @@
     if (!p) { setDetailPdfMsg("PDF nahi ban saka — dobara try karein.", false); return; }
     try {
       var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
-      var doc = base.doc, M = base.M, R = base.R, st = base.st;
+      var doc = base.doc, M = base.M, R = base.R, C = base.C;
       var me = myId();
       var s = personStats(personId);
-      // Newest first (detail view jaisi order) + running balance (oldest-first
-      // accumulate, phir newest-first dikhao — renderDetailTxns wali logic).
-      var sorted = personTxns(personId).slice().sort(function (a, b) {
-        var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
-        if (d) return d;
-        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
-      });
-      var asc = sorted.slice().reverse();
-      var run = 0, balById = {};
-      asc.forEach(function (t) {
-        var a = Number(t.amount) || 0;
-        if (t.payer_id === me) run += a;
-        else if (t.receiver_id === me) run -= a;
-        balById[t.id] = run;
-      });
-      // Header
-      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-      doc.text(base.trunc(p.name || p.email, 30) + " — Hisaab Report", M, st.y); st.y += 22;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-      doc.text("Dost: " + base.trunc(p.name || p.email, 40), M, st.y); st.y += 16;
-      doc.text("Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + sorted.length, M, st.y); st.y += 10;
-      base.hline(st.y); st.y += 18;
-      // Totals
-      doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-      doc.text("Is dost ka hisaab", M, st.y); st.y += 18;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-      doc.text("Diye: " + fmtRs(s.given), M, st.y); st.y += 16;
-      doc.text("Liye: " + fmtRs(s.taken), M, st.y); st.y += 16;
-      var netTxt = "Net: " + fmtRs(Math.abs(s.net)) + (s.net > 0 ? " (mujhe milne hain)" : s.net < 0 ? " (mujhe dene hain)" : " (barabar hai)");
-      doc.text(netTxt, M, st.y); st.y += 8;
+      var rd = personReportData(personId);
+      var sorted = rd.sorted, balById = rd.balById;
+      var netSigned = netSignedTxt(s.net);
+      base.headerBand(base.trunc(p.name || p.email, 30) + " — Hisaab Report", fmtDateLong(todayLocal()));
+      base.metaLine("Dost: " + base.trunc(p.name || p.email, 40) + "  ·  Records: " + sorted.length);
+      base.summaryCards([
+        { label: "Diye", value: fmtRs(s.given), color: C.red },
+        { label: "Liye", value: fmtRs(s.taken), color: C.green },
+        { label: "Net", value: netSigned, color: C.blue }
+      ]);
       // History — sirf is dost ke records
       base.section("Len-den history (" + sorted.length + " records)");
       function histHeader() {
-        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-        doc.text("Date", M, st.y);
-        doc.text("Note", 115, st.y);
-        doc.text("Diye", 320, st.y, { align: "right" });
-        doc.text("Liye", 405, st.y, { align: "right" });
-        doc.text("Balance", R, st.y, { align: "right" });
-        st.y += 6; base.hline(st.y); st.y += 14;
-        doc.setFont("helvetica", "normal");
+        base.tableHead([
+          { t: "Date", x: M },
+          { t: "Note", x: 115 },
+          { t: "Diye", x: 320, align: "right" },
+          { t: "Liye", x: 405, align: "right" },
+          { t: "Balance", x: R, align: "right" }
+        ]);
       }
       histHeader();
-      if (!sorted.length) { doc.text("Abhi koi record nahi.", M, st.y); st.y += 14; }
-      sorted.forEach(function (t) {
+      if (!sorted.length) { base.emptyBox("Abhi koi record nahi."); }
+      sorted.forEach(function (t, i) {
         if (base.needPage(14)) histHeader();
         var a = Number(t.amount) || 0;
         var iGave = t.payer_id === me;
         var bal = balById[t.id];
         var balTxt = bal > 0 ? "+ " + fmtRs(bal) : bal < 0 ? "− " + fmtRs(-bal) : "Rs 0";
-        doc.setFontSize(10);
-        doc.text(fmtDate(t.txn_date), M, st.y);
-        doc.text(base.trunc(t.note || "Food", 26), 115, st.y);
-        doc.text(iGave ? fmtRs(a) : "", 320, st.y, { align: "right" });
-        doc.text(!iGave ? fmtRs(a) : "", 405, st.y, { align: "right" });
-        doc.text(balTxt, R, st.y, { align: "right" });
-        st.y += 14;
+        base.tableRow([
+          { t: fmtDate(t.txn_date), x: M },
+          { t: base.trunc(t.note || "Food", 26), x: 115 },
+          { t: iGave ? fmtRs(a) : "", x: 320, align: "right" },
+          { t: !iGave ? fmtRs(a) : "", x: 405, align: "right" },
+          { t: balTxt, x: R, align: "right" }
+        ], i % 2 === 1);
       });
+      if (sorted.length) {
+        base.totalsRow([
+          { t: "Total", x: M },
+          { t: "", x: 115 },
+          { t: fmtRs(s.given), x: 320, align: "right" },
+          { t: fmtRs(s.taken), x: 405, align: "right" },
+          { t: netSigned, x: R, align: "right" }
+        ]);
+      }
       base.addFooter();
       var blob = doc.output("blob");
       var a = document.createElement("a");
@@ -2922,6 +3035,104 @@
       setDetailPdfMsg("PDF Report download ho gaya (" + sorted.length + " records).", true);
     } catch (e) {
       setDetailPdfMsg("PDF nahi ban saka — dobara try karein.", false);
+    }
+  }
+  // v24.9: Excel (.xlsx) export — SheetJS (xlsx) UMD via CDN. PDF jaisa hi
+  // data, lekin asal .xlsx file (amounts NUMBERS hain, Excel mein sum ho
+  // sakte hain). Lib load na ho to saaf error, crash nahi. Sirf in-memory
+  // data — guest mode mein bhi chalta hai (ZERO network calls; lib SW se
+  // runtime-cache hoti hai, pehli online load ke baad offline bhi).
+  function safeFileName(name) {
+    var s = String(name || "dost").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return s || "dost";
+  }
+  function downloadBlob(blob, filename) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function netLabel(net, posText, negText) {
+    if (net > 0) return "Net (" + posText + ")";
+    if (net < 0) return "Net (" + negText + ")";
+    return "Net (barabar hai)";
+  }
+  function exportPersonXlsx(personId) {
+    var X = window.XLSX || null;
+    if (!X) { setDetailPdfMsg("Excel library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+    var p = findPerson(personId);
+    if (!p) { setDetailPdfMsg("Excel nahi ban saka — dobara try karein.", false); return; }
+    try {
+      var me = myId();
+      var s = personStats(personId);
+      var rd = personReportData(personId);
+      var sorted = rd.sorted, balById = rd.balById;
+      var aoa = [];
+      aoa.push([(p.name || p.email) + " — Hisaab Report"]);
+      aoa.push(["Dost: " + (p.name || p.email) + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + sorted.length]);
+      aoa.push([]);
+      aoa.push(["Diye", s.given]);
+      aoa.push(["Liye", s.taken]);
+      aoa.push([netLabel(s.net, "mujhe milne hain", "mujhe dene hain"), s.net]);
+      aoa.push([]);
+      aoa.push(["Date", "Note", "Diye", "Liye", "Balance"]);
+      sorted.forEach(function (t) {
+        var a = Number(t.amount) || 0;
+        var iGave = t.payer_id === me;
+        aoa.push([fmtDate(t.txn_date), t.note || "Food", iGave ? a : "", !iGave ? a : "", balById[t.id]]);
+      });
+      aoa.push(["", "Total", s.given, s.taken, s.net]);
+      var wb = X.utils.book_new();
+      var ws = X.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+      X.utils.book_append_sheet(wb, ws, "Hisaab");
+      var bytes = X.write(wb, { bookType: "xlsx", type: "array" });
+      downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Easy-Khata-" + safeFileName(p.name || p.email) + "-Report.xlsx");
+      setDetailPdfMsg("Excel Report download ho gaya (" + sorted.length + " records).", true);
+    } catch (e) {
+      setDetailPdfMsg("Excel nahi ban saka — dobara try karein.", false);
+    }
+  }
+  function exportXlsx() {
+    var X = window.XLSX || null;
+    if (!X) { setAcctBackupMsg("Excel library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+    try {
+      var d = fullReportData();
+      var list = d.list, given = d.given, taken = d.taken, net = d.net, people = d.people;
+      var aoa = [];
+      aoa.push(["Easy Khata — Hisaab Report"]);
+      aoa.push(["Naam: " + myName() + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + list.length]);
+      aoa.push([]);
+      aoa.push(["Kull diye", given]);
+      aoa.push(["Kull liye", taken]);
+      aoa.push([netLabel(net, "doston se milne hain", "doston ko dene hain"), net]);
+      aoa.push([]);
+      aoa.push(["Doston ka hisaab"]);
+      aoa.push(["Dost", "Diye", "Liye", "Balance"]);
+      people.forEach(function (p) {
+        aoa.push([p.name || "Unknown", p.given, p.taken, p.given - p.taken]);
+      });
+      aoa.push(["Total", given, taken, net]);
+      aoa.push([]);
+      aoa.push(["Record history (" + list.length + " records)"]);
+      aoa.push(["Date", "Dene wala", "Lene wala", "Amount", "Note"]);
+      var histTotal = 0;
+      list.forEach(function (t) {
+        histTotal += Number(t.amount) || 0;
+        aoa.push([fmtDate(t.txn_date), profileName(t.payer_id), profileName(t.receiver_id), Number(t.amount) || 0, t.note || "Food"]);
+      });
+      aoa.push(["Total", "", "", histTotal, ""]);
+      var wb = X.utils.book_new();
+      var ws = X.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 40 }];
+      X.utils.book_append_sheet(wb, ws, "Full Report");
+      var bytes = X.write(wb, { bookType: "xlsx", type: "array" });
+      downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Easy-Khata-Full-Report.xlsx");
+      setAcctBackupMsg("Excel Report download ho gaya (" + list.length + " records).", true);
+    } catch (e) {
+      setAcctBackupMsg("Excel nahi ban saka — dobara try karein.", false);
     }
   }
   // Scrollable history boxes (v21): box tab scrollable ho (scrollHeight >
@@ -3332,6 +3543,7 @@
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
   $("detailSettleBtn").addEventListener("click", function () { if (detailPersonId) settlePerson(detailPersonId); });
   $("detailPdfBtn").addEventListener("click", function () { if (detailPersonId) exportPersonPdf(detailPersonId); }); // v24.7: per-person PDF Report
+  $("detailXlsxBtn").addEventListener("click", function () { if (detailPersonId) exportPersonXlsx(detailPersonId); }); // v24.9: per-person Excel Report
   $("detailRemoveBtn").addEventListener("click", function () { if (detailPersonId) deleteContact(detailPersonId); });
   $("detailDiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "given"); });
   $("detailLiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "taken"); });
@@ -3345,6 +3557,7 @@
   });
   $("acctBackupBtn").addEventListener("click", exportCsv);
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
+  $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", function () {
@@ -3578,3 +3791,4 @@
   }
   if (!handleAuthHash()) authValidate();
 })();
+

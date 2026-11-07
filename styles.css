@@ -428,6 +428,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .detail-len-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .detail-len-head .section-label{margin:0}
 .detail-pdf-btn{min-height:0;padding:5px 10px;font-size:.8rem;white-space:nowrap}
+.detail-report-btns{display:flex;gap:6px}
 .detail-action{
   display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;
   background:var(--card);border:1px solid var(--line);border-radius:12px;
