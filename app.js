@@ -2733,6 +2733,41 @@
       grey: [100, 116, 139], dark: [15, 23, 42]
     };
     function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+    // v24.10: jsPDF Helvetica sirf WinAnsi (cp1252) glyphs render karta hai.
+    // Unicode minus U+2212 "−" (app on-screen "− Rs 210" ke liye use karta hai)
+    // WinAnsi mein NAHI hai — PDF mein woh toot kar `"` jaisa glyph banta tha
+    // (user ki Awais Khan PDF screenshot: har negative amount `" Rs 210`).
+    // Is liye PDF layer ka HAR text isi choke point se guzarta hai: pdfSafe()
+    // minus ko ASCII "-" mein badalta hai, aur kisi bhi aur non-WinAnsi char
+    // ko "?" karta hai (taake layout kabhi na toote). On-screen formatting
+    // (app.js ke baaki hisse) bilkul nahi badla — sirf PDF draw path safe hai.
+    function pdfSafe(s) {
+      s = String(s == null ? "" : s);
+      return s.replace(/[\u2212\u2013]/g, "-")
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/\u2022/g, "-")
+        .replace(/[^\x20-\x7E\xA0-\xFF\u20AC\u201A\u0192\u201E\u2014\u2026\u2020\u2021\u2030\u2039\u203A\u0152\u0153\u0178\u017D\u017E\u2122]/g, "?");
+    }
+    function txt(t, x, y, o) { doc.text(pdfSafe(t), x, y, o); }
+    // v24.10 overflow guard: har drawn string apne column/box ki chaudai
+    // mein fit honi chahiye — kabhi bahar nahi (user: "Kuch value table
+    // column SE bhr AA rhi hn"). fitText() text ko "…" se chhota karta hai
+    // (sirf TEXT columns — naam/note/title — ke liye). Amounts kabhi
+    // truncate nahi hote: un ke liye column chaudai + row font step-down
+    // (10pt -> 9pt) hai, aur card amounts ke liye fitSize() (15pt -> 11pt).
+    function fitText(s, maxW) {
+      s = String(s == null ? "" : s);
+      if (!maxW || doc.getTextWidth(s) <= maxW) return s;
+      while (s.length > 1 && doc.getTextWidth(s + "…") > maxW) s = s.slice(0, -1);
+      return s + "…";
+    }
+    function fitSize(text, maxW, start, min) {
+      var sz = start;
+      doc.setFontSize(sz);
+      while (sz > min && doc.getTextWidth(text) > maxW) { sz -= 1; doc.setFontSize(sz); }
+      return sz;
+    }
     function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
     function needPage(minY) {
       if (st.y + minY > 775) { doc.addPage(); st.y = 52; return true; }
@@ -2743,7 +2778,7 @@
       st.y += 14;
       doc.setFont("helvetica", "bold"); doc.setFontSize(13);
       doc.setTextColor(C.navy[0], C.navy[1], C.navy[2]);
-      doc.text(title, M, st.y); st.y += 8;
+      txt(fitText(title, R - M), M, st.y); st.y += 8;
       doc.setDrawColor(C.line[0], C.line[1], C.line[2]); doc.line(M, st.y, R, st.y); st.y += 16;
       doc.setTextColor(0, 0, 0);
     }
@@ -2756,12 +2791,13 @@
       doc.rect(0, 64, W, 3, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold"); doc.setFontSize(18);
-      doc.text("EASY KHATA", M, 30);
+      txt("EASY KHATA", M, 30);
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-      doc.text(subtitle, M, 50);
+      var subW = rightText ? (R - M - doc.getTextWidth(rightText) - 16) : (R - M);
+      txt(fitText(subtitle, subW), M, 50);
       if (rightText) {
         doc.setFontSize(10);
-        doc.text(rightText, R, 30, { align: "right" });
+        txt(rightText, R, 30, { align: "right" });
       }
       doc.setTextColor(0, 0, 0);
       st.y = 84;
@@ -2770,7 +2806,7 @@
       needPage(16);
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
       doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
-      doc.text(text, M, st.y); st.y += 16;
+      txt(fitText(text, R - M), M, st.y); st.y += 16;
       doc.setTextColor(0, 0, 0);
     }
     // 3 summary cards aik row mein: label (grey, 9pt) + bold amount (15pt),
@@ -2786,10 +2822,13 @@
         doc.rect(x, st.y, bw, 4, "F");
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
-        doc.text(c.label, x + 10, st.y + 20);
-        doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+        txt(fitText(c.label, bw - 20), x + 10, st.y + 20);
+        doc.setFont("helvetica", "bold");
+        // Card amount apne box mein fit hona chahiye — bara amount ho to
+        // font 15pt se 11pt tak neeche aata hai (truncate kabhi nahi).
+        fitSize(c.value, bw - 20, 15, 11);
         doc.setTextColor(C.dark[0], C.dark[1], C.dark[2]);
-        doc.text(c.value, x + 10, st.y + 42);
+        txt(c.value, x + 10, st.y + 42);
         doc.setTextColor(0, 0, 0);
       });
       st.y += bh + 14;
@@ -2801,13 +2840,16 @@
       doc.rect(M, st.y, R - M, 20, "F");
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
       doc.setTextColor(255, 255, 255);
-      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 14, c.align ? { align: c.align } : undefined); });
+      cols.forEach(function (c) { txt(c.maxW ? fitText(c.t, c.maxW) : c.t, c.x, st.y + 14, c.align ? { align: c.align } : undefined); });
       st.y += 20;
       doc.setFont("helvetica", "normal");
       doc.setTextColor(0, 0, 0);
     }
     // Table row: zebra fill (odd rows) + normal 10pt text. Page break ka
     // faisla caller karta hai (needPage + header dobara) — ye sirf draw karta hai.
+    // Text columns maxW se "…" truncate hote hain; right-aligned amounts
+    // kabhi truncate nahi hote — agar koi amount apni allotted chaudai se
+    // bara ho to poori row 9pt ho jati hai (alignment barkarar).
     function tableRow(cols, zebra) {
       if (zebra) {
         doc.setFillColor(C.zebra[0], C.zebra[1], C.zebra[2]);
@@ -2815,7 +2857,9 @@
       }
       doc.setFont("helvetica", "normal"); doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 10, c.align ? { align: c.align } : undefined); });
+      var small = cols.some(function (c) { return c.align === "right" && c.maxW && doc.getTextWidth(c.t) > c.maxW; });
+      if (small) doc.setFontSize(9);
+      cols.forEach(function (c) { txt(c.maxW && !c.align ? fitText(c.t, c.maxW) : c.t, c.x, st.y + 10, c.align ? { align: c.align } : undefined); });
       st.y += 14;
     }
     // Totals row: upar dark line + bold text.
@@ -2826,7 +2870,9 @@
       doc.line(M, st.y, R, st.y);
       doc.setLineWidth(0.5);
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-      cols.forEach(function (c) { doc.text(c.t, c.x, st.y + 12, c.align ? { align: c.align } : undefined); });
+      var small = cols.some(function (c) { return c.align === "right" && c.maxW && doc.getTextWidth(c.t) > c.maxW; });
+      if (small) doc.setFontSize(9);
+      cols.forEach(function (c) { txt(c.maxW && !c.align ? fitText(c.t, c.maxW) : c.t, c.x, st.y + 12, c.align ? { align: c.align } : undefined); });
       st.y += 18;
       doc.setFont("helvetica", "normal");
     }
@@ -2840,7 +2886,7 @@
       doc.rect(M, st.y, R - M, 34, "S");
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
       doc.setTextColor(C.grey[0], C.grey[1], C.grey[2]);
-      doc.text(text, W / 2, st.y + 21, { align: "center" });
+      txt(fitText(text, R - M - 16), W / 2, st.y + 21, { align: "center" });
       doc.setTextColor(0, 0, 0);
       st.y += 44;
     }
@@ -2852,8 +2898,8 @@
         doc.line(M, 815, R, 815);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         doc.setTextColor(130, 130, 130);
-        doc.text("Easy Khata — Developed by Asad", M, 822);
-        doc.text("Page " + i + " / " + pages, R, 822, { align: "right" });
+        txt("Easy Khata — Developed by Asad", M, 822);
+        txt("Page " + i + " / " + pages, R, 822, { align: "right" });
         doc.setTextColor(0, 0, 0);
       }
     }
@@ -2884,10 +2930,10 @@
       base.metaLine("(+ ka matlab dost ko aap ko dene hain, − ka matlab aap ko dost ko dene hain)");
       function peopleHead() {
         base.tableHead([
-          { t: "Dost", x: M },
-          { t: "Diye", x: 300, align: "right" },
-          { t: "Liye", x: 390, align: "right" },
-          { t: "Balance", x: R, align: "right" }
+          { t: "Dost", x: M, maxW: 200 },
+          { t: "Diye", x: 310, align: "right", maxW: 64 },
+          { t: "Liye", x: 400, align: "right", maxW: 64 },
+          { t: "Balance", x: R, align: "right", maxW: 140 }
         ]);
       }
       peopleHead();
@@ -2896,29 +2942,29 @@
         if (base.needPage(14)) peopleHead();
         var b = p.given - p.taken;
         base.tableRow([
-          { t: base.trunc(p.name || "Unknown", 32), x: M },
-          { t: fmtRs(p.given), x: 300, align: "right" },
-          { t: fmtRs(p.taken), x: 390, align: "right" },
-          { t: (b >= 0 ? "+ " : "− ") + fmtRs(Math.abs(b)), x: R, align: "right" }
+          { t: p.name || "Unknown", x: M, maxW: 200 },
+          { t: fmtRs(p.given), x: 310, align: "right", maxW: 64 },
+          { t: fmtRs(p.taken), x: 400, align: "right", maxW: 64 },
+          { t: (b >= 0 ? "+ " : "− ") + fmtRs(Math.abs(b)), x: R, align: "right", maxW: 140 }
         ], i % 2 === 1);
       });
       if (people.length) {
         base.totalsRow([
-          { t: "Total", x: M },
-          { t: fmtRs(given), x: 300, align: "right" },
-          { t: fmtRs(taken), x: 390, align: "right" },
-          { t: netSigned, x: R, align: "right" }
+          { t: "Total", x: M, maxW: 200 },
+          { t: fmtRs(given), x: 310, align: "right", maxW: 64 },
+          { t: fmtRs(taken), x: 400, align: "right", maxW: 64 },
+          { t: netSigned, x: R, align: "right", maxW: 140 }
         ]);
       }
       // History
       base.section("Record history (" + list.length + " records)");
       function histHeader() {
         base.tableHead([
-          { t: "Date", x: M },
-          { t: "Dene wala", x: 105 },
-          { t: "Lene wala", x: 220 },
-          { t: "Amount", x: 350, align: "right" },
-          { t: "Note", x: 410 }
+          { t: "Date", x: M, maxW: 58 },
+          { t: "Dene wala", x: 104, maxW: 92 },
+          { t: "Lene wala", x: 202, maxW: 92 },
+          { t: "Amount", x: 380, align: "right", maxW: 80 },
+          { t: "Note", x: 388, maxW: 167 }
         ]);
       }
       histHeader();
@@ -2928,20 +2974,20 @@
         if (base.needPage(14)) histHeader();
         histTotal += Number(t.amount) || 0;
         base.tableRow([
-          { t: fmtDate(t.txn_date), x: M },
-          { t: base.trunc(profileName(t.payer_id), 19), x: 105 },
-          { t: base.trunc(profileName(t.receiver_id), 19), x: 220 },
-          { t: fmtRs(t.amount), x: 350, align: "right" },
-          { t: base.trunc(t.note || "Food", 24), x: 410 }
+          { t: fmtDate(t.txn_date), x: M, maxW: 58 },
+          { t: profileName(t.payer_id), x: 104, maxW: 92 },
+          { t: profileName(t.receiver_id), x: 202, maxW: 92 },
+          { t: fmtRs(t.amount), x: 380, align: "right", maxW: 80 },
+          { t: t.note || "Food", x: 388, maxW: 167 }
         ], i % 2 === 1);
       });
       if (list.length) {
         base.totalsRow([
-          { t: "Total", x: M },
-          { t: "", x: 105 },
-          { t: "", x: 220 },
-          { t: fmtRs(histTotal), x: 350, align: "right" },
-          { t: "", x: 410 }
+          { t: "Total", x: M, maxW: 58 },
+          { t: "", x: 104 },
+          { t: "", x: 202 },
+          { t: fmtRs(histTotal), x: 380, align: "right", maxW: 80 },
+          { t: "", x: 388 }
         ]);
       }
       base.addFooter();
@@ -2981,8 +3027,8 @@
       var rd = personReportData(personId);
       var sorted = rd.sorted, balById = rd.balById;
       var netSigned = netSignedTxt(s.net);
-      base.headerBand(base.trunc(p.name || p.email, 30) + " — Hisaab Report", fmtDateLong(todayLocal()));
-      base.metaLine("Dost: " + base.trunc(p.name || p.email, 40) + "  ·  Records: " + sorted.length);
+      base.headerBand((p.name || p.email) + " — Hisaab Report", fmtDateLong(todayLocal()));
+      base.metaLine("Dost: " + (p.name || p.email) + "  ·  Records: " + sorted.length);
       base.summaryCards([
         { label: "Diye", value: fmtRs(s.given), color: C.red },
         { label: "Liye", value: fmtRs(s.taken), color: C.green },
@@ -2992,11 +3038,11 @@
       base.section("Len-den history (" + sorted.length + " records)");
       function histHeader() {
         base.tableHead([
-          { t: "Date", x: M },
-          { t: "Note", x: 115 },
-          { t: "Diye", x: 320, align: "right" },
-          { t: "Liye", x: 405, align: "right" },
-          { t: "Balance", x: R, align: "right" }
+          { t: "Date", x: M, maxW: 58 },
+          { t: "Note", x: 106, maxW: 140 },
+          { t: "Diye", x: 320, align: "right", maxW: 64 },
+          { t: "Liye", x: 405, align: "right", maxW: 64 },
+          { t: "Balance", x: R, align: "right", maxW: 140 }
         ]);
       }
       histHeader();
@@ -3008,20 +3054,20 @@
         var bal = balById[t.id];
         var balTxt = bal > 0 ? "+ " + fmtRs(bal) : bal < 0 ? "− " + fmtRs(-bal) : "Rs 0";
         base.tableRow([
-          { t: fmtDate(t.txn_date), x: M },
-          { t: base.trunc(t.note || "Food", 26), x: 115 },
-          { t: iGave ? fmtRs(a) : "", x: 320, align: "right" },
-          { t: !iGave ? fmtRs(a) : "", x: 405, align: "right" },
-          { t: balTxt, x: R, align: "right" }
+          { t: fmtDate(t.txn_date), x: M, maxW: 58 },
+          { t: t.note || "Food", x: 106, maxW: 140 },
+          { t: iGave ? fmtRs(a) : "", x: 320, align: "right", maxW: 64 },
+          { t: !iGave ? fmtRs(a) : "", x: 405, align: "right", maxW: 64 },
+          { t: balTxt, x: R, align: "right", maxW: 140 }
         ], i % 2 === 1);
       });
       if (sorted.length) {
         base.totalsRow([
-          { t: "Total", x: M },
-          { t: "", x: 115 },
-          { t: fmtRs(s.given), x: 320, align: "right" },
-          { t: fmtRs(s.taken), x: 405, align: "right" },
-          { t: netSigned, x: R, align: "right" }
+          { t: "Total", x: M, maxW: 58 },
+          { t: "", x: 106 },
+          { t: fmtRs(s.given), x: 320, align: "right", maxW: 64 },
+          { t: fmtRs(s.taken), x: 405, align: "right", maxW: 64 },
+          { t: netSigned, x: R, align: "right", maxW: 140 }
         ]);
       }
       base.addFooter();
@@ -3054,10 +3100,59 @@
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
-  function netLabel(net, posText, negText) {
-    if (net > 0) return "Net (" + posText + ")";
-    if (net < 0) return "Net (" + negText + ")";
-    return "Net (barabar hai)";
+  // v24.10: Excel styling — VERIFIED AGAINST THE REAL LIBRARY (probe, not
+  // docs): SheetJS Community Edition 0.18.5 cell styles (`s`) LIKHTA HI NAHI
+  // — styles.xml mein sirf default font/fills aate hain, bold/fill/border
+  // sab drop ho jate hain; sirf `z` (numFmt) aur merges/cols survive karte
+  // hain. Is liye library badli: xlsx-js-style 1.2.0 (SheetJS 0.18.5 ka
+  // drop-in fork, wahi API + `window.XLSX` global) — probe se verify kiya:
+  // fonts/fills/borders/numFmt sab styles.xml mein likhe jate hain, chahe
+  // `cellStyles: true` ho ya na ho. Freeze panes, gridlines-hide aur
+  // fit-to-page is writer mein supported NAHI hain (probe: <pane>/<pageSetup>
+  // kabhi nahi likhe jate) — is liye woh fake NAHI kiye; margins (!margins)
+  // supported hain. (xlsx-js-style browser mein <script> se load hota hai —
+  // cpexcel.js sirf Node mein chahiye hota hai, browser path mein require
+  // guard hai.)
+  var XS = {
+    navy: "FF0A1A2F", white: "FFFFFFFF", zebra: "FFF1F5F9",
+    red: "FFDC2626", grey: "FF64748B", line: "FFDCE3EA", dark: "FF0F172A"
+  };
+  var X_TITLE = { font: { bold: true, sz: 16, color: { rgb: XS.navy } } };
+  var X_META = { font: { sz: 10, color: { rgb: XS.grey } } };
+  var X_LABEL = { font: { bold: true, sz: 11 } };
+  var X_VALUE = { font: { bold: true, sz: 11 } };
+  var X_VALUE_NEG = { font: { bold: true, sz: 11, color: { rgb: XS.red } } };
+  var X_LEGEND = { font: { sz: 9, color: { rgb: XS.grey } }, alignment: { wrapText: true, vertical: "center" } };
+  var X_SECTION = { font: { bold: true, sz: 12, color: { rgb: XS.navy } } };
+  function xCell(ws, addr, style, numFmt) {
+    var c = ws[addr] || {};
+    if (style) c.s = style;
+    if (numFmt) c.z = numFmt;
+    ws[addr] = c;
+  }
+  function xBorder(top) {
+    var thin = { style: "thin", color: { rgb: XS.line } };
+    return { left: thin, right: thin, bottom: thin, top: top || thin };
+  }
+  function xHeadStyle(center) {
+    return { font: { bold: true, sz: 11, color: { rgb: XS.white } },
+      fill: { patternType: "solid", fgColor: { rgb: XS.navy } },
+      alignment: { horizontal: center ? "center" : "left", vertical: "center" } };
+  }
+  function xDataStyle(zebra, right, neg, wrap) {
+    var f = { sz: 11 };
+    if (neg) f.color = { rgb: XS.red };
+    var al = { horizontal: right ? "right" : "left", vertical: "center" };
+    if (wrap) al.wrapText = true;
+    var s = { font: f, alignment: al, border: xBorder() };
+    if (zebra) s.fill = { patternType: "solid", fgColor: { rgb: XS.zebra } };
+    return s;
+  }
+  function xTotalStyle(right, neg) {
+    var f = { bold: true, sz: 11 };
+    if (neg) f.color = { rgb: XS.red };
+    return { font: f, alignment: { horizontal: right ? "right" : "left", vertical: "center" },
+      border: { left: { style: "thin", color: { rgb: XS.line } }, right: { style: "thin", color: { rgb: XS.line } }, bottom: { style: "thin", color: { rgb: XS.line } }, top: { style: "medium", color: { rgb: XS.dark } } } };
   }
   function exportPersonXlsx(personId) {
     var X = window.XLSX || null;
@@ -3070,14 +3165,15 @@
       var rd = personReportData(personId);
       var sorted = rd.sorted, balById = rd.balById;
       var aoa = [];
-      aoa.push([(p.name || p.email) + " — Hisaab Report"]);
-      aoa.push(["Dost: " + (p.name || p.email) + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + sorted.length]);
-      aoa.push([]);
-      aoa.push(["Diye", s.given]);
-      aoa.push(["Liye", s.taken]);
-      aoa.push([netLabel(s.net, "mujhe milne hain", "mujhe dene hain"), s.net]);
-      aoa.push([]);
-      aoa.push(["Date", "Note", "Diye", "Liye", "Balance"]);
+      aoa.push([(p.name || p.email) + " — Hisaab Report"]); // r0 title
+      aoa.push(["Dost: " + (p.name || p.email) + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + sorted.length]); // r1 meta
+      aoa.push([]); // r2
+      aoa.push(["Diye", s.given]); // r3
+      aoa.push(["Liye", s.taken]); // r4
+      aoa.push(["Net", s.net]); // r5 (label chhota rakha — matlab legend row mein)
+      aoa.push(["Net − : mujhe dene hain   |   Net + : mujhe milne hain"]); // r6 legend (merged, wrap)
+      aoa.push([]); // r7
+      aoa.push(["Date", "Note", "Diye", "Liye", "Balance"]); // r8 header
       sorted.forEach(function (t) {
         var a = Number(t.amount) || 0;
         var iGave = t.payer_id === me;
@@ -3086,9 +3182,38 @@
       aoa.push(["", "Total", s.given, s.taken, s.net]);
       var wb = X.utils.book_new();
       var ws = X.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, { s: { r: 6, c: 0 }, e: { r: 6, c: 4 } }];
+      ws["!rows"] = [{ hpt: 24 }, null, null, null, null, null, { hpt: 28 }];
+      ws["!margins"] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+      xCell(ws, "A1", X_TITLE);
+      xCell(ws, "A2", X_META);
+      xCell(ws, "A4", X_LABEL); xCell(ws, "B4", X_VALUE, "#,##0");
+      xCell(ws, "A5", X_LABEL); xCell(ws, "B5", X_VALUE, "#,##0");
+      xCell(ws, "A6", X_LABEL); xCell(ws, "B6", s.net < 0 ? X_VALUE_NEG : X_VALUE, "#,##0");
+      xCell(ws, "A7", X_LEGEND);
+      ["A", "B", "C", "D", "E"].forEach(function (col, i) {
+        xCell(ws, col + "9", xHeadStyle(i >= 2));
+      });
+      sorted.forEach(function (t, i) {
+        var r = 10 + i, zebra = i % 2 === 1, bal = balById[t.id];
+        xCell(ws, "A" + r, xDataStyle(zebra, false, false));
+        xCell(ws, "B" + r, xDataStyle(zebra, false, false, true));
+        xCell(ws, "C" + r, xDataStyle(zebra, true, false), "#,##0");
+        xCell(ws, "D" + r, xDataStyle(zebra, true, false), "#,##0");
+        xCell(ws, "E" + r, xDataStyle(zebra, true, bal < 0), "#,##0");
+        // Lamba note (42 chars se zyada) wrap hota hai — row unchi kar do
+        // taake poora note dikhe, cut na ho.
+        if (String(t.note || "Food").length > 40) ws["!rows"][r - 1] = { hpt: 28 };
+      });
+      var trP = 10 + sorted.length;
+      xCell(ws, "A" + trP, xTotalStyle(false, false));
+      xCell(ws, "B" + trP, xTotalStyle(false, false));
+      xCell(ws, "C" + trP, xTotalStyle(true, false), "#,##0");
+      xCell(ws, "D" + trP, xTotalStyle(true, false), "#,##0");
+      xCell(ws, "E" + trP, xTotalStyle(true, s.net < 0), "#,##0");
       X.utils.book_append_sheet(wb, ws, "Hisaab");
-      var bytes = X.write(wb, { bookType: "xlsx", type: "array" });
+      var bytes = X.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
       downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Easy-Khata-" + safeFileName(p.name || p.email) + "-Report.xlsx");
       setDetailPdfMsg("Excel Report download ho gaya (" + sorted.length + " records).", true);
     } catch (e) {
@@ -3102,33 +3227,88 @@
       var d = fullReportData();
       var list = d.list, given = d.given, taken = d.taken, net = d.net, people = d.people;
       var aoa = [];
-      aoa.push(["Easy Khata — Hisaab Report"]);
-      aoa.push(["Naam: " + myName() + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + list.length]);
-      aoa.push([]);
-      aoa.push(["Kull diye", given]);
-      aoa.push(["Kull liye", taken]);
-      aoa.push([netLabel(net, "doston se milne hain", "doston ko dene hain"), net]);
-      aoa.push([]);
+      aoa.push(["Easy Khata — Hisaab Report"]); // r0 title
+      aoa.push(["Naam: " + myName() + "  ·  Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + list.length]); // r1 meta
+      aoa.push([]); // r2
+      aoa.push(["Kull diye", given]); // r3
+      aoa.push(["Kull liye", taken]); // r4
+      aoa.push(["Net", net]); // r5 (label chhota — matlab legend row mein)
+      aoa.push(["Net − : doston ko dene hain   |   Net + : doston se milne hain"]); // r6 legend (merged, wrap)
+      aoa.push([]); // r7
+      var secPeople = aoa.length;
       aoa.push(["Doston ka hisaab"]);
+      var pHead = aoa.length;
       aoa.push(["Dost", "Diye", "Liye", "Balance"]);
+      var pFirst = aoa.length;
       people.forEach(function (p) {
         aoa.push([p.name || "Unknown", p.given, p.taken, p.given - p.taken]);
       });
+      var pTotal = aoa.length;
       aoa.push(["Total", given, taken, net]);
       aoa.push([]);
+      var secHist = aoa.length;
       aoa.push(["Record history (" + list.length + " records)"]);
+      var hHead = aoa.length;
       aoa.push(["Date", "Dene wala", "Lene wala", "Amount", "Note"]);
+      var hFirst = aoa.length;
       var histTotal = 0;
       list.forEach(function (t) {
         histTotal += Number(t.amount) || 0;
         aoa.push([fmtDate(t.txn_date), profileName(t.payer_id), profileName(t.receiver_id), Number(t.amount) || 0, t.note || "Food"]);
       });
+      var hTotal = aoa.length;
       aoa.push(["Total", "", "", histTotal, ""]);
       var wb = X.utils.book_new();
       var ws = X.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 40 }];
+      ws["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 15 }, { wch: 40 }];
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+        { s: { r: 6, c: 0 }, e: { r: 6, c: 4 } },
+        { s: { r: secPeople, c: 0 }, e: { r: secPeople, c: 4 } },
+        { s: { r: secHist, c: 0 }, e: { r: secHist, c: 4 } }
+      ];
+      ws["!rows"] = [{ hpt: 24 }, null, null, null, null, null, { hpt: 28 }];
+      ws["!margins"] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+      xCell(ws, "A1", X_TITLE);
+      xCell(ws, "A2", X_META);
+      xCell(ws, "A4", X_LABEL); xCell(ws, "B4", X_VALUE, "#,##0");
+      xCell(ws, "A5", X_LABEL); xCell(ws, "B5", X_VALUE, "#,##0");
+      xCell(ws, "A6", X_LABEL); xCell(ws, "B6", net < 0 ? X_VALUE_NEG : X_VALUE, "#,##0");
+      xCell(ws, "A7", X_LEGEND);
+      xCell(ws, "A" + (secPeople + 1), X_SECTION);
+      ["A", "B", "C", "D"].forEach(function (col, i) {
+        xCell(ws, col + (pHead + 1), xHeadStyle(i >= 1));
+      });
+      people.forEach(function (p, i) {
+        var r = pFirst + 1 + i, zebra = i % 2 === 1, bal = p.given - p.taken;
+        xCell(ws, "A" + r, xDataStyle(zebra, false, false, true));
+        xCell(ws, "B" + r, xDataStyle(zebra, true, false), "#,##0");
+        xCell(ws, "C" + r, xDataStyle(zebra, true, false), "#,##0");
+        xCell(ws, "D" + r, xDataStyle(zebra, true, bal < 0), "#,##0");
+        if (String(p.name || "Unknown").length > 22) ws["!rows"][r - 1] = { hpt: 28 };
+      });
+      xCell(ws, "A" + (pTotal + 1), xTotalStyle(false, false));
+      xCell(ws, "B" + (pTotal + 1), xTotalStyle(true, false), "#,##0");
+      xCell(ws, "C" + (pTotal + 1), xTotalStyle(true, false), "#,##0");
+      xCell(ws, "D" + (pTotal + 1), xTotalStyle(true, net < 0), "#,##0");
+      xCell(ws, "A" + (secHist + 1), X_SECTION);
+      ["A", "B", "C", "D", "E"].forEach(function (col, i) {
+        xCell(ws, col + (hHead + 1), xHeadStyle(i === 3));
+      });
+      list.forEach(function (t, i) {
+        var r = hFirst + 1 + i, zebra = i % 2 === 1;
+        xCell(ws, "A" + r, xDataStyle(zebra, false, false));
+        xCell(ws, "B" + r, xDataStyle(zebra, false, false, true));
+        xCell(ws, "C" + r, xDataStyle(zebra, false, false, true));
+        xCell(ws, "D" + r, xDataStyle(zebra, true, false), "#,##0");
+        xCell(ws, "E" + r, xDataStyle(zebra, false, false, true));
+        if (String(profileName(t.payer_id)).length > 22 || String(profileName(t.receiver_id)).length > 22 || String(t.note || "Food").length > 38) ws["!rows"][r - 1] = { hpt: 28 };
+      });
+      xCell(ws, "A" + (hTotal + 1), xTotalStyle(false, false));
+      xCell(ws, "D" + (hTotal + 1), xTotalStyle(true, false), "#,##0");
       X.utils.book_append_sheet(wb, ws, "Full Report");
-      var bytes = X.write(wb, { bookType: "xlsx", type: "array" });
+      var bytes = X.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
       downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Easy-Khata-Full-Report.xlsx");
       setAcctBackupMsg("Excel Report download ho gaya (" + list.length + " records).", true);
     } catch (e) {

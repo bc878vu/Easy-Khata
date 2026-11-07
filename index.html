@@ -519,9 +519,14 @@
 <!-- jsPDF (v24.5): PDF Report ke liye. Agar CDN fail ho to app phir bhi
      chalti hai — exportPdf() saaf error dikhata hai, crash nahi hota. -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<!-- SheetJS (v24.9): Excel (.xlsx) Report ke liye. jsPDF ki tarah — load na
-     ho to export functions saaf error dikhate hain, crash nahi hota. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- xlsx-js-style (v24.10): Excel (.xlsx) Report ke liye. SheetJS 0.18.5 ka
+     drop-in fork (wahi API + window.XLSX global) — farq sirf itna hai ke ye
+     cell styles (bold/fill/border/numFmt) ASAL .xlsx mein LIKHTA hai;
+     SheetJS Community Edition styles drop kar deta tha (probe se verify).
+     jsPDF ki tarah — load na ho to export functions saaf error dikhate
+     hain, crash nahi hota. Freeze panes / gridlines-hide / fit-to-page is
+     writer mein supported NAHI hain — fake nahi kiye. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
@@ -533,6 +538,6 @@
     </div>
   </div>
 
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
