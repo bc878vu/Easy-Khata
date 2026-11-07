@@ -752,7 +752,21 @@
       showApp();
       loadAll();
       maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
-    }).catch(function () {
+    }).catch(function (e) {
+      // v24.8: network fail (offline) session EXPIRE nahi hota — sirf
+      // "expired" (401 / refresh fail) par session wipe + guest. Offline
+      // ho aur cache ho to apna hisaab cache se dikhao (loadAll khud cache
+      // fallback karta hai); cache na ho to hi guest fallback.
+      if (e && e.message === "expired") {
+        saveSession(null);
+        enterGuestMode();
+        return;
+      }
+      if (session && session.access_token && loadCache()) {
+        showApp();
+        loadAll();
+        return;
+      }
       saveSession(null);
       // v24.1: session expire/invalid bhi guest dashboard par le jata hai
       // (login screen nahi) — dobara login navbar ke Login icon se hota hai.
@@ -837,6 +851,15 @@
           done++; // record pehle hi server par hai (lost response ke baad retry) — duplicate nahi
           dropOp(op.key);
           return next(i + 1);
+        }
+        // v24.8: 5xx jo "Settled" lock NAHI — aarzi server kharabi hai, data
+        // loss nahi: op queued rakho, flush roko, baad mein retry hoga.
+        // Sirf permanent rejects drop hote hain (Settled lock, 4xx bad data).
+        if (res.status >= 500 && errMsg.indexOf("Settled") === -1) {
+          syncing = false;
+          renderOffline();
+          setTxnMsg("Sync ruk gaya — internet aate hi dobara hoga.", false);
+          return Promise.resolve(false);
         }
         skipped++;
         if (errMsg.indexOf("Settled") !== -1) skippedSettled++;
@@ -977,6 +1000,7 @@
         return;
       }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
+      renderAll(); // v24.8: cache na ho to bhi khaali state saaf render ho (blank screen nahi)
     });
   }
 
@@ -1751,6 +1775,8 @@
     adminUsers.forEach(function (x) { if (x.id === id) p = x; });
     if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
+    // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
+    if (!navigator.onLine) { setAdminMsg("Admin kaam ke liye internet chahiye.", false); return; }
     if (!window.confirm("'" + (p.name || p.email) + "' — delete karein?\n\nUn ka account, profile aur saare records delete ho jayenge. Ye wapas nahi hoga.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
@@ -1872,6 +1898,7 @@
   }
   function saveAdminEdit() {
     if (!isAdmin() || !adminCurrentUser) return;
+    if (!navigator.onLine) { setAdminEditMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var name = $("adminEditName").value.trim();
     var phone = $("adminEditPhone").value.trim();
     if (!name) { setAdminEditMsg("Naam khaali nahi ho sakta.", false); return; }
@@ -1891,6 +1918,7 @@
   }
   function saveAdminPass() {
     if (!isAdmin() || !adminCurrentUser) return;
+    if (!navigator.onLine) { setAdminPassMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var p1 = $("adminNewPass1").value;
     var p2 = $("adminNewPass2").value;
     if (!p1 || p1.length < 6) { setAdminPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
@@ -1911,6 +1939,7 @@
     var u = adminCurrentUser;
     if (u.id === myId()) { setAdminUserMsg("Khud ko block nahi kar sakte.", false); return; }
     var blocking = !u.blocked;
+    if (!navigator.onLine) { setAdminUserMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     if (!window.confirm(blocking
       ? ("'" + (u.name || u.email) + "' — BLOCK karein?\n\nWo dobara login nahi kar sakega (un ka data mehfooz rahega).")
       : ("'" + (u.name || u.email) + "' — UNBLOCK karein?"))) return;
@@ -1933,6 +1962,7 @@
   }
   function saveAdminSet() {
     if (!isAdmin() || !adminCurrentUser) return;
+    if (!navigator.onLine) { setAdminSetMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var amount = parseFloat($("adminSetAmount").value);
     if (!amount || amount <= 0) { setAdminSetMsg("Sahi raqam likhein.", false); return; }
     var dir = (document.querySelector('input[name="adminSetDir"]:checked') || {}).value || "take";
@@ -2108,6 +2138,10 @@
     if (name.length > 80) { setPhoneMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
     if (username && !/^[A-Za-z0-9_.]{3,30}$/.test(username)) { setPhoneMsg("Username 3–30 harf ka ho — sirf harf, number, _ aur . chalenge.", false); return; }
     if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
+    // v24.8: offline — profile save + avatar upload server ka kaam hai;
+    // seedha saaf refusal, fetch timeout ka wait nahi. (Guest naam alag
+    // local flow hai — saveProfile sirf logged-in mode mein chalta hai.)
+    if (isOffline()) { setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false); return; }
     var btn = $("savePhoneBtn");
     btn.disabled = true;
     setPhoneMsg("Profile save ho rahi hai…", true);
@@ -3486,8 +3520,9 @@
     if (!navigator.onLine || offlineMode) {
       // offlineMode = load fail hua aur cache se dikhaya ja raha hai
       // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
+      // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
       b.hidden = false;
-      b.textContent = "Offline";
+      b.textContent = pending > 0 ? "Offline • Sync pending (" + pending + ")" : "Offline";
     } else if (pending > 0) {
       b.hidden = false;
       b.textContent = "Sync pending (" + pending + ")";

@@ -3,16 +3,27 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v24-7";
+var CACHE = "easy-khata-v24-8";
 var SHELL = [
   "./",
   "index.html",
   "styles.css?v=31",
   "config.js?v=4",
-  "app.js?v=35",
+  "app.js?v=36",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg"
+];
+// v24.8: boot + PDF ke liye zaroori CDN libs (index.html mein pinned versions).
+// Ye cross-origin hain — pehle SW inhein bilkul intercept nahi karta tha,
+// is liye offline khulte hi jsPDF/Firebase/Supabase libs gayab hoti thiin.
+// Sirf YE exact URLs runtime-cache hoti hain (cache-first + background
+// refresh); koi aur cross-origin request intercept nahi hoti.
+var CDN_LIBS = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
+  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"
 ];
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
 
@@ -83,6 +94,19 @@ self.addEventListener("fetch", function (e) {
       }).catch(function () { return caches.match(req); }));
     }
     return; // other API calls (auth etc.): network-only
+  }
+
+  if (CDN_LIBS.indexOf(req.url) !== -1) {
+    // v24.8: boot/PDF libs — cache-first, background refresh. Pehli online
+    // load par cache ho jayein, phir offline bhi boot + PDF chalein.
+    e.respondWith(caches.match(req).then(function (cached) {
+      var net = fetch(req).then(function (res) {
+        if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
+        return res;
+      }).catch(function () { return cached; });
+      return cached || net;
+    }));
+    return;
   }
 
   if (url.origin !== self.location.origin) return;
