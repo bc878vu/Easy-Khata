@@ -281,9 +281,7 @@
     } catch (e) {}
   }
   setUserScopedStorage(session && session.user ? session.user.id : "");
-  // Never discard old financial operations automatically. The queue is bounded
-  // only by browser storage; if storage is full we surface an explicit error.
-  var OUTBOX_MAX = 5000;
+
   /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
      Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
      Server ko kabhi kuch nahi bheja jata: na Supabase (na profiles, na
@@ -376,10 +374,8 @@
   }
   function queueOp(op) {
     var ops = loadOutbox();
-    if (ops.length >= OUTBOX_MAX) {
-      setTxnMsg("Offline queue bohat bari ho gayi hai. Internet connect karke sync karein; koi purana record delete nahi kiya.", false);
-      return false;
-    }
+    // Do not silently cap/drop old ledger operations. Browser storage quota
+    // errors are surfaced by saveOutbox and existing queue contents stay intact.
     ops.push(op);
     return saveOutbox(ops);
   }
@@ -2989,10 +2985,14 @@
     // "session khatam" na dikhe.
   }
   function isNetErr(e) {
-    // Real browsers: TypeError "Failed to fetch" / "NetworkError..." /
-    // "Load failed" / "Network request failed". ("network offline" bhi —
-    // test harness ka rejection message.)
-    return !!e && (e.name === "TypeError" || /failed to fetch|networkerror|network request failed|load failed|network offline/i.test(String(e.message || "")));
+    return !!e && (e.name === "TypeError" || e.message === "request-timeout" || /failed to fetch|networkerror|network request failed|load failed|network offline/i.test(String(e.message || "")));
+  }
+  function isTransientResponse(res) {
+    return !!res && (res.status === 408 || res.status === 429 || res.status >= 500);
+  }
+  function markConnectionIssue() {
+    offlineMode = true;
+    renderOffline();
   }
   // v24.11: network throw par aik dafa retry (upload + PATCH dono idempotent
   // hain — upload path pehle se fixed hai, PATCH/upsert dobara safe hai).
