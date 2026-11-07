@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=32">
+<link rel="stylesheet" href="styles.css?v=33">
 </head>
 <body>
 
@@ -423,82 +423,68 @@
     </section>
 
     <section id="adminView" hidden>
-      <div class="card">
-        <button id="adminBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
-        <h2 style="margin-top:10px">Admin Panel — Users</h2>
-        <p class="muted">Sirf admin (Asad) ye dekh sakta hai. Kisi user par click karein — un ka poora balance, edit, password, block aur delete sab yahan hai.</p>
-        <p id="adminStats" class="muted"></p>
-        <p id="adminMsg" class="msg" role="status"></p>
-        <button id="adminAddUserBtn" class="btn btn-primary" type="button">+ User add karein</button>
-        <div id="adminAddUserBox" hidden>
-          <div class="field"><label for="adminAddName">Naam</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan"></div>
-          <div class="field"><label for="adminAddEmail">Email</label><input id="adminAddEmail" type="email" placeholder="Example: ali@gmail.com"></div>
-          <div class="field"><label for="adminAddPhone">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="Example: 0300 1234567"></div>
-          <div class="field"><label for="adminAddPass">Password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf"></div>
-          <button id="adminAddSaveBtn" class="btn btn-primary" type="button">User banayein</button>
-          <p id="adminAddMsg" class="msg" role="status"></p>
+      <div class="admin-shell">
+        <div class="admin-hero">
+          <div>
+            <p class="admin-eyebrow">EASY KHATA · CONTROL CENTER</p>
+            <h1>Admin Dashboard</h1>
+            <p>Users, ledger activity aur platform health — sab aik jagah.</p>
+          </div>
+          <div class="admin-hero-actions">
+            <button id="adminRefreshBtn" class="btn btn-soft" type="button">↻ Refresh data</button>
+            <button id="adminExportUsersBtn" class="btn btn-primary" type="button">↓ Export users</button>
+          </div>
         </div>
-        <div id="adminUserList" class="people"></div>
+        <p id="adminMsg" class="msg" role="status"></p>
+        <div class="admin-kpis" id="adminKpis" aria-live="polite"></div>
+        <div class="admin-grid">
+          <article class="admin-panel admin-chart-panel">
+            <div class="admin-panel-head"><div><h2>Transaction activity</h2><p>Last 14 days · loaded ledger records</p></div><span class="admin-live-tag">LIVE DATA</span></div>
+            <div id="adminDailyChart" class="admin-chart" role="img" aria-label="Daily transaction activity chart"></div>
+          </article>
+          <article class="admin-panel admin-chart-panel">
+            <div class="admin-panel-head"><div><h2>Monthly volume</h2><p>Last 6 months · total recorded amount</p></div></div>
+            <div id="adminMonthlyChart" class="admin-chart" role="img" aria-label="Monthly transaction volume chart"></div>
+          </article>
+        </div>
+        <div class="admin-grid admin-lower-grid">
+          <article class="admin-panel">
+            <div class="admin-panel-head"><div><h2>Recent ledger activity</h2><p>Latest transactions available in this session</p></div></div>
+            <div id="adminRecentActivity" class="admin-recent-list"></div>
+          </article>
+          <article class="admin-panel">
+            <div class="admin-panel-head"><div><h2>Most active users</h2><p>Ranked by user record count</p></div></div>
+            <div id="adminTopUsers" class="admin-top-users"></div>
+          </article>
+        </div>
+        <article class="admin-panel admin-users-panel">
+          <div class="admin-panel-head admin-users-heading">
+            <div><h2>User management</h2><p id="adminStats">Users aur account controls</p></div>
+            <button id="adminAddUserBtn" class="btn btn-primary" type="button">＋ Add user</button>
+          </div>
+          <div class="admin-toolbar">
+            <div class="admin-search"><span>⌕</span><input id="adminUserSearch" type="search" placeholder="Search name, email or phone…" aria-label="Search users"></div>
+            <select id="adminUserStatus" aria-label="Filter users"><option value="all">All users</option><option value="active">Active only</option><option value="blocked">Blocked only</option></select>
+            <select id="adminUserSort" aria-label="Sort users"><option value="recent">Newest joined</option><option value="records">Most records</option><option value="name">Name A–Z</option></select>
+          </div>
+          <div id="adminUserCount" class="admin-result-count"></div>
+          <div id="adminAddUserBox" class="admin-add-box" hidden>
+            <div class="admin-add-grid">
+              <div class="field"><label for="adminAddName">Full name</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan"></div>
+              <div class="field"><label for="adminAddEmail">Email address</label><input id="adminAddEmail" type="email" placeholder="ali@example.com"></div>
+              <div class="field"><label for="adminAddPhone">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="0300 1234567"></div>
+              <div class="field"><label for="adminAddPass">Temporary password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+            </div>
+            <button id="adminAddSaveBtn" class="btn btn-primary" type="button">Create account</button>
+            <p id="adminAddMsg" class="msg" role="status"></p>
+          </div>
+          <div id="adminUserList" class="admin-user-grid"></div>
+        </article>
+        <p class="admin-footnote">Analytics transaction list ke currently loaded latest 500 records par based hain. User counts aur account status server-side admin list se aate hain.</p>
       </div>
     </section>
 
-    <section id="adminUserView" hidden>
-      <div class="card">
-        <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
-        <h2 id="adminUserTitle" style="margin-top:10px"></h2>
-        <p id="adminUserBadges"></p>
-        <dl class="kv">
-          <dt>Email</dt><dd id="adminUserEmail"></dd>
-          <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
-          <dt>Joined</dt><dd id="adminUserJoined"></dd>
-          <dt>User ID</dt><dd id="adminUserId"></dd>
-        </dl>
-        <div id="adminUserSummary" class="summary"></div>
-        <div class="detail-actions">
-          <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
-          <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
-          <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
-          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
-        </div>
-        <div id="adminEditBox" hidden>
-          <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
-          <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
-          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
-          <p id="adminEditMsg" class="msg" role="status"></p>
-        </div>
-        <div id="adminPassBox" hidden>
-          <div class="field"><label for="adminNewPass1">Naya password</label>
-            <div class="pw-wrap">
-              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
-              <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-            </div>
-          </div>
-          <div class="field"><label for="adminNewPass2">Naya password dobara</label>
-            <div class="pw-wrap">
-              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
-              <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
-            </div>
-          </div>
-          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
-          <p id="adminPassMsg" class="msg" role="status"></p>
-        </div>
-        <h3 style="margin-top:16px">Raqam set karein (admin)</h3>
-        <p class="muted">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
-        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
-        <div class="field"><label>Kisam</label>
-          <div class="seg">
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
-          </div>
-        </div>
-        <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
-        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Raqam set karein</button>
-        <p id="adminSetMsg" class="msg" role="status"></p>
-        <h3 style="margin-top:16px">Is user ka hisaab</h3>
-        <div id="adminUserTxns" class="txns"></div>
-        <p id="adminUserMsg" class="msg" role="status"></p>
-      </div>
-    </section>
+ion>
 
   </main>
 
@@ -540,6 +526,6 @@
     </div>
   </div>
 
-<script src="app.js?v=40"></script>
+<script src="app.js?v=41"></script>
 </body>
 </html>

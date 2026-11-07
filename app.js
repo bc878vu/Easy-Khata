@@ -145,6 +145,9 @@
   function visibleTxns() { return txns.filter(function (t) { return !hiddenTxnIds[t.id]; }); }
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
   var adminCurrentUser = null;
+  var adminUserSearchText = "";
+  var adminUserStatusFilter = "all";
+  var adminUserSortMode = "recent";
   var dbReady = false;
   var authMode = "login";
   var editingId = null;
@@ -1045,6 +1048,7 @@
       offlineMode = false;
       return loadHiddenIds().then(function () {
         renderAll();
+        if (currentView === "admin") renderAdminDashboard();
         loadNotifs();
         loadContacts();
         saveCache();
@@ -1862,34 +1866,100 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
+  function adminDateKey(value) { return String(value || "").slice(0, 10); }
+  function adminChartBars(items, formatter, showValues) {
+    if (!items.length) return '<p class="empty">Abhi chart ke liye data nahi.</p>';
+    var max = Math.max.apply(Math, items.map(function (x) { return Number(x.value) || 0; }).concat([1]));
+    return '<div class="admin-bars">' + items.map(function (x) {
+      var value = Number(x.value) || 0;
+      var height = Math.max(4, Math.round(value / max * 100));
+      return '<div class="admin-bar-col"><div class="admin-bar-value">' + (showValues ? esc(formatter(value)) : '') + '</div><div class="admin-bar-track"><span style="height:' + height + '%"></span></div><div class="admin-bar-label">' + esc(x.label) + '</div></div>';
+    }).join('') + '</div>';
+  }
+  function renderAdminDashboard() {
+    var users = adminUsers || [], rows = txns || [];
+    var blocked = users.filter(function (u) { return !!u.blocked; }).length;
+    var active = users.length - blocked;
+    var totalAmount = rows.reduce(function (sum, t) { return sum + (Number(t.amount) || 0); }, 0);
+    var today = todayLocal();
+    var todayCount = rows.filter(function (t) { return adminDateKey(t.txn_date) === today; }).length;
+    var kpis = [
+      {label:"Total users",value:users.length,meta:active+" active · "+blocked+" blocked",icon:"♙",tone:"blue"},
+      {label:"Ledger records",value:rows.length,meta:"Latest records loaded",icon:"▤",tone:"violet"},
+      {label:"Recorded volume",value:fmtRs(totalAmount),meta:"Across loaded records",icon:"↗",tone:"green"},
+      {label:"Today’s activity",value:todayCount,meta:"Transactions dated today",icon:"◷",tone:"amber"}
+    ];
+    $("adminKpis").innerHTML = kpis.map(function (k) {
+      return '<article class="admin-kpi"><div class="admin-kpi-top"><span>'+esc(k.label)+'</span><i class="admin-kpi-icon '+k.tone+'">'+k.icon+'</i></div><strong>'+esc(k.value)+'</strong><small>'+esc(k.meta)+'</small></article>';
+    }).join('');
+    var dayItems=[];
+    for(var d=13;d>=0;d--){
+      var date=new Date(); date.setDate(date.getDate()-d);
+      var key=date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate());
+      var count=rows.filter(function(t){return adminDateKey(t.txn_date)===key;}).length;
+      dayItems.push({label:pad(date.getDate())+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][date.getMonth()],value:count});
+    }
+    $("adminDailyChart").innerHTML=adminChartBars(dayItems,function(v){return String(v);},true);
+    var monthItems=[];
+    for(var m=5;m>=0;m--){
+      var md=new Date(); md.setDate(1); md.setMonth(md.getMonth()-m);
+      var mk=md.getFullYear()+"-"+pad(md.getMonth()+1);
+      var amount=rows.filter(function(t){return adminDateKey(t.txn_date).slice(0,7)===mk;}).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+      monthItems.push({label:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][md.getMonth()],value:amount});
+    }
+    $("adminMonthlyChart").innerHTML=adminChartBars(monthItems,function(v){return v>=100000?(v/1000).toFixed(0)+"k":v.toLocaleString("en-US");},true);
+    var recent=rows.slice().sort(function(x,y){return String(y.created_at||y.txn_date).localeCompare(String(x.created_at||x.txn_date));}).slice(0,7);
+    $("adminRecentActivity").innerHTML=recent.length?recent.map(function(t){
+      var p=profileName(t.payer_id),r=profileName(t.receiver_id);
+      return '<div class="admin-recent-row"><span class="admin-activity-icon">↔</span><div class="admin-recent-main"><strong>'+esc(p)+' → '+esc(r)+'</strong><small>'+esc(t.note||"Ledger entry")+' · '+esc(fmtDate(t.txn_date))+'</small></div><b>'+esc(fmtRs(t.amount))+'</b></div>';
+    }).join(''):'<p class="empty">No recent transactions.</p>';
+    var top=users.slice().sort(function(x,y){return (Number(y.records)||0)-(Number(x.records)||0);}).slice(0,6);
+    $("adminTopUsers").innerHTML=top.length?top.map(function(u,i){
+      var count=Number(u.records)||0, max=Math.max(1,Number(top[0].records)||0);
+      return '<div class="admin-top-row"><span class="admin-rank">'+(i+1)+'</span><div class="admin-top-main"><strong>'+esc(u.name||u.email||"Unknown")+'</strong><div class="admin-mini-track"><span style="width:'+Math.round(count/max*100)+'%"></span></div></div><b>'+count+'</b></div>';
+    }).join(''):'<p class="empty">No users found.</p>';
+    var recordTotal=users.reduce(function(s,u){return s+(Number(u.records)||0);},0);
+    $("adminStats").textContent=users.length+" accounts · "+recordTotal+" user-linked records (may count a shared record for both participants)";
+    renderAdminUserList();
+  }
+  function renderAdminUserList() {
+    var list=(adminUsers||[]).slice(), query=String(adminUserSearchText||"").toLowerCase();
+    if(adminUserStatusFilter==="active") list=list.filter(function(u){return !u.blocked;});
+    if(adminUserStatusFilter==="blocked") list=list.filter(function(u){return !!u.blocked;});
+    if(query) list=list.filter(function(u){return [u.name,u.email,u.phone,u.id].join(" ").toLowerCase().indexOf(query)!==-1;});
+    list.sort(function(x,y){
+      if(adminUserSortMode==="records") return (Number(y.records)||0)-(Number(x.records)||0);
+      if(adminUserSortMode==="name") return String(x.name||x.email||"").localeCompare(String(y.name||y.email||""));
+      return String(y.created_at||"").localeCompare(String(x.created_at||""));
+    });
+    $("adminUserCount").textContent="Showing "+list.length+" of "+(adminUsers||[]).length+" users";
+    if(!list.length){$("adminUserList").innerHTML='<p class="empty">Is filter ke mutabiq koi user nahi mila.</p>';return;}
+    var me=myId();
+    $("adminUserList").innerHTML=list.map(function(u){
+      var isMe=u.id===me;
+      return '<article class="admin-user-card"><button class="admin-user-open" type="button" data-admin-open="'+esc(u.id)+'"><span class="admin-user-avatar">'+esc(initials(u.name||u.email))+'</span><span class="admin-user-copy"><strong>'+esc(u.name||u.email||"Unknown")+'</strong><small>'+esc(u.email||"No email")+'</small><small>'+esc(u.phone||"Phone not added")+'</small></span><span class="admin-user-status '+(u.blocked?'blocked':'active')+'">'+(u.blocked?'Blocked':'Active')+'</span></button><div class="admin-user-meta"><span>'+esc(Number(u.records)||0)+' records</span><span>Joined '+esc(fmtDate(u.created_at)||"—")+'</span><span>'+(isMe?'Administrator':'Member')+'</span></div><div class="admin-user-actions"><button class="btn btn-soft btn-mini" type="button" data-admin-open="'+esc(u.id)+'">Manage account →</button>'+(isMe?'':'<button class="btn btn-danger btn-mini" type="button" data-admin-del="'+esc(u.id)+'">Delete</button>')+'</div></article>';
+    }).join('');
+  }
+  function exportAdminUsers() {
+    if(!isAdmin()) return;
+    var rows=[["Name","Email","Phone","Status","Records","Joined"]];
+    (adminUsers||[]).forEach(function(u){rows.push([u.name||"",u.email||"",u.phone||"",u.blocked?"Blocked":"Active",Number(u.records)||0,u.created_at||""]);});
+    var csv=rows.map(function(row){return row.map(function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+    var url=URL.createObjectURL(blob), link=document.createElement("a");
+    link.href=url;link.download="easy-khata-users-"+todayLocal()+".csv";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  }
   function renderAdmin() {
-    // Admin only: the list comes from a server-side RPC (checked in the DB).
     if (!isAdmin()) { $("navAdminBtn").hidden = true; return; }
     $("navAdminBtn").hidden = false;
+    if(!navigator.onLine){setAdminMsg("Offline mode — admin dashboard ko refresh karne ke liye internet chahiye.",false);renderAdminDashboard();return;}
+    setAdminMsg("Dashboard data load ho raha hai…",true);
     sb("rpc/admin_list_users", { method: "POST", body: {} })
       .then(function (res) {
-        if (!res.ok) { setAdminMsg("Users load nahi hue — dobara try karein.", false); return; }
+        if (!res.ok) { setAdminMsg("Users load nahi hue ("+res.status+") — dobara try karein.", false); return; }
         adminUsers = Array.isArray(res.body) ? res.body : [];
-        var total = 0;
-        adminUsers.forEach(function (u) { total += Number(u.records) || 0; });
-        $("adminStats").textContent = "Kull users: " + adminUsers.length + " · Kull records: " + total;
-        if (!adminUsers.length) {
-          $("adminUserList").innerHTML = '<p class="empty">Abhi koi user nahi.</p>';
-          return;
-        }
-        var me = myId();
-        var html = "";
-        adminUsers.forEach(function (u) {
-          var badge = u.id === me
-            ? '<span class="badge-admin">Admin (you)</span>'
-            : (u.blocked ? ' <span class="badge-blocked">Blocked</span>' : '');
-          var del = u.id === me ? "" : '<button class="btn-danger" type="button" data-admin-del="' + esc(u.id) + '">Delete user</button>';
-          html += '<div class="person admin-user" data-admin-open="' + esc(u.id) + '"><div><div class="p-name">' + esc(u.name || u.email) + badge + '</div>' +
-            '<div class="p-detail">' + esc(u.email || "") + (u.phone ? ' · ' + esc(u.phone) : '') + '</div>' +
-            '<div class="p-detail">' + (Number(u.records) || 0) + ' record · Shamil ' + esc(fmtDate(u.created_at)) + '</div></div>' +
-            '<div class="p-actions">' + del + '</div></div>';
-        });
-        $("adminUserList").innerHTML = html;
+        renderAdminDashboard();
+        setAdminMsg("Dashboard updated · "+new Date().toLocaleTimeString(), true);
       }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
   }
   function deleteUser(id) {
@@ -4052,6 +4122,11 @@
     var del = e.target.closest ? e.target.closest("[data-admin-txn-del]") : null;
     if (del) adminDeleteTxn(del.getAttribute("data-admin-txn-del"));
   });
+  $("adminUserSearch").addEventListener("input",function(e){adminUserSearchText=e.target.value||"";renderAdminUserList();});
+  $("adminUserStatus").addEventListener("change",function(e){adminUserStatusFilter=e.target.value||"all";renderAdminUserList();});
+  $("adminUserSort").addEventListener("change",function(e){adminUserSortMode=e.target.value||"recent";renderAdminUserList();});
+  $("adminRefreshBtn").addEventListener("click",function(){loadAll();renderAdmin();});
+  $("adminExportUsersBtn").addEventListener("click",exportAdminUsers);
   $("adminUserList").addEventListener("click", function (e) {
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
     if (d) { deleteUser(d.getAttribute("data-admin-del")); return; }
