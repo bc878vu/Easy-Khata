@@ -89,6 +89,7 @@ export default async function handler(req, res) {
   const q = new URLSearchParams({
     select: "id",
     created_at: "gte." + since,
+    created_by: "eq." + sender.id,
     or: "(and(payer_id.eq." + sender.id + ",receiver_id.eq." + recipientId + "),and(payer_id.eq." + recipientId + ",receiver_id.eq." + sender.id + "))",
     limit: "1"
   });
