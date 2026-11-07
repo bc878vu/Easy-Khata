@@ -1264,3 +1264,11 @@ input,select,textarea,button{max-width:100%}
  .community-card{padding:10px;gap:4px 8px}
 }
 @media(min-width:700px){.community-modal{padding:24px}}
+
+.community-invite-box{padding:13px;margin:10px 0 16px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.community-invite-box h3{margin:0 0 9px;font-size:13px}
+.community-invite-row{display:grid;grid-template-columns:minmax(0,1fr) 115px auto;gap:7px}
+.community-invite-row input,.community-invite-row select,.member-role-select{min-width:0;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);padding:9px;font:inherit;font-size:12px}
+.community-invite-row .btn{font-size:11px;padding:8px}
+.member-role-select{flex:1}
+@media(max-width:520px){.community-invite-row{grid-template-columns:minmax(0,1fr) 105px}.community-invite-row .btn{grid-column:1/-1;width:100%}}
