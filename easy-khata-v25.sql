@@ -11,6 +11,14 @@ create table if not exists public.khata_txn_hidden (
   primary key (txn_id, user_id)
 );
 alter table public.khata_txn_hidden enable row level security;
+do $
+begin
+  if not exists (select 1 from pg_constraint where conrelid='public.khata_txn_hidden'::regclass and conname='khata_txn_hidden_user_id_fkey') then
+    alter table public.khata_txn_hidden add constraint khata_txn_hidden_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade not valid;
+  end if;
+end $;
+alter table public.khata_txn_hidden validate constraint khata_txn_hidden_user_id_fkey;
 create index if not exists khata_txn_hidden_user_idx on public.khata_txn_hidden(user_id);
 
 drop policy if exists khata_txn_hidden_select_own on public.khata_txn_hidden;
