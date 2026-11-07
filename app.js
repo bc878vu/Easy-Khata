@@ -3852,7 +3852,7 @@
       var amt = (idx === ids.length - 1) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
       txns.unshift({
         id: newUuid(), payer_id: me, receiver_id: id, amount: amt,
-        note: (note || "Food") + " (split equally)", txn_date: date,
+        note: note, txn_date: date,
         created_by: me, created_at: new Date().toISOString()
       });
     });
@@ -3884,7 +3884,7 @@
       var recBody = {
         id: newUuid(),
         payer_id: me, receiver_id: id, amount: amt,
-        note: (note || "Food") + " (split equally)", txn_date: date, created_by: me
+        note: note, txn_date: date, created_by: me
       };
       if (isOffline()) {
         // Offline: record local save karein, sync baad mein hoga.
@@ -3931,7 +3931,7 @@
       payer_id: dir === "given" ? me : person,
       receiver_id: dir === "given" ? person : me,
       amount: amount,
-      note: note || "Food",
+      note: note,
       txn_date: date,
       created_by: me
     };
