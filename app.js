@@ -163,6 +163,9 @@
   var hiddenTxnIds = {}; // {txnId: true}
   function isTxnHidden(id) { return !!hiddenTxnIds[id]; }
   function visibleTxns() { return txns.filter(function (t) { return !hiddenTxnIds[t.id]; }); }
+  // Balance ledger is independent from history visibility: hiding a row only
+  // removes it from the history UI, never from balances or friend totals.
+  function balanceTxns() { return txns; }
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
   var adminCurrentUser = null;
   var adminUserSearchText = "";
@@ -216,7 +219,7 @@
     try {
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
-        contacts: myContacts, txns: txns, savedAt: Date.now()
+        contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now()
       }));
     } catch (e) {}
   }
@@ -233,6 +236,8 @@
     profiles = [{ id: guestMeId, name: guestMeName, email: "", phone: "" }];
     myContacts = (g && g.contacts ? g.contacts : []).map(function (c) { c.manual = true; return c; });
     txns = (g && g.txns) || [];
+    hiddenTxnIds = {};
+    (g && Array.isArray(g.hidden) ? g.hidden : []).forEach(function (id) { hiddenTxnIds[id] = true; });
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -361,7 +366,7 @@
       if (!p.first || d < p.first) p.first = d;
       if (!p.last || d > p.last) p.last = d;
     }
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       var d = String(t.txn_date || "");
       if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].given += a; bump(map[t.receiver_id], d); }
@@ -2552,7 +2557,7 @@
 
   function personStats(id) {
     var given = 0, taken = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId() && t.receiver_id === id) given += a;
       if (t.receiver_id === myId() && t.payer_id === id) taken += a;
@@ -2730,7 +2735,7 @@
   }
   function shareAll() {
     var given = 0, taken = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId()) given += a;
       if (t.receiver_id === myId()) taken += a;
@@ -3975,8 +3980,8 @@
     if (t.payer_id !== myId() && t.receiver_id !== myId()) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
     askConfirm("Record hatayein?", "Ye record sirf aapki history se hat jayega — doosre dost ko koi fark nahi parega.", "Hatayein", function () {
     if (guestMode) {
-      // v24: guest record — sirf local delete, koi server call nahi.
-      txns = txns.filter(function (x) { return x.id !== id; });
+      // Guest history hide only: preserve the underlying transaction for balances.
+      hiddenTxnIds[id] = true;
       saveGuestStore();
       renderAll();
       setTxnMsg("Record delete ho gaya.", true);
