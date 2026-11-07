@@ -141,6 +141,10 @@
       "Content-Type": "application/json"
     };
     if (opts.prefer) headers["Prefer"] = opts.prefer;
+    if (opts.range) {
+      headers["Range-Unit"] = "items";
+      headers["Range"] = opts.range;
+    }
     return fetchWithTimeout(API + "/rest/v1/" + path, {
       method: opts.method || "GET",
       headers: headers,
@@ -1083,6 +1087,28 @@
       }).catch(function () { return hiddenTxnIds; });
   }
 
+  // Fetch the full ledger in bounded pages so balances never silently stop
+  // counting after the first 500 records. A 500-row page stays below the
+  // common PostgREST max_rows setting and keeps each response manageable.
+  function loadAllTransactions() {
+    var pageSize = 500, offset = 0, rows = [];
+    function loadPage() {
+      return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc", {
+        range: offset + "-" + (offset + pageSize - 1)
+      }).then(function (res) {
+        if (!res.ok) throw new Error("txns load failed");
+        var page = Array.isArray(res.body) ? res.body : [];
+        rows = rows.concat(page);
+        if (page.length === pageSize) {
+          offset += pageSize;
+          return loadPage();
+        }
+        return rows;
+      });
+    }
+    return loadPage();
+  }
+
   function loadAll() {
     if (guestMode) {
       // v24: guest mode mein Refresh sirf local store dobara parhta hai —
@@ -1112,11 +1138,10 @@
       dbReady = true;
       $("setupBox").hidden = true;
       profiles = res.body || [];
-      return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500");
-    }).then(function (res) {
-      if (!res) return;
-      if (!res.ok) throw new Error("txns load failed");
-      txns = res.body || [];
+      return loadAllTransactions();
+    }).then(function (rows) {
+      if (!rows) return;
+      txns = rows;
       rtLastFetch = Date.now();
       offlineMode = false;
       return loadHiddenIds().then(function () {
@@ -1516,10 +1541,9 @@
     }).catch(function () { return false; });
   }
   function refreshTxns() {
-    return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500")
-      .then(function (res) {
-        if (!res.ok) return;
-        txns = res.body || [];
+    return loadAllTransactions()
+      .then(function (rows) {
+        txns = rows;
         return loadHiddenIds().then(function () { renderAll(); });
       }).catch(function () {});
   }
