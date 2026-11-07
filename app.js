@@ -1897,7 +1897,9 @@
     return '<div class="admin-bars">' + items.map(function (x) {
       var value = Number(x.value) || 0;
       var height = Math.max(4, Math.round(value / max * 100));
-      return '<div class="admin-bar-col"><div class="admin-bar-value">' + (showValues ? esc(formatter(value)) : '') + '</div><div class="admin-bar-track"><span style="height:' + height + '%"></span></div><div class="admin-bar-label">' + esc(x.label) + '</div></div>';
+      var fullLabel = x.title || x.label || "";
+      var shortLabel = x.shortLabel || x.label || "";
+      return '<div class="admin-bar-col"><div class="admin-bar-value">' + (showValues ? esc(formatter(value)) : '') + '</div><div class="admin-bar-track"><span style="height:' + height + '%"></span></div><div class="admin-bar-label" title="' + esc(fullLabel) + '"><span class="admin-bar-label-full">' + esc(x.label) + '</span><span class="admin-bar-label-short">' + esc(shortLabel) + '</span></div></div>';
     }).join('') + '</div>';
   }
   function renderAdminDashboard() {
@@ -1921,7 +1923,8 @@
       var date=new Date(); date.setDate(date.getDate()-d);
       var key=date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate());
       var count=rows.filter(function(t){return adminDateKey(t.txn_date)===key;}).length;
-      dayItems.push({label:pad(date.getDate())+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][date.getMonth()],value:count});
+      var dayMonth = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][date.getMonth()];
+      dayItems.push({label:pad(date.getDate())+" "+dayMonth,shortLabel:String(date.getDate()),title:pad(date.getDate())+" "+dayMonth+" "+date.getFullYear(),value:count});
     }
     $("adminDailyChart").innerHTML=adminChartBars(dayItems,function(v){return String(v);},true);
     var monthItems=[];
