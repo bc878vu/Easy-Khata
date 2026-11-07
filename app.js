@@ -410,13 +410,17 @@
       if (!c) {
         var legacyRaw = window.localStorage.getItem(CACHE_KEY);
         var legacy = legacyRaw ? JSON.parse(legacyRaw) : null;
-        // Legacy cache is usable only when its recorded tenant matches.
+        // Pre-workspace cache snapshots can be safely assigned to the user's
+        // own active workspace only; never reuse them for another tenant.
+        if (legacy && !legacy.workspaceId && Array.isArray(legacy.profiles)) {
+          legacy.profiles.forEach(function (p) {
+            if (p.id === myId() && p.active_workspace_id) legacy.workspaceId = p.active_workspace_id;
+          });
+        }
         if (legacy && legacy.workspaceId && (!target || legacy.workspaceId === target)) {
           c = legacy;
-          if (legacy.workspaceId) {
-            window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + legacy.workspaceId, JSON.stringify(legacy));
-            window.localStorage.setItem(LAST_WORKSPACE_KEY, legacy.workspaceId);
-          }
+          window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + legacy.workspaceId, JSON.stringify(legacy));
+          window.localStorage.setItem(LAST_WORKSPACE_KEY, legacy.workspaceId);
         }
       }
       if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
@@ -4796,7 +4800,7 @@
   window.addEventListener("online", handleConnectionRestored);
   window.addEventListener("offline", function () { offlineMode = true; renderOffline(); });
   var offlineBadgeEl = $("offlineBadge");
-  if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", function () { flushOutbox(); });
+  if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", handleConnectionRestored);
   renderOffline();
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
