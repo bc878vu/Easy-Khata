@@ -1044,3 +1044,17 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 @media(prefers-reduced-motion:reduce){
   #txnForm input,#txnForm select{transition:none}
 }
+
+/* v28: person detail quick actions sit directly under outstanding balance */
+#personDetailView .detail-top-actions{
+  margin:10px 0 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+#personDetailView .detail-top-actions .btn{
+  width:100%;min-width:0;min-height:54px;padding:12px 8px;
+  border-radius:14px;font-size:.91rem;font-weight:750;
+}
+#personDetailView .detail-actions-row{margin:0 0 16px}
+@media(max-width:380px){
+  #personDetailView .detail-top-actions{gap:7px}
+  #personDetailView .detail-top-actions .btn{font-size:.82rem;padding:10px 5px}
+}
