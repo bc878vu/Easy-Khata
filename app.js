@@ -3639,6 +3639,139 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
+  // Khata screen PDF: current user's own transactions in the active community,
+  // respecting the live search, member and date filters. Never export another
+  // member's personal ledger just because the community ledger is shared.
+  function exportFilteredLedgerPdf() {
+    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+    if (!PdfCtor) { setTxnMsg("PDF tayyar nahi ho saki. Internet check karke dobara try karein.", false); return; }
+    try {
+      var me = myId();
+      var list = filteredTxns().filter(function (t) {
+        return t.payer_id === me || t.receiver_id === me;
+      }).slice().sort(function (a, b) {
+        var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
+        return d || String(b.created_at || "").localeCompare(String(a.created_at || ""));
+      });
+      if (!list.length) { setTxnMsg("Is filter mein aap ka koi record nahi mila.", false); return; }
+
+      var givenMinor = 0, takenMinor = 0, people = {};
+      list.forEach(function (t) {
+        var amount = moneyToMinor(t.amount);
+        var otherId = t.payer_id === me ? t.receiver_id : t.payer_id;
+        if (!people[otherId]) people[otherId] = {
+          name: profileName(otherId), givenMinor: 0, takenMinor: 0
+        };
+        if (t.payer_id === me) {
+          givenMinor += amount;
+          people[otherId].givenMinor += amount;
+        } else {
+          takenMinor += amount;
+          people[otherId].takenMinor += amount;
+        }
+      });
+      var given = moneyFromMinor(givenMinor);
+      var taken = moneyFromMinor(takenMinor);
+      var net = moneyFromMinor(givenMinor - takenMinor);
+      var peopleList = Object.keys(people).map(function (id) {
+        var p = people[id];
+        p.given = moneyFromMinor(p.givenMinor);
+        p.taken = moneyFromMinor(p.takenMinor);
+        p.net = moneyFromMinor(p.givenMinor - p.takenMinor);
+        return p;
+      }).sort(function (a, b) { return b.net - a.net; });
+
+      var active = workspaces.filter(function (w) { return w.id === currentWorkspaceId; })[0];
+      var spaceName = active ? active.name : (guestMode ? "Personal hisaab" : "Personal");
+      var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
+      var doc = base.doc, M = base.M, R = base.R, C = base.C;
+      var rangeText = txnFromDate || txnToDate
+        ? "Muddat: " + (txnFromDate ? fmtDate(txnFromDate) : "Shuru se") + " se " + (txnToDate ? fmtDate(txnToDate) : "Aaj tak")
+        : "Muddat: Tamam tareekhein";
+
+      base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
+      base.metaLine("Naam: " + myName() + "  |  Community: " + spaceName);
+      base.metaLine(rangeText + "  |  Aap ke records: " + list.length);
+      base.summaryCards([
+        { label: "Aap ne diye", value: fmtRs(given), color: C.red },
+        { label: "Aap ko mile", value: fmtRs(taken), color: C.green },
+        { label: "Net balance", value: netSignedTxt(net), color: C.blue }
+      ]);
+
+      base.section("Doston ka hisaab");
+      base.metaLine("(+ ka matlab dost aap ko denge, - ka matlab aap dost ko denge)");
+      function peopleHead() {
+        base.tableHead([
+          { t: "Dost", x: M, maxW: 190 },
+          { t: "Aap ne diye", x: 310, align: "right", maxW: 76 },
+          { t: "Aap ko mile", x: 400, align: "right", maxW: 76 },
+          { t: "Balance", x: R, align: "right", maxW: 110 }
+        ]);
+      }
+      peopleHead();
+      if (!peopleList.length) base.emptyBox("Abhi koi dost ya record nahi.");
+      peopleList.forEach(function (p, i) {
+        if (base.needPage(14)) peopleHead();
+        base.tableRow([
+          { t: p.name || "Unknown", x: M, maxW: 190 },
+          { t: fmtRs(p.given), x: 310, align: "right", maxW: 76 },
+          { t: fmtRs(p.taken), x: 400, align: "right", maxW: 76 },
+          { t: (p.net >= 0 ? "+ " : "- ") + fmtRs(Math.abs(p.net)), x: R, align: "right", maxW: 110 }
+        ], i % 2 === 1);
+      });
+      if (peopleList.length) base.totalsRow([
+        { t: "Total", x: M, maxW: 190 },
+        { t: fmtRs(given), x: 310, align: "right", maxW: 76 },
+        { t: fmtRs(taken), x: 400, align: "right", maxW: 76 },
+        { t: netSignedTxt(net), x: R, align: "right", maxW: 110 }
+      ]);
+
+      base.section("Len-den ki tafseel (" + list.length + " records)");
+      function historyHead() {
+        base.tableHead([
+          { t: "Tareekh", x: M, maxW: 54 },
+          { t: "Dene wala", x: 100, maxW: 105 },
+          { t: "Lene wala", x: 214, maxW: 105 },
+          { t: "Raqam", x: 420, align: "right", maxW: 72 },
+          { t: "Note", x: 430, maxW: 125 }
+        ]);
+      }
+      historyHead();
+      var historyTotalMinor = 0;
+      list.forEach(function (t, i) {
+        if (base.needPage(14)) historyHead();
+        historyTotalMinor += moneyToMinor(t.amount);
+        base.tableRow([
+          { t: fmtDate(t.txn_date), x: M, maxW: 54 },
+          { t: profileName(t.payer_id), x: 100, maxW: 105 },
+          { t: profileName(t.receiver_id), x: 214, maxW: 105 },
+          { t: fmtRs(t.amount), x: 420, align: "right", maxW: 72 },
+          { t: t.note || "Food", x: 430, maxW: 125 }
+        ], i % 2 === 1);
+      });
+      base.totalsRow([
+        { t: "Total", x: M, maxW: 54 },
+        { t: "", x: 100 },
+        { t: "", x: 214 },
+        { t: fmtRs(moneyFromMinor(historyTotalMinor)), x: 420, align: "right", maxW: 72 },
+        { t: "", x: 430 }
+      ]);
+      base.addFooter();
+      var safeName = base.fileName(myName());
+      var safeSpace = base.fileName(spaceName);
+      var link = document.createElement("a");
+      var blob = doc.output("blob");
+      link.href = URL.createObjectURL(blob);
+      link.download = "Easy-Khata-" + safeName + "-" + safeSpace + "-" + todayLocal() + ".pdf";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 500);
+      setTxnMsg("Aap ki PDF report download ho gayi (" + list.length + " records).", true);
+    } catch (e) {
+      setTxnMsg("PDF report nahi ban saki. Dobara koshish karein.", false);
+    }
+  }
+
   function setAcctBackupMsg(text, ok) {
     var el = $("acctBackupMsg");
     if (!el) return;
