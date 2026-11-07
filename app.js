@@ -252,6 +252,7 @@
   var offlineMode = false;   // true jab cache se dikhaya ja raha ho
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
   var loadSequence = 0;       // stale overlapping refreshes cannot overwrite newer workspace data
+  var dataWorkspaceId = "";  // tenant represented by the in-memory ledger
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
   var CACHE_WORKSPACE_PREFIX = CACHE_KEY + "_workspace_";
   var LAST_WORKSPACE_KEY = "easykhata_last_workspace_v1_anonymous";
@@ -1023,7 +1024,7 @@
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
       if(!res.ok){setTxnMsg("Workspace switch nahi hua — access verify karein.",false);renderWorkspaceBar();return;}
-      currentWorkspaceId=id;profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
+      currentWorkspaceId=id;dataWorkspaceId="";profiles=[];txns=[];myContacts=[];hiddenTxnIds={};workspaces=[];teardownRealtime();loadAll();
     }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
@@ -1444,15 +1445,19 @@
       setTxnMsg("", true);
       return;
     }
+    var thisLoad = ++loadSequence;
     setTxnMsg("");
     acceptInviteFromUrl().then(function (accepted) {
-      if (accepted) { teardownRealtime(); loadAll(); return; }
+      if (thisLoad !== loadSequence) return null;
+      if (accepted) { teardownRealtime(); loadAll(); return null; }
       profilesQuery(true).then(function (res) {
+      if (thisLoad !== loadSequence) return null;
       // If a column doesn't exist yet (purana SQL), load with the minimal
       // columns — warna 42703 retry bhi wahi columns mangta.
       if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
       return res;
     }).then(function (res) {
+      if (thisLoad !== loadSequence || !res) return null;
       if (!res.ok) {
         if (tableMissing(res)) {
           dbReady = false;
@@ -1465,15 +1470,22 @@
       }
       dbReady = true;
       $("setupBox").hidden = true;
-      profiles = res.body || [];
+      var nextProfiles = res.body || [];
       var selfProfile = null;
-      profiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
-      currentWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
-      if (!currentWorkspaceId) throw new Error("active workspace missing");
+      nextProfiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
+      var nextWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
+      if (!nextWorkspaceId) throw new Error("active workspace missing");
+      if (dataWorkspaceId && dataWorkspaceId !== nextWorkspaceId) {
+        // Never keep the previous tenant's records visible after a remote switch.
+        profiles=[];txns=[];myContacts=[];hiddenTxnIds={};workspaces=[];dataWorkspaceId="";
+      }
+      profiles = nextProfiles;
+      currentWorkspaceId = nextWorkspaceId;
       return loadWorkspaces().then(function () { return loadAllTransactions(); });
     }).then(function (rows) {
-      if (!rows) return;
+      if (thisLoad !== loadSequence || !rows) return;
       txns = rows;
+      dataWorkspaceId = currentWorkspaceId;
       rtLastFetch = Date.now();
       offlineMode = false;
       return loadHiddenIds().then(function () {
@@ -1485,14 +1497,17 @@
         saveCache();
         flushOutbox();
       });
-    }).catch(function () {
-      // Offline: aakhri save hua data dikhayein (agar cache hai).
-      var c = loadCache();
-      if (c) {
+    }).catch(function (loadError) {
+      if (thisLoad !== loadSequence) return;
+      // Use only a cache snapshot for the workspace currently selected.
+      var c = loadCache(currentWorkspaceId);
+      if (!c && !currentWorkspaceId) c = loadCache();
+      if (c && (!currentWorkspaceId || c.workspaceId === currentWorkspaceId)) {
         offlineMode = true;
         dbReady = true;
         profiles = c.profiles || [];
-        currentWorkspaceId = c.workspaceId || currentWorkspaceId;
+        if (!currentWorkspaceId) currentWorkspaceId = c.workspaceId || "";
+        dataWorkspaceId = c.workspaceId || "";
         txns = c.txns || [];
         hiddenTxnIds = {};
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
@@ -1504,8 +1519,12 @@
         renderOffline();
         return;
       }
-      setTxnMsg("Records load nahi hue — refresh karein.", false);
-      renderAll(); // v24.8: cache na ho to bhi khaali state saaf render ho (blank screen nahi)
+      offlineMode = true;
+      renderOffline();
+      setTxnMsg("Database se rabta nahi ho raha. Purana ledger clear nahi kiya — connection wapas aate hi dobara load hoga.", false);
+      // Keep the last known in-memory state; never replace it with an empty ledger
+      // merely because one refresh timed out.
+      if (profiles.length || txns.length || myContacts.length) renderAll();
     });
     });
   }
