@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=46">
+<link rel="stylesheet" href="styles.css?v=47">
 </head>
 <body>
 
@@ -162,6 +162,13 @@ window.addEventListener("error", function () {
       <button id="notifBtn" class="icon-btn" type="button" title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     </div>
   </header>
+
+  <div id="workspaceBar" class="workspace-bar" hidden>
+    <label for="workspaceSelect">Workspace</label>
+    <select id="workspaceSelect" aria-label="Active workspace"></select>
+    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Business</button>
+    <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite</button>
+  </div>
 
   <main class="wrap">
 
@@ -622,6 +629,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=54"></script>
+<script src="app.js?v=55"></script>
 </body>
 </html>
