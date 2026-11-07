@@ -388,7 +388,7 @@
     // hoti hai; loadNotifs/loadContacts loadAll se pehle chal jayein to bhi
     // cache mehfooz rehta hai.
     if (!profiles || !profiles.length) return;
-    if (!currentWorkspaceId) return;
+    if (!currentWorkspaceId || dataWorkspaceId !== currentWorkspaceId) return;
     try {
       var snapshot = JSON.stringify({
         profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
