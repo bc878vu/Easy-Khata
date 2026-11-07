@@ -152,4 +152,6 @@ grant execute on function public.admin_set_user_password(uuid,text) to authentic
 grant execute on function public.admin_set_user_blocked(uuid,boolean) to authenticated;
 grant execute on function public.admin_delete_user(uuid) to authenticated;
 
+alter function public.set_site_content_updated_at() set search_path = pg_catalog, public;
+
 commit;
