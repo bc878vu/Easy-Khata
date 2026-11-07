@@ -165,7 +165,8 @@
       return fetchWithTimeout(API + "/rest/v1/" + path, {
         method: method, headers: headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined
-      }, 15000).then(function (r) {
+      }, navigator.onLine ? 12000 : 6000).then(function (r) {
+        lastNetworkResponseAt = Date.now();
         return r.text().then(function (t) {
           var j = null;
           try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
@@ -189,13 +190,13 @@
         if(res.status===401&&!authRetried&&session&&session.refresh_token){
           return refreshOnce().then(function(ok){return ok?run(true,networkAttempt):res;});
         }
-        if(method==="GET"&&(res.status>=500)&&networkAttempt<2){
+        if(method==="GET"&&(res.status>=500)&&networkAttempt<1){
           return wait(400*(networkAttempt+1)).then(function(){return run(authRetried,networkAttempt+1);});
         }
         return res;
       }).catch(function(err){
         var transient=err&&(err.name==="TypeError"||err.message==="request-timeout"||/failed to fetch|networkerror|network request failed|load failed/i.test(String(err.message||"")));
-        if(method==="GET"&&transient&&networkAttempt<2){
+        if(method==="GET"&&transient&&networkAttempt<1){
           return wait(450*(networkAttempt+1)).then(function(){return run(authRetried,networkAttempt+1);});
         }
         throw err;
@@ -243,7 +244,8 @@
      Internet na ho to data localStorage mein save hota hai aur app poori
      tarah offline chalti hai; online hote hi outbox sync ho jata hai.
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
-  var offlineMode = false;   // true jab cache se dikhaya ja raha ho
+  var offlineMode = false;
+  var lastNetworkResponseAt = 0;
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
   var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
@@ -464,12 +466,6 @@
       saveCache();
       renderAll();
       setTxnMsg("Naam save ho gaya — ab har record mein yehi naam nazar aayega.", true);
-    }
-    if (isOffline()) {
-      queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: id, body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null }, ts: Date.now() });
-      applyName();
-      setTxnMsg("Naam offline save ho gaya — internet aate hi sync hoga.", true);
-      return;
     }
     sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null } })
       .then(function (res) {
@@ -1225,7 +1221,7 @@
       }
     });
     if (converted) saveOutbox(ops);
-    if (!ops.length || !navigator.onLine) return Promise.resolve(false);
+    if (!ops.length) return Promise.resolve(false);
     syncing = true;
     setTxnMsg("Sync ho raha hai…", true);
     var done = 0, skipped = 0, skippedSettled = 0;
@@ -1948,17 +1944,6 @@
     var btn = $("saveContactBtn");
     btn.disabled = true;
     var contactBody = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: phone || null };
-    if (isOffline()) {
-      var createdOffline = offlineContactInsert(contactBody);
-      $("newContactName").value = "";
-      $("newContactPhone").value = "";
-      setContactMsg("Dost offline add ho gaya — online hote hi sync hoga.", true);
-      renderSummary();
-      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
-      $("txnPerson").value = createdOffline.id;
-      btn.disabled = false;
-      return;
-    }
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) { setContactMsg("Dost save nahi hua — dobara try karein.", false); return; }
@@ -2025,11 +2010,6 @@
         var mine = visibleTxns().filter(function (t) { return (t.payer_id === id || t.receiver_id === id) && (t.payer_id === myId() || t.receiver_id === myId()); });
         mine.forEach(function (t) { offlineTxnHide(t.id); });
       };
-      if (isOffline()) {
-        deleteTxnsOffline();
-        deleteRowOffline();
-        return;
-      }
       var deleteRow = function () {
         sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
           .then(function (res) {
@@ -2446,7 +2426,6 @@
   function renderAdmin() {
     if (!isAdmin()) { $("navAdminBtn").hidden = true; return; }
     $("navAdminBtn").hidden = false;
-    if(!navigator.onLine){setAdminMsg("Offline mode — admin dashboard ko refresh karne ke liye internet chahiye.",false);renderAdminDashboard();return;}
     setAdminMsg("Dashboard data load ho raha hai…",true);
     sb("rpc/admin_list_users", { method: "POST", body: {} })
       .then(function (res) {
@@ -3329,11 +3308,6 @@
       saveGuestStore();
       renderAll();
       setPeopleMsg("Hisaab barabar ho gaya!", true);
-      return;
-    }
-    if (isOffline()) {
-      offlineTxnInsert(body);
-      setPeopleMsg("Settlement offline save ho gayi — online hote hi sync hogi.", true);
       return;
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
@@ -4437,14 +4411,6 @@
         payer_id: me, receiver_id: id, amount: amt,
         note: note, txn_date: date, created_by: me
       };
-      if (isOffline()) {
-        // Offline: record local save karein, sync baad mein hoga.
-        offlineTxnInsert(recBody);
-        done++;
-        offlineSaved = true;
-        next();
-        return;
-      }
       sb("khata_transactions", { method: "POST", prefer: "return=representation", body: recBody }).then(function (res) {
         if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id)); } }
         else failed++;
@@ -4521,17 +4487,6 @@
     }
     if (editingId) {
       var editId = editingId;
-      if (isOffline()) {
-        // Offline edit: local state + outbox. Settled history kabhi edit nahi hoti.
-        var t = null;
-        txns.forEach(function (x) { if (x.id === editId) t = x; });
-        if (t && isTxnLocked(t)) { btn.disabled = false; setTxnMsg(LOCK_MSG, false); return; }
-        offlineTxnUpdate(editId, body);
-        resetTxnForm();
-        setTxnMsg("Edit offline save ho gayi — online hote hi sync hogi.", true);
-        btn.disabled = false;
-        return;
-      }
       sb("khata_transactions?id=eq." + encodeURIComponent(editId), { method: "PATCH", prefer: "return=minimal", body: body })
         .then(function (res) {
           btn.disabled = false;
@@ -4545,14 +4500,6 @@
           resetTxnForm();
           setTxnMsg("Edit offline save ho gayi — online hote hi sync hogi.", true);
         });
-      return;
-    }
-    if (isOffline()) {
-      offlineTxnInsert(Object.assign({ id: recId }, body));
-      $("txnAmount").value = "";
-      $("txnNote").value = "";
-      setTxnMsg("Record offline save ho gaya — online hote hi sync hoga.", true);
-      btn.disabled = false;
       return;
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: Object.assign({ id: recId }, body) })
@@ -4606,11 +4553,6 @@
       saveGuestStore();
       renderAll();
       setTxnMsg("Record delete ho gaya.", true);
-      return;
-    }
-    if (isOffline()) {
-      offlineTxnHide(id);
-      setTxnMsg("Record offline hat gaya — online hote hi sync hoga.", true);
       return;
     }
     hideTxnOnline(id);
