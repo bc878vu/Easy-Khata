@@ -829,3 +829,36 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 @media(prefers-reduced-motion:reduce){
   body{transition:none}
 }
+
+
+/* v32: Always-visible Add Friend action — do not invert text with theme tokens. */
+#addPersonBtn{
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  width:100%;
+  min-height:52px;
+  margin:12px 0 14px;
+  padding:13px 16px;
+  border:1px solid #1d4ed8!important;
+  border-radius:13px;
+  background:#1d4ed8!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff;
+  font-size:1rem;
+  font-weight:750;
+  line-height:1.35;
+  text-align:center;
+  opacity:1!important;
+  visibility:visible!important;
+  box-shadow:0 4px 12px rgba(29,78,216,.2);
+}
+#addPersonBtn:active{background:#1e40af!important;transform:translateY(1px)}
+[data-theme="dark"] #addPersonBtn{
+  background:#2563eb!important;
+  border-color:#60a5fa!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
+}
