@@ -78,7 +78,14 @@
     if (stored) session = JSON.parse(stored);
   } catch (e) { session = null; }
   function saveSession(s) {
+    var previousId = session && session.user ? session.user.id : "";
     session = s || null;
+    var nextId = session && session.user ? session.user.id : "";
+    setUserScopedStorage(nextId);
+    if (previousId !== nextId) {
+      workspaces = []; currentWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
+      try { teardownRealtime(); } catch (e) {}
+    }
     try {
       if (s) window.localStorage.setItem(SESSION_KEY, JSON.stringify(s));
       else window.localStorage.removeItem(SESSION_KEY);
@@ -196,8 +203,34 @@
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
   var offlineMode = false;   // true jab cache se dikhaya ja raha ho
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
-  var CACHE_KEY = "easykhata_cache_v1";
-  var OUTBOX_KEY = "easykhata_outbox_v1";
+  var CACHE_KEY = "easykhata_cache_v1_anonymous";
+  var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
+  function setUserScopedStorage(userId) {
+    var uid = userId || "anonymous";
+    CACHE_KEY = "easykhata_cache_v1_" + uid;
+    OUTBOX_KEY = "easykhata_outbox_v1_" + uid;
+    if (!userId) return;
+    try {
+      if (!window.localStorage.getItem(CACHE_KEY)) {
+        var legacy = window.localStorage.getItem("easykhata_cache_v1");
+        var parsed = legacy ? JSON.parse(legacy) : null;
+        if (parsed && Array.isArray(parsed.profiles) && parsed.profiles.some(function (p) { return p.id === userId; })) {
+          window.localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
+        }
+      }
+      if (!window.localStorage.getItem(OUTBOX_KEY)) {
+        var oldOps = JSON.parse(window.localStorage.getItem("easykhata_outbox_v1") || "[]");
+        if (Array.isArray(oldOps) && oldOps.length) {
+          var mine = oldOps.filter(function (o) {
+            var b = o && o.body || {};
+            return b.created_by === userId || b.owner_id === userId || b.user_id === userId;
+          });
+          if (mine.length) window.localStorage.setItem(OUTBOX_KEY, JSON.stringify(mine));
+        }
+      }
+    } catch (e) {}
+  }
+  setUserScopedStorage(session && session.user ? session.user.id : "");
   var OUTBOX_MAX = 200;
   /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
      Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
@@ -2175,11 +2208,11 @@
     if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
     if (!navigator.onLine) { setAdminMsg("Admin kaam ke liye internet chahiye.", false); return; }
-    if (!window.confirm("'" + (p.name || p.email) + "' — delete karein?\n\nUn ka account, profile aur saare records delete ho jayenge. Ye wapas nahi hoga.")) return;
+    if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band hoga aur workspace access suspend hoga. Ledger records aur history mehfooz rahenge.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
         if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
-        setAdminMsg("User delete ho gaya.", true);
+        setAdminMsg("User deactivate ho gaya. Un ka ledger data mehfooz hai.", true);
         if (adminCurrentUser && adminCurrentUser.id === id) {
           adminCurrentUser = null;
           showView("admin");
