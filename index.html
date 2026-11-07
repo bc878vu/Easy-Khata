@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=38">
+<link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body>
 
@@ -203,15 +203,32 @@ window.addEventListener("error", function () {
             <label for="txnPerson">Kis ke saath?</label>
             <select id="txnPerson"></select>
           </div>
-          <div class="row" style="margin-top:-4px"><button id="addContactToggleBtn" class="btn btn-ghost" type="button">+ Dost add karein (app par nahi hain)</button></div>
-          <div id="addContactBox" hidden>
-            <div class="field"><label for="newContactName">Naam</label><input id="newContactName" type="text" maxlength="80" placeholder="Example: Maha Chaudhary"></div>
-            <div class="field"><label for="newContactPhone">Phone number (optional — ye number baad mein un ke account se link ho jayega)</label><input id="newContactPhone" type="tel" inputmode="tel" placeholder="Example: 0300 1234567"></div>
-            <div class="row">
-              <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Choose from contacts</button>
-              <button id="saveContactBtn" class="btn btn-primary" type="button">Save karein</button>
+          <div class="contact-add-wrap">
+            <button id="addContactToggleBtn" class="contact-add-trigger" type="button" aria-expanded="false" aria-controls="addContactBox">
+              <span class="contact-add-icon" aria-hidden="true">＋</span>
+              <span class="contact-add-copy"><strong>Dost add karein</strong><small>Jo abhi Easy Khata par nahi hain</small></span>
+              <span class="contact-add-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="addContactBox" class="contact-add-panel" hidden>
+              <div class="contact-add-heading">
+                <span class="contact-add-avatar" aria-hidden="true">👤</span>
+                <span><strong>Naya dost</strong><small>Naam aur number add karein</small></span>
+              </div>
+              <div class="field">
+                <label for="newContactName">Dost ka naam</label>
+                <input id="newContactName" type="text" maxlength="80" autocomplete="off" placeholder="Misal: Yaseen">
+              </div>
+              <div class="field">
+                <label for="newContactPhone">Phone / WhatsApp number <span class="optional-label">Optional</span></label>
+                <input id="newContactPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0300 1234567">
+                <p class="contact-field-hint">Number dene se baad mein unka account banne par dost automatically link ho sakta hai.</p>
+              </div>
+              <div class="contact-add-actions">
+                <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Contacts se chunein</button>
+                <button id="saveContactBtn" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> Dost save karein</button>
+              </div>
+              <p id="contactMsg" class="msg" role="status" aria-live="polite"></p>
             </div>
-            <p id="contactMsg" class="msg" role="status"></p>
           </div>
           <div class="field" id="txnDirRow">
             <label>Kisam</label>
@@ -599,6 +616,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
 </body>
 </html>
