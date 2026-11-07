@@ -968,14 +968,15 @@
         enterGuestMode();
         return;
       }
-      if (session && session.access_token && loadCache()) {
+      if (session && session.access_token) {
+        // A temporary network/API outage is NOT a logout. Keep the cloud
+        // session even when this device has no offline snapshot yet.
         showApp();
         loadAll();
+        if (!loadCache()) setTxnMsg("Server se filhal rabta nahi ho raha. Aap ka account login rahega — internet aate hi data dobara load hoga.", false);
         return;
       }
       saveSession(null);
-      // v24.1: session expire/invalid bhi guest dashboard par le jata hai
-      // (login screen nahi) — dobara login navbar ke Login icon se hota hai.
       enterGuestMode();
     });
   }
@@ -1495,6 +1496,7 @@
       dataWorkspaceId = currentWorkspaceId;
       rtLastFetch = Date.now();
       offlineMode = false;
+      renderOffline();
       return loadHiddenIds().then(function () {
         if (thisLoad !== loadSequence) return;
         renderAll();
