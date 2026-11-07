@@ -889,3 +889,72 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 @media(max-width:420px){
   .people{max-height:316px;padding:7px;gap:7px}
 }
+
+
+/* v34 — refined add-friend panel in the new-record form */
+.contact-add-wrap{margin:0 0 16px}
+.contact-add-trigger{
+  width:100%;min-height:66px;display:flex;align-items:center;gap:12px;
+  padding:11px 14px;border:1px solid var(--line);border-radius:15px;
+  background:var(--card);color:var(--ink);text-align:left;cursor:pointer;
+  box-shadow:0 2px 8px rgba(15,23,42,.035);
+  transition:border-color .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.contact-add-trigger:hover,.contact-add-trigger.is-open{
+  border-color:var(--accent);background:var(--accent-soft);
+  box-shadow:0 4px 14px rgba(29,78,216,.08);
+}
+.contact-add-icon{
+  width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;
+  border-radius:12px;background:var(--accent-soft);color:var(--accent);
+  font-size:1.55rem;font-weight:500;line-height:1;
+}
+.contact-add-copy{display:grid;gap:3px;min-width:0;flex:1}
+.contact-add-copy strong{font-size:.96rem;font-weight:750;line-height:1.25}
+.contact-add-copy small,.contact-add-heading small{
+  color:var(--muted);font-size:.77rem;font-weight:450;line-height:1.35;
+}
+.contact-add-chevron{color:var(--muted);font-size:1.3rem;transition:transform .18s ease}
+.contact-add-trigger.is-open .contact-add-chevron{transform:rotate(180deg)}
+.contact-add-panel{
+  margin-top:10px;padding:15px;border:1px solid var(--line);
+  border-radius:16px;background:var(--tab-bg);
+  animation:contactPanelIn .2s ease both;
+}
+@keyframes contactPanelIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.contact-add-heading{display:flex;align-items:center;gap:10px;margin:0 0 15px}
+.contact-add-avatar{
+  width:38px;height:38px;display:grid;place-items:center;border-radius:12px;
+  background:var(--accent-soft);font-size:1.15rem;
+}
+.contact-add-heading span:last-child{display:grid;gap:2px}
+.contact-add-heading strong{font-size:.95rem;font-weight:750}
+.contact-add-panel .field{margin-bottom:13px}
+.contact-add-panel .field label{font-size:.86rem;margin-bottom:6px}
+.contact-add-panel input{
+  min-height:48px;border-radius:11px;background:var(--input-bg);
+  border-color:var(--input-border);padding:11px 13px;
+}
+.contact-add-panel input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.optional-label{
+  display:inline-block;margin-left:5px;padding:2px 7px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent);font-size:.68rem;font-weight:700;
+  vertical-align:1px;
+}
+.contact-field-hint{margin:6px 1px 0;color:var(--muted);font-size:.75rem;line-height:1.45}
+.contact-add-actions{display:flex;gap:9px;align-items:stretch}
+.contact-add-actions .btn{min-height:46px;flex:1;justify-content:center;font-size:.88rem;padding:10px 12px}
+#saveContactBtn{font-weight:750;box-shadow:0 4px 10px rgba(29,78,216,.16)}
+#pickContactBtn{background:var(--card);border:1px solid var(--line);color:var(--accent)}
+#saveContactBtn:disabled{opacity:.65;cursor:wait}
+.contact-add-panel #contactMsg{margin:10px 0 0;line-height:1.4}
+@media(max-width:420px){
+  .contact-add-trigger{min-height:62px;padding:10px 12px}
+  .contact-add-panel{padding:13px}
+  .contact-add-actions{flex-direction:column}
+  .contact-add-actions .btn{width:100%;min-height:45px}
+}
+@media(prefers-reduced-motion:reduce){
+  .contact-add-panel{animation:none}
+  .contact-add-trigger,.contact-add-chevron{transition:none}
+}
