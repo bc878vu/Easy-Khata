@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=47">
+<link rel="stylesheet" href="styles.css?v=48">
 </head>
 <body>
 
@@ -166,11 +166,12 @@ window.addEventListener("error", function () {
   <div id="workspaceBar" class="workspace-bar" hidden>
     <label for="workspaceSelect">Workspace</label>
     <select id="workspaceSelect" aria-label="Active workspace"></select>
-    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Communities</button>
-    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Create</button>
+    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Find / Join</button>
+    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Create community</button>
     <button id="workspaceSetupBtn" class="btn btn-ghost" type="button" hidden>Set password</button>
     <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite</button>
     <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Members</button>
+    <p id="communityOnboardingHint" class="community-onboarding-hint">Personal Space ke ilawa aap community <strong>Find / Join</strong> karke request bhej sakte hain, ya apni <strong>new community create</strong> kar sakte hain. Har community ka hisaab alag rahega.</p>
   </div>
 
   <main class="wrap">
@@ -692,6 +693,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=56"></script>
+<script src="app.js?v=57"></script>
 </body>
 </html>

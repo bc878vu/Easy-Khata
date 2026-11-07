@@ -91,7 +91,7 @@
     var nextId = session && session.user ? session.user.id : "";
     setUserScopedStorage(nextId);
     if (previousId !== nextId) {
-      workspaces = []; currentWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
+      workspaces = []; currentWorkspaceId = ""; dataWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
       try { teardownRealtime(); } catch (e) {}
     }
     try {
@@ -115,6 +115,20 @@
     return m.full_name || session.user.email || "";
   }
   function authToken() { return session && session.access_token ? session.access_token : ANON; }
+  var refreshSessionPromise = null;
+  function refreshSession() {
+    if (!session || !session.refresh_token) return Promise.resolve(false);
+    if (refreshSessionPromise) return refreshSessionPromise;
+    refreshSessionPromise = authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.access_token) return false;
+        saveSession(res.body);
+        return true;
+      })
+      .catch(function () { return false; })
+      .then(function (ok) { refreshSessionPromise = null; return ok; });
+    return refreshSessionPromise;
+  }
 
   /* ---------- Supabase helpers ---------- */
   function fetchWithTimeout(url, options, timeoutMs) {
@@ -150,27 +164,53 @@
   }
   function sb(path, opts) {
     opts = opts || {};
-    var headers = {
-      "apikey": ANON,
-      "Authorization": "Bearer " + authToken(),
-      "Content-Type": "application/json"
-    };
-    if (opts.prefer) headers["Prefer"] = opts.prefer;
-    if (opts.range) {
-      headers["Range-Unit"] = "items";
-      headers["Range"] = opts.range;
-    }
-    return fetchWithTimeout(API + "/rest/v1/" + path, {
-      method: opts.method || "GET",
-      headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    }, 12000).then(function (r) {
-      return r.text().then(function (t) {
-        var j = null;
-        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
-        return { ok: r.ok, status: r.status, body: j, raw: t };
+    var method = String(opts.method || "GET").toUpperCase();
+    var bodyText = opts.body ? JSON.stringify(opts.body) : undefined;
+    function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+    function request(authRetried, transientRetried) {
+      var headers = {
+        "apikey": ANON,
+        "Authorization": "Bearer " + authToken(),
+        "Content-Type": "application/json"
+      };
+      if (opts.prefer) headers["Prefer"] = opts.prefer;
+      if (opts.range) {
+        headers["Range-Unit"] = "items";
+        headers["Range"] = opts.range;
+      }
+      return fetchWithTimeout(API + "/rest/v1/" + path, {
+        method: method,
+        headers: headers,
+        body: bodyText
+      }, 18000).then(function (r) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+          return { ok: r.ok, status: r.status, body: j, raw: t };
+        });
+      }).then(function (res) {
+        // Access tokens expire while the app is open. Refresh once and replay
+        // the request; PostgREST rejects an expired JWT before executing it.
+        if (res.status === 401 && !authRetried && session && session.refresh_token) {
+          return refreshSession().then(function (refreshed) {
+            return refreshed ? request(true, transientRetried) : res;
+          });
+        }
+        // Retry only safe reads. Never automatically replay a write/RPC after
+        // a timeout because the server may already have committed it.
+        if ((method === "GET" || method === "HEAD") && !transientRetried &&
+            (res.status === 502 || res.status === 503 || res.status === 504)) {
+          return wait(650).then(function () { return request(authRetried, true); });
+        }
+        return res;
+      }).catch(function (err) {
+        if ((method === "GET" || method === "HEAD") && !transientRetried) {
+          return wait(650).then(function () { return request(authRetried, true); });
+        }
+        throw err;
       });
-    });
+    }
+    return request(false, false);
   }
 
   /* ---------- state ---------- */
@@ -211,11 +251,17 @@
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
   var offlineMode = false;   // true jab cache se dikhaya ja raha ho
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
+  var loadSequence = 0;       // stale overlapping refreshes cannot overwrite newer workspace data
+  var dataWorkspaceId = "";  // tenant represented by the in-memory ledger
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
+  var CACHE_WORKSPACE_PREFIX = CACHE_KEY + "_workspace_";
+  var LAST_WORKSPACE_KEY = "easykhata_last_workspace_v1_anonymous";
   var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
   function setUserScopedStorage(userId) {
     var uid = userId || "anonymous";
     CACHE_KEY = "easykhata_cache_v1_" + uid;
+    CACHE_WORKSPACE_PREFIX = CACHE_KEY + "_workspace_";
+    LAST_WORKSPACE_KEY = "easykhata_last_workspace_v1_" + uid;
     OUTBOX_KEY = "easykhata_outbox_v1_" + uid;
     if (!userId) return;
     try {
@@ -239,7 +285,7 @@
     } catch (e) {}
   }
   setUserScopedStorage(session && session.user ? session.user.id : "");
-  var OUTBOX_MAX = 200;
+  var OUTBOX_MAX = 2000;
   /* ---------- guest mode (v24) — bina login ke personal manual hisaab ----------
      Data SIRF is device par localStorage (easykhata_guest_v1) mein rehta hai.
      Server ko kabhi kuch nahi bheja jata: na Supabase (na profiles, na
@@ -326,8 +372,8 @@
     var ops = loadOutbox();
     ops.push(op);
     if (ops.length > OUTBOX_MAX) {
-      ops = ops.slice(ops.length - OUTBOX_MAX);
-      try { console.warn("Easy Khata: outbox full — sab se purane ops hata diye."); } catch (e) {}
+      // Never discard pending financial operations. Warn, but retain the queue.
+      try { console.warn("Easy Khata: outbox is large; preserving every pending operation."); } catch (e) {}
     }
     saveOutbox(ops);
   }
@@ -342,18 +388,43 @@
     // hoti hai; loadNotifs/loadContacts loadAll se pehle chal jayein to bhi
     // cache mehfooz rehta hai.
     if (!profiles || !profiles.length) return;
+    if (!currentWorkspaceId || dataWorkspaceId !== currentWorkspaceId) return;
     try {
-      window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
-      }));
+      var snapshot = JSON.stringify({
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
+        hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
+      });
+      // One independent cache per workspace prevents a failed workspace switch
+      // from showing another community's last-synced ledger.
+      window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + currentWorkspaceId, snapshot);
+      window.localStorage.setItem(LAST_WORKSPACE_KEY, currentWorkspaceId);
+      // Keep the old user-level cache as a migration source for older builds.
+      window.localStorage.setItem(CACHE_KEY, snapshot);
     } catch (e) {}
   }
-  function loadCache() {
+  function loadCache(workspaceId) {
     try {
-      var raw = window.localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      var c = JSON.parse(raw);
+      var target = workspaceId || window.localStorage.getItem(LAST_WORKSPACE_KEY) || "";
+      var raw = target ? window.localStorage.getItem(CACHE_WORKSPACE_PREFIX + target) : null;
+      var c = raw ? JSON.parse(raw) : null;
+      if (!c) {
+        var legacyRaw = window.localStorage.getItem(CACHE_KEY);
+        var legacy = legacyRaw ? JSON.parse(legacyRaw) : null;
+        // Pre-workspace cache snapshots can be safely assigned to the user's
+        // own active workspace only; never reuse them for another tenant.
+        if (legacy && !legacy.workspaceId && Array.isArray(legacy.profiles)) {
+          legacy.profiles.forEach(function (p) {
+            if (p.id === myId() && p.active_workspace_id) legacy.workspaceId = p.active_workspace_id;
+          });
+        }
+        if (legacy && legacy.workspaceId && (!target || legacy.workspaceId === target)) {
+          c = legacy;
+          window.localStorage.setItem(CACHE_WORKSPACE_PREFIX + legacy.workspaceId, JSON.stringify(legacy));
+          window.localStorage.setItem(LAST_WORKSPACE_KEY, legacy.workspaceId);
+        }
+      }
       if (!c || !Array.isArray(c.profiles) || !Array.isArray(c.txns)) return null;
+      if (target && c.workspaceId !== target) return null;
       return c;
     } catch (e) { return null; }
   }
@@ -901,14 +972,15 @@
         enterGuestMode();
         return;
       }
-      if (session && session.access_token && loadCache()) {
+      if (session && session.access_token) {
+        // A temporary network/API outage is NOT a logout. Keep the cloud
+        // session even when this device has no offline snapshot yet.
         showApp();
         loadAll();
+        if (!loadCache()) setTxnMsg("Server se filhal rabta nahi ho raha. Aap ka account login rahega — internet aate hi data dobara load hoga.", false);
         return;
       }
       saveSession(null);
-      // v24.1: session expire/invalid bhi guest dashboard par le jata hai
-      // (login screen nahi) — dobara login navbar ke Login icon se hota hai.
       enterGuestMode();
     });
   }
@@ -937,6 +1009,8 @@
     $("workspaceInviteBtn").hidden=!active||active.type!=="business";
     $("workspaceMembersBtn").hidden=!active||active.type!=="business";
     $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed||active.current_role!=="owner";
+    var hint=$("communityOnboardingHint");
+    if(hint) hint.hidden=workspaces.some(function(w){return w.type==="business";});
   }
   function loadWorkspaces(){
     return sb("khata_workspaces?select=id,name,type,created_by,status,community_username,community_listed&status=eq.active&order=created_at.asc").then(function(res){
@@ -957,7 +1031,7 @@
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
       if(!res.ok){setTxnMsg("Workspace switch nahi hua — access verify karein.",false);renderWorkspaceBar();return;}
-      currentWorkspaceId=id;profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
+      currentWorkspaceId=id;dataWorkspaceId="";profiles=[];txns=[];myContacts=[];hiddenTxnIds={};workspaces=[];teardownRealtime();loadAll();
     }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
@@ -1134,7 +1208,9 @@
     // account cache workspace (the workspace in which the offline work began),
     // and only fall back to the current workspace for legacy installations.
     var legacyCache = loadCache();
-    var legacyWorkspaceId = (legacyCache && legacyCache.workspaceId) || currentWorkspaceId;
+    // Pending writes belong to the workspace in which they were created.
+    // Current active workspace is the safe fallback for legacy rows lacking a tenant id.
+    var legacyWorkspaceId = currentWorkspaceId || (legacyCache && legacyCache.workspaceId);
     ops.forEach(function (o) {
       if (o.body && !o.body.workspace_id && (o.table === "khata_transactions" || o.table === "khata_contacts") && legacyWorkspaceId) {
         o.body.workspace_id = legacyWorkspaceId;
@@ -1151,7 +1227,7 @@
       }
     });
     if (converted) saveOutbox(ops);
-    if (!ops.length || !navigator.onLine) return Promise.resolve(false);
+    if (!ops.length) return Promise.resolve(false); // navigator.onLine can be wrong; let the real request decide
     syncing = true;
     setTxnMsg("Sync ho raha hai…", true);
     var done = 0, skipped = 0, skippedSettled = 0;
@@ -1378,15 +1454,19 @@
       setTxnMsg("", true);
       return;
     }
+    var thisLoad = ++loadSequence;
     setTxnMsg("");
     acceptInviteFromUrl().then(function (accepted) {
-      if (accepted) { teardownRealtime(); loadAll(); return; }
+      if (thisLoad !== loadSequence) return null;
+      if (accepted) { teardownRealtime(); loadAll(); return null; }
       profilesQuery(true).then(function (res) {
+      if (thisLoad !== loadSequence) return null;
       // If a column doesn't exist yet (purana SQL), load with the minimal
       // columns — warna 42703 retry bhi wahi columns mangta.
       if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
       return res;
     }).then(function (res) {
+      if (thisLoad !== loadSequence || !res) return null;
       if (!res.ok) {
         if (tableMissing(res)) {
           dbReady = false;
@@ -1399,18 +1479,30 @@
       }
       dbReady = true;
       $("setupBox").hidden = true;
-      profiles = res.body || [];
+      var nextProfiles = res.body || [];
       var selfProfile = null;
-      profiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
-      currentWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
-      if (!currentWorkspaceId) throw new Error("active workspace missing");
-      return loadWorkspaces().then(function () { return loadAllTransactions(); });
+      nextProfiles.forEach(function (p) { if (p.id === myId()) selfProfile = p; });
+      var nextWorkspaceId = (selfProfile && selfProfile.active_workspace_id) || currentWorkspaceId;
+      if (!nextWorkspaceId) throw new Error("active workspace missing");
+      if (dataWorkspaceId && dataWorkspaceId !== nextWorkspaceId) {
+        // Never keep the previous tenant's records visible after a remote switch.
+        profiles=[];txns=[];myContacts=[];hiddenTxnIds={};workspaces=[];dataWorkspaceId="";
+      }
+      profiles = nextProfiles;
+      currentWorkspaceId = nextWorkspaceId;
+      return loadWorkspaces().then(function () {
+        if (thisLoad !== loadSequence) return null;
+        return loadAllTransactions();
+      });
     }).then(function (rows) {
-      if (!rows) return;
+      if (thisLoad !== loadSequence || !rows) return;
       txns = rows;
+      dataWorkspaceId = currentWorkspaceId;
       rtLastFetch = Date.now();
       offlineMode = false;
+      renderOffline();
       return loadHiddenIds().then(function () {
+        if (thisLoad !== loadSequence) return;
         renderAll();
         if (currentView === "admin") renderAdminDashboard();
         setupRealtime();
@@ -1419,14 +1511,17 @@
         saveCache();
         flushOutbox();
       });
-    }).catch(function () {
-      // Offline: aakhri save hua data dikhayein (agar cache hai).
-      var c = loadCache();
-      if (c) {
+    }).catch(function (loadError) {
+      if (thisLoad !== loadSequence) return;
+      // Use only a cache snapshot for the workspace currently selected.
+      var c = loadCache(currentWorkspaceId);
+      if (!c && !currentWorkspaceId) c = loadCache();
+      if (c && (!currentWorkspaceId || c.workspaceId === currentWorkspaceId)) {
         offlineMode = true;
         dbReady = true;
         profiles = c.profiles || [];
-        currentWorkspaceId = c.workspaceId || currentWorkspaceId;
+        if (!currentWorkspaceId) currentWorkspaceId = c.workspaceId || "";
+        dataWorkspaceId = c.workspaceId || "";
         txns = c.txns || [];
         hiddenTxnIds = {};
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
@@ -1438,8 +1533,12 @@
         renderOffline();
         return;
       }
-      setTxnMsg("Records load nahi hue — refresh karein.", false);
-      renderAll(); // v24.8: cache na ho to bhi khaali state saaf render ho (blank screen nahi)
+      offlineMode = true;
+      renderOffline();
+      setTxnMsg("Database se rabta nahi ho raha. Purana ledger clear nahi kiya — connection wapas aate hi dobara load hoga.", false);
+      // Keep the last known in-memory state; never replace it with an empty ledger
+      // merely because one refresh timed out.
+      if (profiles.length || txns.length || myContacts.length) renderAll();
     });
     });
   }
@@ -1559,6 +1658,10 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, function () { scheduleLiveReload(); })
+        // Join approval/invite acceptance should update the workspace switcher too.
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_workspace_members", filter: "user_id=eq." + myId() }, function () {
+          setTimeout(function () { if (session && !guestMode) loadAll(); }, 350);
+        })
         .subscribe();
     } catch (e) { rtChannel = null; }
   }
@@ -1573,9 +1676,12 @@
     } catch (e) { rtChannel = null; }
   }
   document.addEventListener("visibilitychange", function () {
-    // Re-fetch when the tab becomes visible again (catches changes made
-    // elsewhere while the tab was hidden). Throttled: at most once per 30s.
-    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) scheduleLiveReload();
+    // A suspended mobile tab can miss the online event or outlive its JWT.
+    // Reconcile the complete workspace after resume if cache/outbox is stale.
+    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) {
+      if (offlineMode || loadOutbox().length) handleConnectionRestored();
+      else scheduleLiveReload();
+    }
   });
   function fmtNotifTime(ts) {
     try {
@@ -4677,10 +4783,24 @@
       b.hidden = true;
     }
   }
-  window.addEventListener("online", function () { renderOffline(); flushOutbox(); });
-  window.addEventListener("offline", renderOffline);
+  var reconnectTimer = null;
+  function handleConnectionRestored() {
+    renderOffline();
+    if (guestMode || !session) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      flushOutbox().then(function (synced) {
+        // flushOutbox refreshes the full ledger after a successful sync.
+        // With no queue or a failed attempt, still reload the last server state.
+        if (!synced) loadAll();
+      });
+    }, 700);
+  }
+  window.addEventListener("online", handleConnectionRestored);
+  window.addEventListener("offline", function () { offlineMode = true; renderOffline(); });
   var offlineBadgeEl = $("offlineBadge");
-  if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", function () { flushOutbox(); });
+  if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", handleConnectionRestored);
   renderOffline();
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
