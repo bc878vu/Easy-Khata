@@ -1279,9 +1279,13 @@
         if (notifFirstLoad) { incoming.forEach(function (n) { if (n.id) seenNotifIds[n.id] = true; }); notifFirstLoad = false; }
         else if (fresh.length) {
           fresh.forEach(function (n) { seenNotifIds[n.id] = true; });
-          playNotifSound();
-          if (document.visibilityState === "visible" && window.Notification && Notification.permission === "granted") {
-            fresh.slice(0, 3).forEach(function (n) { try { new Notification(n.title || "Easy Khata", { body: n.body || "Nayi notification aayi hai.", icon: "icons/icon.svg", tag: "easy-khata-" + n.id }); } catch (e) {} });
+          // Foreground popup + tone only while visible. Background/closed
+          // delivery is handled by the push service workers (system sound).
+          if (document.visibilityState === "visible") {
+            playNotifSound();
+            if (window.Notification && Notification.permission === "granted") {
+              fresh.slice(0, 3).forEach(function (n) { try { new Notification(n.title || "Easy Khata", { body: n.body || "Nayi notification aayi hai.", icon: "icons/icon.svg", tag: "easy-khata-" + n.id }); } catch (e) {} });
+            }
           }
         }
         notifs = incoming;
@@ -1969,7 +1973,7 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
-  var adminHiddenByTxn = {};
+  var adminHiddenByTxn = {}, adminHiddenStatusLoaded = false;
   function renderAdminUserTxnRows(u, mine) {
     if (!mine.length) { $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>'; return; }
     var html = "";
@@ -1977,7 +1981,7 @@
       var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
       var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
       var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
-      var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : '<div class="t-sub">Visible in both histories</div>';
+      var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : (adminHiddenStatusLoaded ? '<div class="t-sub">Visible in both histories</div>' : '<div class="t-sub">Hidden status unavailable</div>');
       var controls = lock ? '<span class="t-lock">🔒 Settled</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
       html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
     });
@@ -2044,11 +2048,13 @@
       '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
       '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
       '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
+    adminHiddenStatusLoaded = false;
     renderAdminUserTxnRows(u, mine);
     sb("rpc/admin_list_txn_hides", { method: "POST", body: {} }).then(function (res) {
       if (!res.ok) return;
       adminHiddenByTxn = {};
       (res.body || []).forEach(function (row) { if (!adminHiddenByTxn[row.txn_id]) adminHiddenByTxn[row.txn_id] = []; adminHiddenByTxn[row.txn_id].push(row.user_name || row.user_id); });
+      adminHiddenStatusLoaded = true;
       if (adminCurrentUser && adminCurrentUser.id === u.id) renderAdminUserTxnRows(u, mine);
     }).catch(function () {});
     showView("adminUser");
