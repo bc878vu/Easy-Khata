@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=33">
+<link rel="stylesheet" href="styles.css?v=34">
 </head>
 <body>
 
@@ -35,6 +35,22 @@
   <div class="splash-spinner" aria-label="Loading"></div>
 </div>
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('hide');},6000);</script>
+
+<script>
+window.addEventListener("error", function () {
+  var splash = document.getElementById("splash");
+  if (splash) splash.classList.add("hide");
+  var wrap = document.getElementById("authWrap");
+  var auth = document.getElementById("authBox");
+  if (wrap) wrap.hidden = false;
+  if (auth) auth.hidden = false;
+  var msg = document.getElementById("authMsg");
+  if (msg && !msg.textContent) {
+    msg.textContent = "App start hone mein masla aya. Page refresh karein; agar masla rahe to support se rabta karein.";
+    msg.className = "msg err";
+  }
+});
+</script>
 
 <div id="setupBox" class="card setup" hidden>
   <h2>Database setup baaqi hai</h2>
@@ -484,7 +500,63 @@
       </div>
     </section>
 
-ion>
+<section id="adminUserView" hidden>
+      <div class="card">
+        <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+        <h2 id="adminUserTitle" style="margin-top:10px"></h2>
+        <p id="adminUserBadges"></p>
+        <dl class="kv">
+          <dt>Email</dt><dd id="adminUserEmail"></dd>
+          <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
+          <dt>Joined</dt><dd id="adminUserJoined"></dd>
+          <dt>User ID</dt><dd id="adminUserId"></dd>
+        </dl>
+        <div id="adminUserSummary" class="summary"></div>
+        <div class="detail-actions">
+          <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
+          <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
+          <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
+          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
+        </div>
+        <div id="adminEditBox" hidden>
+          <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
+          <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
+          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
+          <p id="adminEditMsg" class="msg" role="status"></p>
+        </div>
+        <div id="adminPassBox" hidden>
+          <div class="field"><label for="adminNewPass1">Naya password</label>
+            <div class="pw-wrap">
+              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
+              <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <div class="field"><label for="adminNewPass2">Naya password dobara</label>
+            <div class="pw-wrap">
+              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
+              <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+            </div>
+          </div>
+          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
+          <p id="adminPassMsg" class="msg" role="status"></p>
+        </div>
+        <h3 style="margin-top:16px">Raqam set karein (admin)</h3>
+        <p class="muted">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
+        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500"></div>
+        <div class="field"><label>Kisam</label>
+          <div class="seg">
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
+          </div>
+        </div>
+        <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
+        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Raqam set karein</button>
+        <p id="adminSetMsg" class="msg" role="status"></p>
+        <h3 style="margin-top:16px">Is user ka hisaab</h3>
+        <div id="adminUserTxns" class="txns"></div>
+        <p id="adminUserMsg" class="msg" role="status"></p>
+      </div>
+    </section>
 
   </main>
 
@@ -496,7 +568,7 @@ ion>
 
 <button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js?v=4"></script>
 <!-- Firebase (v23): Cloud Messaging for closed-app push notifications.
      Compat builds — plain script tags, no bundler. If the CDN fails the app
@@ -506,7 +578,7 @@ ion>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- jsPDF (v24.5): PDF Report ke liye. Agar CDN fail ho to app phir bhi
      chalti hai — exportPdf() saaf error dikhata hai, crash nahi hota. -->
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- xlsx-js-style (v24.10): Excel (.xlsx) Report ke liye. SheetJS 0.18.5 ka
      drop-in fork (wahi API + window.XLSX global) — farq sirf itna hai ke ye
      cell styles (bold/fill/border/numFmt) ASAL .xlsx mein LIKHTA hai;
@@ -514,7 +586,7 @@ ion>
      jsPDF ki tarah — load na ho to export functions saaf error dikhate
      hain, crash nahi hota. Freeze panes / gridlines-hide / fit-to-page is
      writer mein supported NAHI hain — fake nahi kiye. -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
@@ -526,6 +598,6 @@ ion>
     </div>
   </div>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>
