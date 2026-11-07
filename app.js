@@ -4255,8 +4255,17 @@
   $("pickContactBtn").addEventListener("click", pickContact);
   $("addContactToggleBtn").addEventListener("click", function () {
     var b = $("addContactBox");
+    var trigger = $("addContactToggleBtn");
     b.hidden = !b.hidden;
-    if (!b.hidden) $("newContactName").focus();
+    trigger.setAttribute("aria-expanded", String(!b.hidden));
+    trigger.classList.toggle("is-open", !b.hidden);
+    trigger.querySelector(".contact-add-copy strong").textContent = b.hidden ? "Dost add karein" : "Form band karein";
+    trigger.querySelector(".contact-add-copy small").textContent = b.hidden ? "Jo abhi Easy Khata par nahi hain" : "Naya dost add karna cancel karein";
+    trigger.querySelector(".contact-add-icon").textContent = b.hidden ? "＋" : "×";
+    if (!b.hidden) {
+      $("newContactName").focus();
+      b.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   });
   if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
   $("notifBtn").addEventListener("click", showNotifView);
