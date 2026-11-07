@@ -144,7 +144,10 @@
   function isTxnHidden(id) { return !!hiddenTxnIds[id]; }
   function visibleTxns() { return txns.filter(function (t) { return !hiddenTxnIds[t.id]; }); }
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
-  var adminCurrentUser = null;\n  var adminUserSearchText = "";\n  var adminUserStatusFilter = "all";\n  var adminUserSortMode = "recent";
+  var adminCurrentUser = null;
+  var adminUserSearchText = "";
+  var adminUserStatusFilter = "all";
+  var adminUserSortMode = "recent";
   var dbReady = false;
   var authMode = "login";
   var editingId = null;
