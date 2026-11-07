@@ -1109,3 +1109,44 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   .contact-add-actions{flex-direction:row}
   .contact-add-actions .btn{min-height:39px}
 }
+
+
+/* v35 — one clear add-friend action, compact and responsive */
+.contact-add-wrap{margin:0 0 12px;min-width:0}
+.contact-add-trigger{
+  width:100%;min-width:0;min-height:54px;display:flex;align-items:center;
+  justify-content:center;gap:10px;padding:10px 14px;
+  border:1px solid #1d4ed8;border-radius:13px;
+  background:#1d4ed8;color:#fff;text-align:center;
+  box-shadow:0 4px 12px rgba(29,78,216,.18);
+  -webkit-tap-highlight-color:transparent;
+}
+.contact-add-trigger:hover,.contact-add-trigger.is-open{
+  border-color:#1e40af;background:#1e40af;color:#fff;
+  box-shadow:0 5px 14px rgba(29,78,216,.22);
+}
+.contact-add-trigger:active{transform:translateY(1px)}
+.contact-add-icon{
+  width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;
+  border-radius:8px;background:rgba(255,255,255,.16);
+  color:#fff;font-size:1.35rem;font-weight:600;line-height:1;
+}
+.contact-add-copy{display:flex;flex:0 1 auto;min-width:0;align-items:center;justify-content:center}
+.contact-add-copy strong{font-size:.94rem;font-weight:750;line-height:1.2;color:#fff}
+.contact-add-copy small,.contact-add-chevron{display:none!important}
+[data-theme="dark"] .contact-add-trigger{
+  background:#2563eb;border-color:#60a5fa;color:#fff;
+}
+[data-theme="dark"] .contact-add-trigger:hover,
+[data-theme="dark"] .contact-add-trigger.is-open{background:#1d4ed8;border-color:#93c5fd}
+.contact-add-panel{width:100%;min-width:0;margin-top:8px;padding:clamp(10px,2.5vw,15px)}
+.contact-add-panel input{width:100%;min-width:0}
+@media(max-width:360px){
+  .contact-add-trigger{min-height:48px;padding:8px 10px;gap:8px;border-radius:11px}
+  .contact-add-copy strong{font-size:.88rem}
+  .contact-add-icon{width:23px;height:23px;flex-basis:23px;font-size:1.2rem}
+}
+@media(min-width:700px){
+  .contact-add-wrap{margin-bottom:14px}
+  .contact-add-trigger{min-height:56px}
+}

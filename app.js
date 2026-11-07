@@ -4114,14 +4114,6 @@
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); });
-  $("addPersonBtn").addEventListener("click", function () {
-    showView("khata");
-    var card = $("txnFormCard");
-    if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
-    var b = $("addContactBox");
-    b.hidden = false;
-    $("newContactName").focus();
-  });
   $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
