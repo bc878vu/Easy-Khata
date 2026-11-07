@@ -137,6 +137,12 @@
   /* ---------- state ---------- */
   var profiles = [];   // {id, name, email, phone}
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
+  // v24.11: per-user hidden records — Delete kabhi real DELETE nahi karta.
+  // Har user ke apne hidden ids (khata_txn_hidden table) — sirf us ki apni
+  // history se record hat-ta hai, doosre dost ko koi fark nahi parta.
+  var hiddenTxnIds = {}; // {txnId: true}
+  function isTxnHidden(id) { return !!hiddenTxnIds[id]; }
+  function visibleTxns() { return txns.filter(function (t) { return !hiddenTxnIds[t.id]; }); }
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
   var adminCurrentUser = null;
   var dbReady = false;
@@ -262,7 +268,7 @@
     if (!profiles || !profiles.length) return;
     try {
       window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, savedAt: Date.now()
+        profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now()
       }));
     } catch (e) {}
   }
@@ -332,7 +338,7 @@
       if (!p.first || d < p.first) p.first = d;
       if (!p.last || d > p.last) p.last = d;
     }
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       var d = String(t.txn_date || "");
       if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].given += a; bump(map[t.receiver_id], d); }
@@ -342,7 +348,7 @@
   }
   function personTxns(id) {
     // This person's records, newest first (txns are already sorted desc).
-    return txns.filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
+    return visibleTxns().filter(function (t) { return t.payer_id === id || t.receiver_id === id; });
   }
 
   /* ---------- settled-history lock ----------
@@ -796,6 +802,17 @@
     if (guestMode) return Promise.resolve(false); // v24: guest ka koi outbox nahi — kuch sync nahi hota
     if (syncing) return Promise.resolve(false);
     var ops = loadOutbox();
+    // v24.11: purane version se queued khata_transactions delete ops — real
+    // DELETE kabhi nahi bhejte; hide (khata_txn_hidden insert) mein badal dein.
+    var converted = false;
+    ops.forEach(function (o) {
+      if (o.op === "delete" && o.table === "khata_transactions") {
+        o.op = "insert"; o.table = "khata_txn_hidden";
+        o.body = { txn_id: o.id, user_id: myId() };
+        converted = true;
+      }
+    });
+    if (converted) saveOutbox(ops);
     if (!ops.length || !navigator.onLine) return Promise.resolve(false);
     syncing = true;
     setTxnMsg("Sync ho raha hai…", true);
@@ -921,12 +938,19 @@
     queueOp({ key: newUuid(), op: "update", table: "khata_transactions", id: id, body: body, ts: Date.now() });
     applyTxnUpdateLocal(id, body);
   }
-  function offlineTxnDelete(id) {
-    // Pending insert hai to use hata dein (server par kabhi gaya hi nahi — delete op nahi chahiye).
-    if (!removePendingInsert("khata_transactions", id)) {
-      queueOp({ key: newUuid(), op: "delete", table: "khata_transactions", id: id, ts: Date.now() });
+  function offlineTxnHide(id) {
+    // v24.11: offline hide — pending insert hai to use hata dein (server par
+    // kabhi gaya hi nahi — hide op nahi chahiye); warna hide op queue karein
+    // (flushOutbox ki insert branch POST karti hai; 409 = pehle se hidden).
+    if (removePendingInsert("khata_transactions", id)) {
+      txns = txns.filter(function (t) { return t.id !== id; });
+    } else {
+      var ops = loadOutbox();
+      var dup = false;
+      ops.forEach(function (o) { if (o.op === "insert" && o.table === "khata_txn_hidden" && o.id === id) dup = true; });
+      if (!dup) queueOp({ key: newUuid(), op: "insert", table: "khata_txn_hidden", id: id, body: { txn_id: id, user_id: myId() }, ts: Date.now() });
+      hiddenTxnIds[id] = true;
     }
-    txns = txns.filter(function (t) { return t.id !== id; });
     saveCache();
     renderAll();
   }
@@ -940,6 +964,20 @@
     queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: rec.id, body: { id: rec.id, owner_id: rec.owner_id, name: rec.name, phone: rec.phone }, ts: Date.now() });
     saveCache();
     return rec;
+  }
+
+  function loadHiddenIds() {
+    // v24.11: meri hidden record ids lao (khata_txn_hidden). Table na ho
+    // (purana SQL) to khaali set — load kabhi is par fail nahi hota.
+    if (guestMode) return Promise.resolve(hiddenTxnIds);
+    return sb("khata_txn_hidden?select=txn_id&user_id=eq." + encodeURIComponent(myId()), {})
+      .then(function (res) {
+        if (res.ok && res.body) {
+          hiddenTxnIds = {};
+          res.body.forEach(function (r) { if (r.txn_id) hiddenTxnIds[r.txn_id] = true; });
+        }
+        return hiddenTxnIds;
+      }).catch(function () { return hiddenTxnIds; });
   }
 
   function loadAll() {
@@ -978,11 +1016,13 @@
       txns = res.body || [];
       rtLastFetch = Date.now();
       offlineMode = false;
-      renderAll();
-      loadNotifs();
-      loadContacts();
-      saveCache();
-      flushOutbox();
+      return loadHiddenIds().then(function () {
+        renderAll();
+        loadNotifs();
+        loadContacts();
+        saveCache();
+        flushOutbox();
+      });
     }).catch(function () {
       // Offline: aakhri save hua data dikhayein (agar cache hai).
       var c = loadCache();
@@ -991,6 +1031,8 @@
         dbReady = true;
         profiles = c.profiles || [];
         txns = c.txns || [];
+        hiddenTxnIds = {};
+        (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
         myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
         notifs = c.notifs || [];
         renderAll();
@@ -1118,6 +1160,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions" }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications" }, function () { scheduleLiveReload(); })
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts" }, function () { scheduleLiveReload(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden" }, function () { scheduleLiveReload(); })
         .subscribe();
     } catch (e) { rtChannel = null; }
   }
@@ -1305,7 +1348,7 @@
       .then(function (res) {
         if (!res.ok) return;
         txns = res.body || [];
-        renderAll();
+        return loadHiddenIds().then(function () { renderAll(); });
       }).catch(function () {});
   }
   function setContactMsg(text, ok) {
@@ -1382,12 +1425,12 @@
     // If there are records, those are deleted first (only the ones I created), then the contact.
     // BUT: settled history can never be deleted — if any record is locked, refuse.
     var count = 0, hasLocked = false;
-    txns.forEach(function (t) {
-      if (t.payer_id === id || t.receiver_id === id) { count++; if (isTxnLocked(t)) hasLocked = true; }
+    visibleTxns().forEach(function (t) {
+      if ((t.payer_id === id || t.receiver_id === id) && (t.payer_id === myId() || t.receiver_id === myId())) { count++; if (isTxnLocked(t)) hasLocked = true; }
     });
     if (hasLocked) { setPeopleMsg("Is dost ka settled hisaab history mein save hai — usay delete nahi kar sakte.", false); return; }
     var text = count > 0
-      ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records bhi delete ho jayenge — ye wapas nahi hoga."
+      ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records sirf aapki history se hat jayenge — doosre dost ko koi fark nahi parega. Ye wapas nahi hoga."
       : "'" + (c.name || "") + "' ko contacts se remove karein?";
     askConfirm("Dost remove karein?", text, "Remove karein", function () {
       if (guestMode) {
@@ -1414,9 +1457,9 @@
         setPeopleMsg("Contact offline remove ho gaya — online hote hi sync hoga.", true);
       };
       var deleteTxnsOffline = function () {
-        // Sirf apne banaye hue records (online version ki tarah) — locked wale pehle hi rok diye gaye.
-        var mine = txns.filter(function (t) { return t.created_by === myId() && (t.payer_id === id || t.receiver_id === id); });
-        mine.forEach(function (t) { offlineTxnDelete(t.id); });
+        // v24.11: mere + is dost ke saare visible records (banane wala koi bhi ho) — sirf mere liye hide, delete nahi. Locked wale pehle hi rok diye gaye.
+        var mine = visibleTxns().filter(function (t) { return (t.payer_id === id || t.receiver_id === id) && (t.payer_id === myId() || t.receiver_id === myId()); });
+        mine.forEach(function (t) { offlineTxnHide(t.id); });
       };
       if (isOffline()) {
         deleteTxnsOffline();
@@ -1437,15 +1480,23 @@
           });
       };
       if (count === 0) { deleteRow(); return; }
-      sb("khata_transactions?created_by=eq." + encodeURIComponent(myId()) + "&or=(payer_id.eq." + encodeURIComponent(id) + ",receiver_id.eq." + encodeURIComponent(id) + ")", { method: "DELETE" })
-        .then(function (res) {
-          if (!res.ok) { setPeopleMsg("Records delete nahi hue — dobara try karein.", false); return; }
-          refreshTxns();
-          deleteRow();
-        }).catch(function () {
-          deleteTxnsOffline();
-          deleteRowOffline();
-        });
+      // v24.11: records DELETE nahi — har aik ko mere liye hide karein (khata_txn_hidden), phir contact row delete karein.
+      var hideIds = visibleTxns().filter(function (t) { return (t.payer_id === id || t.receiver_id === id) && (t.payer_id === myId() || t.receiver_id === myId()); }).map(function (t) { return t.id; });
+      Promise.all(hideIds.map(function (tid) {
+        return sb("khata_txn_hidden", { method: "POST", prefer: "return=minimal", body: { txn_id: tid, user_id: myId() } })
+          .then(function (r) { return (r.ok || r.status === 409) ? tid : null; })
+          .catch(function () { return null; });
+      })).then(function (done) {
+        var failed = hideIds.filter(function (tid) { return done.indexOf(tid) === -1; });
+        failed.forEach(function (tid) { offlineTxnHide(tid); });
+        hideIds.forEach(function (tid) { if (done.indexOf(tid) !== -1) hiddenTxnIds[tid] = true; });
+        saveCache();
+        renderAll();
+        deleteRow();
+      }).catch(function () {
+        deleteTxnsOffline();
+        deleteRowOffline();
+      });
     });
   }
   function pickContact() {
@@ -1998,7 +2049,7 @@
     var el = $("monthStats");
     var now = todayLocal().slice(0, 7);
     var given = 0, taken = 0, count = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
       if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
       var a = Number(t.amount) || 0;
@@ -2006,7 +2057,7 @@
       if (t.payer_id === myId()) given += a;
       if (t.receiver_id === myId()) taken += a;
     });
-    if (!txns.length) { el.hidden = true; return; }
+    if (!visibleTxns().length) { el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML = "Is mahine (<strong>" + esc(monthName(now + "-01")) + "</strong>): diye <strong>" + esc(fmtRs(given)) + "</strong> · liye <strong>" + esc(fmtRs(taken)) + "</strong> · " + count + " records";
   }
@@ -2014,7 +2065,7 @@
   function renderInsights() {
     var el = $("insightStats");
     var me = myId();
-    var mine = txns.filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
+    var mine = visibleTxns().filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
     if (!mine.length) { el.hidden = true; return; }
     var biggest = mine[0], total = 0;
     var counts = {};
@@ -2117,9 +2168,50 @@
       } catch (e) { resolve(file); }
     });
   }
-  function uploadAvatar(file) {
+  // v24.11: access token 1 ghante ka hota hai. Save se pehle check karein —
+  // expired ho to refresh_token se naya lein (authValidate wala flow);
+  // refresh na ho to false (caller dobara login ka message dikhaye).
+  function ensureFreshToken() {
+    if (!session || !session.access_token) return Promise.resolve(false);
+    var expMs = Number(session.expires_at) || 0;
+    if (expMs && expMs < 1e12) expMs *= 1000; // GoTrue expires_at seconds mein deta hai
+    if (expMs && expMs - Date.now() > 60000) return Promise.resolve(true);
+    if (!session.refresh_token) {
+      // Expiry unknown aur refresh ka rasta nahi — save try karein, 401 par
+      // dobara-login ka message aayega (token shayad abhi valid ho).
+      return Promise.resolve(!expMs);
+    }
+    return authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
+      .then(function (res) {
+        if (res.ok && res.body && res.body.access_token) {
+          if (!res.body.user && session.user) res.body.user = session.user;
+          saveSession(res.body);
+          return true;
+        }
+        return false;
+      });
+    // NOTE: yahan .catch nahi — refresh ka network throw caller tak jaye
+    // (saveProfile ka isNetErr mapping), taake network failure kabhi
+    // "session khatam" na dikhe.
+  }
+  function isNetErr(e) {
+    // Real browsers: TypeError "Failed to fetch" / "NetworkError..." /
+    // "Load failed" / "Network request failed". ("network offline" bhi —
+    // test harness ka rejection message.)
+    return !!e && (e.name === "TypeError" || /failed to fetch|networkerror|network request failed|load failed|network offline/i.test(String(e.message || "")));
+  }
+  // v24.11: network throw par aik dafa retry (upload + PATCH dono idempotent
+  // hain — upload path pehle se fixed hai, PATCH/upsert dobara safe hai).
+  function withNetRetry(fn, triesLeft) {
+    return fn().catch(function (e) {
+      if (triesLeft > 0 && isNetErr(e)) return withNetRetry(fn, triesLeft - 1);
+      throw e;
+    });
+  }
+
+  function uploadAvatar(file, path) {
     return downscaleImage(file).then(function (blob) {
-      var path = myId() + "/" + Date.now() + ".jpg";
+      path = path || (myId() + "/" + Date.now() + ".jpg");
       return fetch(API + "/storage/v1/object/avatars/" + path, {
         method: "POST",
         headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "image/jpeg", "x-upsert": "true" },
@@ -2138,49 +2230,61 @@
     if (name.length > 80) { setPhoneMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
     if (username && !/^[A-Za-z0-9_.]{3,30}$/.test(username)) { setPhoneMsg("Username 3–30 harf ka ho — sirf harf, number, _ aur . chalenge.", false); return; }
     if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
-    // v24.8: offline — profile save + avatar upload server ka kaam hai;
-    // seedha saaf refusal, fetch timeout ka wait nahi. (Guest naam alag
-    // local flow hai — saveProfile sirf logged-in mode mein chalta hai.)
-    if (isOffline()) { setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false); return; }
+    // v24.11: offline pre-check hata diya — navigator.onLine ka ghalat false
+    // flag save rok deta tha jabke internet theek tha (yehi Toseef ke case
+    // ka sab se likely cause hai: koi network call hue baghair hi "internet
+    // check karein" dikh gaya). Ab seedha save try hota hai; network throw
+    // par aik dafa retry, aur har failure ki ASLI wajah dikhai jati hai
+    // (session khatam / permission / network) — 401/403 kabhi "internet"
+    // ka message nahi banenge.
     var btn = $("savePhoneBtn");
     btn.disabled = true;
     setPhoneMsg("Profile save ho rahi hai…", true);
-    var checkUsername = username
-      ? sb("khata_profiles?select=id&username=ilike." + encodeURIComponent(username.replace(/%/g, "\\%").replace(/_/g, "\\_")) + "&id=neq." + encodeURIComponent(myId()), {})
-        .then(function (res) {
-          if (res.ok && res.body && res.body.length) throw new Error("username-taken");
-        })
-      : Promise.resolve();
-    checkUsername.then(function () {
-      if (pendingAvatarFile) return uploadAvatar(pendingAvatarFile);
-      if (removeAvatar) return "__REMOVE__";
-      return null;
-    }).then(function (avatarUrl) {
-      var body = { name: name, phone: phone || null, username: username || null };
-      if (avatarUrl === "__REMOVE__") body.avatar_url = null;
-      else if (avatarUrl) body.avatar_url = avatarUrl;
-      return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
-        method: "PATCH",
-        prefer: "return=representation",
-        body: body
-      }).then(function (res) {
-        if (!res.ok) throw new Error("profile-save-failed");
-        if (res.body && res.body.length) return res.body[0];
-        // No profile row exists — PATCH silently does nothing, so create it.
-        var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
-        if (body.avatar_url) up.avatar_url = body.avatar_url;
-        return sb("khata_profiles?on_conflict=id", {
-          method: "POST",
-          prefer: "resolution=merge-duplicates,return=minimal",
-          body: up
-        }).then(function (res2) {
-          if (!res2.ok) throw new Error("profile-save-failed");
-          return up;
+    // Upload path aik dafa banayein — retry par wahi path dobara use ho
+    // (x-upsert se dobara upload safe hai).
+    var avatarPath = pendingAvatarFile ? (myId() + "/" + Date.now() + ".jpg") : null;
+    ensureFreshToken().then(function (fresh) {
+      if (!fresh) throw new Error("session-expired");
+      var doSave = function () {
+        var checkUsername = username
+          ? sb("khata_profiles?select=id&username=ilike." + encodeURIComponent(username.replace(/%/g, "\\%").replace(/_/g, "\\_")) + "&id=neq." + encodeURIComponent(myId()), {})
+            .then(function (res) {
+              if (res.ok && res.body && res.body.length) throw new Error("username-taken");
+            })
+          : Promise.resolve();
+        return checkUsername.then(function () {
+          if (pendingAvatarFile) return uploadAvatar(pendingAvatarFile, avatarPath);
+          if (removeAvatar) return "__REMOVE__";
+          return null;
+        }).then(function (avatarUrl) {
+          var body = { name: name, phone: phone || null, username: username || null };
+          if (avatarUrl === "__REMOVE__") body.avatar_url = null;
+          else if (avatarUrl) body.avatar_url = avatarUrl;
+          return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
+            method: "PATCH",
+            prefer: "return=representation",
+            body: body
+          }).then(function (res) {
+            if (!res.ok) throw new Error("profile-save-failed " + res.status);
+            if (res.body && res.body.length) return res.body[0];
+            // No profile row exists — PATCH silently does nothing, so create it.
+            var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
+            if (body.avatar_url) up.avatar_url = body.avatar_url;
+            return sb("khata_profiles?on_conflict=id", {
+              method: "POST",
+              prefer: "resolution=merge-duplicates,return=minimal",
+              body: up
+            }).then(function (res2) {
+              if (!res2.ok) throw new Error("profile-save-failed " + res2.status);
+              return up;
+            });
+          }).then(function (saved) {
+            // Auth metadata bhi sync karein (header ka naam wahi se aata hai).
+            return updateUserMeta({ full_name: name, phone: phone || "" }).then(function () { return saved; }, function () { return saved; });
+          });
         });
-      }).then(function (saved) {
-        // Auth metadata bhi sync karein (header ka naam wahi se aata hai).
-        return updateUserMeta({ full_name: name, phone: phone || "" }).then(function () { return saved; }, function () { return saved; });
-      });
+      };
+      return withNetRetry(doSave, 1);
     }).then(function (saved) {
       btn.disabled = false;
       var me = myProfile();
@@ -2204,9 +2308,15 @@
       setPhoneMsg("Profile save ho gaya! ✓", true);
     }).catch(function (e) {
       btn.disabled = false;
-      if (e && e.message === "username-taken") setPhoneMsg("Ye username kisi aur ne liya hua hai — koi aur chunein.", false);
-      else if (e && /^upload failed/.test(e.message || "")) setPhoneMsg("Photo upload nahi hui — internet check kar ke dobara try karein.", false);
-      else setPhoneMsg("Profile save nahi hui — internet check kar ke dobara try karein.", false);
+      var m = (e && e.message) || "";
+      if (m === "username-taken") setPhoneMsg("Ye username kisi aur ne liya hua hai — koi aur chunein.", false);
+      // v24.11 (v24.5 wala saveReason pattern): 401/403 = session khatam —
+      // kabhi "internet check karein" nahi; network throw = internet;
+      // baaki = dobara try karein (bina internet ka ilzaam).
+      else if (m === "session-expired" || /^profile-save-failed (401|403)/.test(m) || /^upload failed (401|403)/.test(m)) setPhoneMsg("Session khatam ho gaya — dobara login karein.", false);
+      else if (/^upload failed/.test(m)) setPhoneMsg("Photo upload nahi hui — dobara try karein.", false);
+      else if (isNetErr(e)) setPhoneMsg("Internet se rabta nahi ho raha — dobara try karein.", false);
+      else setPhoneMsg("Profile save nahi hui — dobara try karein.", false);
     });
   }
   function setPhoneMsg(text, ok) {
@@ -2238,7 +2348,7 @@
 
   function personStats(id) {
     var given = 0, taken = 0;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === myId() && t.receiver_id === id) given += a;
       if (t.receiver_id === myId() && t.payer_id === id) taken += a;
@@ -2248,7 +2358,7 @@
   function latestTxnWith(id) {
     // Most recent record between me and this person (by date, then by creation time).
     var me = myId(), best = null;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var mine = (t.payer_id === me && t.receiver_id === id) || (t.receiver_id === me && t.payer_id === id);
       if (!mine) return;
       if (!best) { best = t; return; }
@@ -2260,7 +2370,7 @@
   function latestTxn() {
     // Most recent record involving me (any person).
     var me = myId(), best = null;
-    txns.forEach(function (t) {
+    visibleTxns().forEach(function (t) {
       var mine = t.payer_id === me || t.receiver_id === me;
       if (!mine) return;
       if (!best) { best = t; return; }
@@ -2579,7 +2689,9 @@
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
-      } else if (isAdmin()) {
+      } else if (t.payer_id === me || t.receiver_id === me) {
+        // v24.11: involved non-creator — sirf apne liye hide (Delete). Admin
+        // normal view mein aam user hai — isAdmin() branch hata di gayi.
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
       html += '<div class="drow">' +
@@ -2644,7 +2756,7 @@
 
   function filteredTxns() {
     var q = txnSearchText.trim().toLowerCase();
-    return txns.filter(function (t) {
+    return visibleTxns().filter(function (t) {
       if (txnFilterPerson && t.payer_id !== txnFilterPerson && t.receiver_id !== txnFilterPerson) return false;
       if (txnFromDate && String(t.txn_date || "") < txnFromDate) return false;
       if (txnToDate && String(t.txn_date || "") > txnToDate) return false;
@@ -2688,7 +2800,7 @@
   function fullReportData() {
     var me = myId();
     var given = 0, taken = 0;
-    var list = txns.slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
+    var list = visibleTxns().slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
     list.forEach(function (t) {
       var a = Number(t.amount) || 0;
       if (t.payer_id === me) given += a;
@@ -3339,7 +3451,7 @@
       fc.hidden = !anyFilter;
       if (anyFilter) fc.textContent = list.length + " records dikh rahe hain";
     }
-    if (!txns.length) {
+    if (!visibleTxns().length) {
       $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
       refreshScrollHints();
       return;
@@ -3363,7 +3475,9 @@
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
-      } else if (isAdmin()) {
+      } else if (t.payer_id === me || t.receiver_id === me) {
+        // v24.11: involved non-creator — sirf apne liye hide (Delete). Admin
+        // normal view mein aam user hai — isAdmin() branch hata di gayi.
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
       html += '<div class="txn"><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
@@ -3629,13 +3743,32 @@
       });
   }
 
+  // v24.11: Delete = SIRF apne liye hide (khata_txn_hidden). App kabhi real
+  // DELETE nahi bhejta — na normal view se, na admin apne normal account
+  // se (admin CRUD sirf Admin Panel ke andar hota hai). Doosre dost ki
+  // history, totals aur balances bilkul nahi badalte.
+  function hideTxnOnline(id) {
+    return sb("khata_txn_hidden", { method: "POST", prefer: "return=minimal", body: { txn_id: id, user_id: myId() } })
+      .then(function (res) {
+        if (!res.ok && res.status !== 409) { setTxnMsg("Record hataya nahi gaya — dobara try karein.", false); return false; }
+        hiddenTxnIds[id] = true;
+        saveCache();
+        renderAll();
+        setTxnMsg("Record sirf aapki history se hat gaya.", true);
+        return true;
+      }).catch(function () {
+        offlineTxnHide(id);
+        setTxnMsg("Record offline hat gaya — online hote hi sync hoga.", true);
+        return true;
+      });
+  }
   function deleteTxn(id) {
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
-    if (t.created_by !== myId() && !isAdmin()) return;
-    askConfirm("Record delete karein?", "Ye record hamesha ke liye delete ho jayega.", "Delete karein", function () {
+    if (t.payer_id !== myId() && t.receiver_id !== myId()) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
+    askConfirm("Record hatayein?", "Ye record sirf aapki history se hat jayega — doosre dost ko koi fark nahi parega.", "Hatayein", function () {
     if (guestMode) {
       // v24: guest record — sirf local delete, koi server call nahi.
       txns = txns.filter(function (x) { return x.id !== id; });
@@ -3645,18 +3778,11 @@
       return;
     }
     if (isOffline()) {
-      offlineTxnDelete(id);
-      setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
+      offlineTxnHide(id);
+      setTxnMsg("Record offline hat gaya — online hote hi sync hoga.", true);
       return;
     }
-    sb("khata_transactions?id=eq." + encodeURIComponent(id), { method: "DELETE" })
-      .then(function (res) {
-        if (!res.ok) { setTxnMsg("Delete nahi hua.", false); return; }
-        loadAll();
-      }).catch(function () {
-        offlineTxnDelete(id);
-        setTxnMsg("Record offline delete ho gaya — online hote hi sync hoga.", true);
-      });
+    hideTxnOnline(id);
     });
   }
 
