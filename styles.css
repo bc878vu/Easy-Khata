@@ -68,18 +68,15 @@ body{
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   line-height:1.5;
-  /* v24.4: footer sirf Account page par hai — clearance context ke mutabiq:
-     auth (na nav na footer): 24px; app screens (sirf bottom nav): 70px;
-     Account view (nav + fixed footer): 110px (body.has-nav.has-footer). */
+  /* v24.7: footer ab Account view ke andar in-flow hai (fixed patti nahi) —
+     is liye clearance sirf context ke mutabiq: auth: 24px; app screens
+     (sirf bottom nav): 70px. has-footer scheme khatam (v24.4/v24.6 superseded). */
   padding-bottom:24px;
   overflow-x:clip;
 }
-/* v24.4: app screens par sirf bottom nav (~61px) clear karna hai — footer
-   sirf Account par hota hai (neeche has-footer rule). */
+/* v24.7: app screens par sirf bottom nav (~61px) clear karna hai — footer
+   Account view ke andar in-flow hai, clearance nahi chahiye. */
 body.has-nav{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
-/* v24.4: Account view par bottom stack = bottom nav (~61px) + fixed footer
-   (~37px) — aakhri item (Logout) footer ke peeche na chhupe. */
-body.has-nav.has-footer{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 h1{font-size:1.25rem;margin:0 0 8px}
 h2{font-size:1.05rem;margin:0 0 10px}
 h3{font-size:.95rem;margin:14px 0 6px}
@@ -427,6 +424,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .detail-banner.give .db-icon{background:var(--red-soft);color:var(--red-dark)}
 .detail-banner.settled{background:var(--card)}
 .detail-actions-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px}
+/* v24.7: LEN-DEN heading + chhota compact per-person PDF Report button. */
+.detail-len-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.detail-len-head .section-label{margin:0}
+.detail-pdf-btn{min-height:0;padding:5px 10px;font-size:.8rem;white-space:nowrap}
 .detail-action{
   display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;
   background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -497,29 +498,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 /* developer credit — only "Developed by Asad", nothing else; sits low on the
    Account screen (red-line position), colourful 3D gradient + drop shadow,
    modern professional, fully responsive. */
-/* v24.3: footer FIXED at the bottom — user order 2026-11-07 (Account screenshots):
-   "Developed by Asad" hamesha neeche fixed rahe, attractive colourful style.
-   SUPERSEDES v24.2's "110px margin untouched" rule — user ne khud badla hai:
-   fixed hone par 110px spacer ki zaroorat nahi. App screens par bottom nav ke
-   THEEK UPAR (body.has-nav offset), auth page par viewport ke bilkul neeche.
-   Text EXACTLY wahi — "Developed by Asad", koi version string nahi. Gradient
-   + 3D drop-shadow wahi (neeche @supports block). Compact strip (.95rem),
-   aik line (nowrap), background taake scroll karta content peeche se na dikhe.
-   v24.6: gradient + drop-shadow BAR se hatakar .version span par — @supports
-   block pehle .version ki background ko gradient se REPLACE karta tha, is liye
-   fixed bar transparent ho jata tha aur scroll karta Privacy text peeche se
-   dikhta tha (screenshot 2026-11-07 09:17 PKT). Ab .version par opaque
-   background:var(--bg) + border-top separator rehta hai; gradient/3D shadow
-   sirf span (text) par. Position/size/text/scope wahi. */
-.version{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);z-index:35;text-align:center;color:var(--accent);font-size:.95rem;font-weight:800;letter-spacing:.03em;margin:0;padding:6px 10px 8px;background:var(--bg);border-top:1px solid var(--line);white-space:nowrap}
-/* v24.4: footer sirf Account view par — hidden attribute hamesha jeete
-   (fixed element par bhi display:none laagu ho). */
+/* v24.7: footer — user order 2026-11-07 (screenshots): "Develop by Asad ki
+   alag SE Patti na bnao" — Diesel Converter ki tarah page ke bilkul neeche,
+   content ke andar (in-flow), chhota compact credit. SUPERSEDES v24.6 ka
+   opaque fixed bar (live tha ~09:35 PKT) aur v24.4/v24.3 ki fixed strip.
+   Ab koi position:fixed / background band / border-top / heavy drop-shadow
+   nahi — sirf chhota centred gradient text, Account view ke aakhir mein
+   (Logout ke neeche), page ke saath scroll hota hai. Text EXACTLY wahi —
+   "Developed by Asad". Light + dark dono theme mein gradient ke dark
+   variants (--credit-1/2/3) use hote hain. */
+.version{text-align:center;color:var(--accent);font-size:.82rem;font-weight:700;letter-spacing:.03em;margin:18px 0 2px;padding:0;white-space:nowrap}
+/* footer sirf Account view par — hidden attribute hamesha jeete. */
 .version[hidden]{display:none}
-/* Bottom nav ~61px (padding 12 + button ~48 + border 1) — footer uske theek
-   upar; +1px clearance taake nav ka top border kabhi cover na ho. */
-body.has-nav .version{bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
-  .version span{display:inline-block;background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 2px 2px rgba(15,23,42,.35)) drop-shadow(0 6px 12px rgba(37,99,235,.25))}
+  .version span{display:inline-block;background:linear-gradient(90deg,var(--credit-1),var(--credit-2),var(--credit-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
 }
 
 /* ---------- notifications / admin ---------- */

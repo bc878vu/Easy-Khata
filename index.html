@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=30">
+<link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
 
@@ -275,7 +275,11 @@
         <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span>WhatsApp</span></button>
         <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span>Hisaab barabar</span></button>
       </div>
-      <p class="section-label">LEN-DEN</p>
+      <div class="detail-len-head">
+        <p class="section-label">LEN-DEN</p>
+        <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button">📄 PDF Report</button>
+      </div>
+      <p id="detailPdfMsg" class="msg" role="status"></p>
       <div id="detailTxns" class="dtable scroll-box"></div>
       <p id="detailScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane len-den dekhne ke liye</p>
       <div class="detail-bottom">
@@ -394,6 +398,12 @@
         <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
         <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
       </div>
+      <!-- v24.7: footer ab Account view ke andar, content ke bilkul aakhir mein
+           (in-flow) — Diesel Converter ki tarah: alag fixed patti nahi, page ki
+           neeche wali khaali jagah mein chhota compact credit. Text EXACTLY
+           "Developed by Asad". showView("account") par dikhta hai, baaki views
+           par hidden (accountView khud hidden hota hai + vf.hidden toggle). -->
+      <p class="version" id="versionFooter" hidden><span>Developed by Asad</span></p>
     </section>
 
     <section id="notifView" hidden>
@@ -516,12 +526,6 @@
     </div>
   </div>
 
-<!-- v24.4: footer SIRF Account (settings) page par — v24.3 ka "global fixed"
-     rule user order se supersede ho gaya (Khata/detail par fixed footer
-     content ke upar aa jata tha). Body-level hi rehta hai, showView("account")
-     par dikhta hai, baaki views par hidden. Text bilkul wahi: "Developed by Asad". -->
-<p class="version" id="versionFooter" hidden><span>Developed by Asad</span></p>
-
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>

@@ -425,11 +425,10 @@
     hideSplash();
     teardownRealtime();
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
-    // v24.4: auth page par na bottom nav hota hai na footer — footer sirf
-    // Account page par dikhta hai (body.has-nav + has-footer hatao).
+    // v24.7: auth page par na bottom nav hota hai na footer — footer sirf
+    // Account view ke andar dikhta hai (in-flow, showView toggle karta hai).
     // Logout/boot par icon badge bhi clear (koi user nahi = koi unread nahi).
     document.body.classList.remove("has-nav");
-    document.body.classList.remove("has-footer");
     clearAppBadgeNow();
     var vf0 = $("versionFooter");
     if (vf0) vf0.hidden = true;
@@ -484,13 +483,11 @@
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser");
     $("fabAdd").hidden = name !== "khata";
-    // v24.4: footer SIRF Account (settings) page par — Khata/detail/notifs/
-    // admin par fixed footer content ke upar aa jata tha (screenshots:
-    // "+ Dost add karein" button aur "Kis liye?" field par overlap). Footer
-    // Account par fixed rehta hai (bottom nav ke upar), baaki views par hidden.
+    // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
+    // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
+    // baaki views par sirf hidden karna kaafi hai (koi fixed bar nahi).
     var vf = $("versionFooter");
     if (vf) vf.hidden = name !== "account";
-    document.body.classList.toggle("has-footer", name === "account");
     window.scrollTo(0, 0);
   }
   function showAppView() {
@@ -2484,6 +2481,7 @@
     var id = detailPersonId;
     var p = findPerson(id);
     if (!p) { detailPersonId = null; showView("khata"); return; }
+    setDetailPdfMsg(""); // dost badle to purana PDF message na rahe
     var s = personStats(id);
     var list = personTxns(id);
     var first = null;
@@ -2761,6 +2759,135 @@
       setAcctBackupMsg("PDF Report download ho gaya (" + list.length + " records).", true);
     } catch (e) {
       setAcctBackupMsg("PDF nahi ban saka — dobara try karein.", false);
+    }
+  }
+  function setDetailPdfMsg(text, ok) {
+    var el = $("detailPdfMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  // v24.7: shared PDF primitives — exportPdf (poora hisaab) aur
+  // exportPersonPdf (aik dost ka hisaab) dono isi pattern se page banate
+  // hain. exportPdf ko chheda nahi (v24.5 se tested hai) — sirf naya
+  // function is factory ko use karta hai.
+  function pdfBase(doc) {
+    var W = 595, M = 40, R = W - M;
+    var st = { y: 52 };
+    function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+    function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
+    function needPage(minY) {
+      if (st.y + minY > 775) { doc.addPage(); st.y = 52; return true; }
+      return false;
+    }
+    function section(title) {
+      needPage(34);
+      st.y += 14;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+      doc.text(title, M, st.y); st.y += 8;
+      hline(st.y); st.y += 16;
+    }
+    function addFooter() {
+      var pages = doc.getNumberOfPages();
+      for (var i = 1; i <= pages; i++) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.setTextColor(130, 130, 130);
+        doc.text("Easy Khata — Developed by Asad", M, 822);
+        doc.text("Page " + i + " / " + pages, R, 822, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+      }
+    }
+    function fileName(name) {
+      var s = String(name || "dost").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return s || "dost";
+    }
+    return { doc: doc, st: st, W: W, M: M, R: R, trunc: trunc, hline: hline, needPage: needPage, section: section, addFooter: addFooter, fileName: fileName };
+  }
+  // v24.7: Per-person PDF Report — detail view se (kisi bhi dost ka: profile
+  // user ya manual contact). Sirf US dost ke records — baaki doston ka kuch
+  // nahi. Sirf in-memory data (guest mode mein bhi chalta hai, ZERO network
+  // calls). Locked (Settled) records bhi list mein aate hain — read-only
+  // report hai, edit/delete nahi.
+  function exportPersonPdf(personId) {
+    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+    if (!PdfCtor) { setDetailPdfMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+    var p = findPerson(personId);
+    if (!p) { setDetailPdfMsg("PDF nahi ban saka — dobara try karein.", false); return; }
+    try {
+      var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
+      var doc = base.doc, M = base.M, R = base.R, st = base.st;
+      var me = myId();
+      var s = personStats(personId);
+      // Newest first (detail view jaisi order) + running balance (oldest-first
+      // accumulate, phir newest-first dikhao — renderDetailTxns wali logic).
+      var sorted = personTxns(personId).slice().sort(function (a, b) {
+        var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
+        if (d) return d;
+        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+      });
+      var asc = sorted.slice().reverse();
+      var run = 0, balById = {};
+      asc.forEach(function (t) {
+        var a = Number(t.amount) || 0;
+        if (t.payer_id === me) run += a;
+        else if (t.receiver_id === me) run -= a;
+        balById[t.id] = run;
+      });
+      // Header
+      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+      doc.text(base.trunc(p.name || p.email, 30) + " — Hisaab Report", M, st.y); st.y += 22;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text("Dost: " + base.trunc(p.name || p.email, 40), M, st.y); st.y += 16;
+      doc.text("Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + sorted.length, M, st.y); st.y += 10;
+      base.hline(st.y); st.y += 18;
+      // Totals
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+      doc.text("Is dost ka hisaab", M, st.y); st.y += 18;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text("Diye: " + fmtRs(s.given), M, st.y); st.y += 16;
+      doc.text("Liye: " + fmtRs(s.taken), M, st.y); st.y += 16;
+      var netTxt = "Net: " + fmtRs(Math.abs(s.net)) + (s.net > 0 ? " (mujhe milne hain)" : s.net < 0 ? " (mujhe dene hain)" : " (barabar hai)");
+      doc.text(netTxt, M, st.y); st.y += 8;
+      // History — sirf is dost ke records
+      base.section("Len-den history (" + sorted.length + " records)");
+      function histHeader() {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+        doc.text("Date", M, st.y);
+        doc.text("Note", 115, st.y);
+        doc.text("Diye", 320, st.y, { align: "right" });
+        doc.text("Liye", 405, st.y, { align: "right" });
+        doc.text("Balance", R, st.y, { align: "right" });
+        st.y += 6; base.hline(st.y); st.y += 14;
+        doc.setFont("helvetica", "normal");
+      }
+      histHeader();
+      if (!sorted.length) { doc.text("Abhi koi record nahi.", M, st.y); st.y += 14; }
+      sorted.forEach(function (t) {
+        if (base.needPage(14)) histHeader();
+        var a = Number(t.amount) || 0;
+        var iGave = t.payer_id === me;
+        var bal = balById[t.id];
+        var balTxt = bal > 0 ? "+ " + fmtRs(bal) : bal < 0 ? "− " + fmtRs(-bal) : "Rs 0";
+        doc.setFontSize(10);
+        doc.text(fmtDate(t.txn_date), M, st.y);
+        doc.text(base.trunc(t.note || "Food", 26), 115, st.y);
+        doc.text(iGave ? fmtRs(a) : "", 320, st.y, { align: "right" });
+        doc.text(!iGave ? fmtRs(a) : "", 405, st.y, { align: "right" });
+        doc.text(balTxt, R, st.y, { align: "right" });
+        st.y += 14;
+      });
+      base.addFooter();
+      var blob = doc.output("blob");
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "Easy-Khata-" + base.fileName(p.name || p.email) + "-Report.pdf";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      setDetailPdfMsg("PDF Report download ho gaya (" + sorted.length + " records).", true);
+    } catch (e) {
+      setDetailPdfMsg("PDF nahi ban saka — dobara try karein.", false);
     }
   }
   // Scrollable history boxes (v21): box tab scrollable ho (scrollHeight >
@@ -3170,6 +3297,7 @@
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
   $("detailSettleBtn").addEventListener("click", function () { if (detailPersonId) settlePerson(detailPersonId); });
+  $("detailPdfBtn").addEventListener("click", function () { if (detailPersonId) exportPersonPdf(detailPersonId); }); // v24.7: per-person PDF Report
   $("detailRemoveBtn").addEventListener("click", function () { if (detailPersonId) deleteContact(detailPersonId); });
   $("detailDiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "given"); });
   $("detailLiyeBtn").addEventListener("click", function () { if (detailPersonId) openAddFor(detailPersonId, "taken"); });
