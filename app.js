@@ -150,6 +150,7 @@
   }
   function sb(path, opts) {
     opts = opts || {};
+    var method = String(opts.method || "GET").toUpperCase();
     var headers = {
       "apikey": ANON,
       "Authorization": "Bearer " + authToken(),
@@ -160,17 +161,47 @@
       headers["Range-Unit"] = "items";
       headers["Range"] = opts.range;
     }
-    return fetchWithTimeout(API + "/rest/v1/" + path, {
-      method: opts.method || "GET",
-      headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    }, 12000).then(function (r) {
-      return r.text().then(function (t) {
-        var j = null;
-        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
-        return { ok: r.ok, status: r.status, body: j, raw: t };
+    function request() {
+      return fetchWithTimeout(API + "/rest/v1/" + path, {
+        method: method, headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      }, 15000).then(function (r) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+          return { ok: r.ok, status: r.status, body: j, raw: t };
+        });
       });
-    });
+    }
+    function wait(ms) { return new Promise(function(resolve){setTimeout(resolve,ms);}); }
+    function refreshOnce() {
+      if (!session || !session.refresh_token) return Promise.resolve(false);
+      return authCall("/token?grant_type=refresh_token",{refresh_token:session.refresh_token}).then(function(res){
+        if(!res.ok||!res.body||!res.body.access_token)return false;
+        if(!res.body.user&&session.user)res.body.user=session.user;
+        saveSession(res.body);
+        headers.Authorization="Bearer "+authToken();
+        return true;
+      });
+    }
+    function run(authRetried,networkAttempt) {
+      return request().then(function(res){
+        if(res.status===401&&!authRetried&&session&&session.refresh_token){
+          return refreshOnce().then(function(ok){return ok?run(true,networkAttempt):res;});
+        }
+        if(method==="GET"&&(res.status>=500)&&networkAttempt<2){
+          return wait(400*(networkAttempt+1)).then(function(){return run(authRetried,networkAttempt+1);});
+        }
+        return res;
+      }).catch(function(err){
+        var transient=err&&(err.name==="TypeError"||err.message==="request-timeout"||/failed to fetch|networkerror|network request failed|load failed/i.test(String(err.message||"")));
+        if(method==="GET"&&transient&&networkAttempt<2){
+          return wait(450*(networkAttempt+1)).then(function(){return run(authRetried,networkAttempt+1);});
+        }
+        throw err;
+      });
+    }
+    return run(false,0);
   }
 
   /* ---------- state ---------- */
