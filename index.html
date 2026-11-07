@@ -166,7 +166,9 @@ window.addEventListener("error", function () {
   <div id="workspaceBar" class="workspace-bar" hidden>
     <label for="workspaceSelect">Workspace</label>
     <select id="workspaceSelect" aria-label="Active workspace"></select>
-    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Business</button>
+    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Communities</button>
+    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Create</button>
+    <button id="workspaceSetupBtn" class="btn btn-ghost" type="button" hidden>Set password</button>
     <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite</button>
     <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Members</button>
   </div>
@@ -619,6 +621,66 @@ window.addEventListener("error", function () {
      hain, crash nahi hota. Freeze panes / gridlines-hide / fit-to-page is
      writer mein supported NAHI hain — fake nahi kiye. -->
 <script async src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <div id="communityOverlay" class="modal-overlay" hidden>
+    <section class="community-modal" role="dialog" aria-modal="true" aria-labelledby="communityModalTitle">
+      <header class="community-modal-head">
+        <div><span class="eyebrow">EASY KHATA COMMUNITIES</span><h2 id="communityModalTitle">Explore communities</h2></div>
+        <button id="communityModalClose" class="modal-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="community-tabs">
+        <button id="communityTabCreate" type="button">Create community</button>
+        <button id="communityTabJoin" type="button">Find & join</button>
+      </div>
+      <div id="communityPanelCreate" class="community-panel" hidden>
+        <p class="muted">Apni company ya office ki private community banayein. Username unique hoga aur password sirf server par securely hash hoga.</p>
+        <div class="field"><label for="newCommunityName">Community name</label><input id="newCommunityName" maxlength="100" placeholder="Example: Power House"></div>
+        <div class="field"><label for="newCommunityUsername">Community username</label><input id="newCommunityUsername" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="example: powerhouse"></div>
+        <div class="field"><label for="newCommunityPassword">Community password</label><input id="newCommunityPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters"></div>
+        <div class="field"><label for="newCommunityDescription">Short description (optional)</label><textarea id="newCommunityDescription" maxlength="240" rows="2" placeholder="What is this community for?"></textarea></div>
+        <button id="communityCreateSubmit" class="btn btn-primary btn-block" type="button">Create secure community</button>
+      </div>
+      <div id="communityPanelJoin" class="community-panel" hidden>
+        <p class="muted">Community directory se apni community dhoondein. Join karne ke liye exact username aur password required hai; phir owner approval dega.</p>
+        <div class="community-search"><input id="communitySearch" type="search" placeholder="Search community name or username"><span>⌕</span></div>
+        <div id="communityDirectory" class="community-directory"><p class="muted">Communities load ho rahi hain…</p></div>
+        <div class="community-join-form">
+          <h3>Join a community</h3>
+          <div class="field"><label for="joinCommunityUsername">Community username</label><input id="joinCommunityUsername" autocapitalize="none" autocomplete="off" placeholder="Exact username"></div>
+          <div class="field"><label for="joinCommunityPassword">Community password</label><input id="joinCommunityPassword" type="password" autocomplete="off" placeholder="Community password"></div>
+          <button id="communityJoinSubmit" class="btn btn-primary btn-block" type="button">Verify & request to join</button>
+        </div>
+      </div>
+      <div id="communityPanelSetup" class="community-panel" hidden>
+        <p class="muted">Existing Power House community ka username pehle se set hai. Apna private password set karein. Password set hone ke baad hi community public directory mein nazar aayegi.</p>
+        <div class="community-username-chip" id="communitySetupUsername">@powerhouse</div>
+        <div class="field"><label for="communitySetupPassword">New community password</label><input id="communitySetupPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters"></div>
+        <button id="communitySetupSubmit" class="btn btn-primary btn-block" type="button">Save password & list community</button>
+      </div>
+      <p id="communityMsg" class="msg" role="status" hidden></p>
+    </section>
+  </div>
+
+  <div id="membersOverlay" class="modal-overlay" hidden>
+    <section class="community-modal members-modal" role="dialog" aria-modal="true" aria-labelledby="membersModalTitle">
+      <header class="community-modal-head">
+        <div><span class="eyebrow">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle">Members & requests</h2></div>
+        <button id="membersModalClose" class="modal-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="community-invite-box">
+        <h3>Invite by email</h3>
+        <div class="community-invite-row">
+          <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address">
+          <select id="workspaceInviteRole" aria-label="Invite role"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+          <button id="workspaceInviteSubmit" class="btn btn-primary" type="button">Copy invite link</button>
+        </div>
+      </div>
+      <h3>Pending join requests</h3>
+      <div id="communityRequestsList" class="community-list"></div>
+      <h3 class="members-section-title">Active members</h3>
+      <div id="workspaceMemberCards" class="community-list"></div>
+    </section>
+  </div>
+
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
