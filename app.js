@@ -102,8 +102,28 @@
   function authToken() { return session && session.access_token ? session.access_token : ANON; }
 
   /* ---------- Supabase helpers ---------- */
+  function fetchWithTimeout(url, options, timeoutMs) {
+    options = options || {};
+    var controller = window.AbortController ? new window.AbortController() : null;
+    if (controller) options.signal = controller.signal;
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (controller) { try { controller.abort(); } catch (e) {} }
+        if (!settled) { settled = true; reject(new Error("request-timeout")); }
+      }, timeoutMs || 12000);
+      fetch(url, options).then(function (response) {
+        if (settled) return;
+        settled = true; clearTimeout(timer); resolve(response);
+      }, function (error) {
+        if (settled) return;
+        settled = true; clearTimeout(timer); reject(error);
+      });
+    });
+  }
+
   function authCall(path, body) {
-    return fetch(API + "/auth/v1" + path, {
+    return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -111,7 +131,7 @@
         "Authorization": "Bearer " + ANON
       },
       body: JSON.stringify(body || {})
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+    }, 12000).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
   function sb(path, opts) {
     opts = opts || {};
@@ -121,11 +141,11 @@
       "Content-Type": "application/json"
     };
     if (opts.prefer) headers["Prefer"] = opts.prefer;
-    return fetch(API + "/rest/v1/" + path, {
+    return fetchWithTimeout(API + "/rest/v1/" + path, {
       method: opts.method || "GET",
       headers: headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined
-    }).then(function (r) {
+    }, 12000).then(function (r) {
       return r.text().then(function (t) {
         var j = null;
         try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
@@ -747,9 +767,9 @@
       enterGuestMode();
       return;
     }
-    fetch(API + "/auth/v1/user", {
+    fetchWithTimeout(API + "/auth/v1/user", {
       headers: { "apikey": ANON, "Authorization": "Bearer " + session.access_token }
-    }).then(function (r) {
+    }, 8000).then(function (r) {
       if (r.ok) return r.json();
       if (session.refresh_token) {
         return authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
