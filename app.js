@@ -91,7 +91,7 @@
     var nextId = session && session.user ? session.user.id : "";
     setUserScopedStorage(nextId);
     if (previousId !== nextId) {
-      workspaces = []; currentWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
+      workspaces = []; currentWorkspaceId = ""; dataWorkspaceId = ""; profiles = []; txns = []; myContacts = []; hiddenTxnIds = {};
       try { teardownRealtime(); } catch (e) {}
     }
     try {
