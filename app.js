@@ -1215,6 +1215,10 @@
         .subscribe();
     } catch (e) { rtChannel = null; }
   }
+  // Realtime CDN loads asynchronously so it cannot delay first paint.
+  window.EASY_KHATA_ON_SUPABASE_READY = function () {
+    if (session && !guestMode) setupRealtime();
+  };
   function teardownRealtime() {
     try {
       if (rtTimer) { clearTimeout(rtTimer); rtTimer = null; }
