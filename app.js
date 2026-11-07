@@ -1197,7 +1197,7 @@
           var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
           saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
           var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
-          remove.addEventListener("click",function(){if(!window.confirm("Member ka access remove karein? Purana ledger record mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
+          remove.addEventListener("click",function(){if(!window.confirm("Is member ka community access band karein? Purana hisaab mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
           actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
         }
         box.appendChild(card);
@@ -1348,7 +1348,7 @@
       }).catch(function () {
         syncing = false;
         renderOffline();
-        setTxnMsg("Sync ruk gaya — internet aate hi dobara hoga.", false);
+        setTxnMsg("Internet aate hi pending records khud update ho jayenge.", false);
         return Promise.resolve(false);
       });
     }
@@ -1617,7 +1617,7 @@
       }
       try { window.localStorage.removeItem(GUEST_KEY); } catch (e) {}
       loadAll(); // pehle load (ye txnMsg saaf karta hai), phir kamyabi ka message
-      setTxnMsg("Guest hisaab cloud mein save ho gaya! ✓", true);
+      setTxnMsg("Aap ka guest hisaab account mein save ho gaya! ✓", true);
     }).catch(function () {
       setTxnMsg("Hisaab transfer nahi ho saka. Internet check karke dobara koshish karein. Aapka mehmaan wala hisaab mehfooz hai.", false);
     });
@@ -2264,7 +2264,7 @@
     if (reason === "sw-not-ready") return "Service worker ready nahi hua — app band kar ke dobara kholein, phir try karein.";
     if (reason === "subscribe-failed") return "Subscription nahi bani" + (detail ? " (" + detail + ")" : "") + " — Chrome mein kholein (WhatsApp/Facebook ke andar wale browser se nahi), internet check karein, phir try karein.";
     if (reason === "fcm-init-failed") return "Firebase start nahi hua" + (detail ? " (" + detail + ")" : "") + " — app refresh kar ke dobara try karein.";
-    if (reason === "fcm-token-failed") return "Firebase token nahi bana" + (detail ? " (" + detail + ")" : "") + " — internet check karein aur dobara try karein.";
+    if (reason === "fcm-token-failed") return "Notifications tayyar nahi ho sakin. Internet check karke dobara try karein.";
     if (reason === "save-failed") return "Internet se rabta nahi ho raha. Dobara try karein.";
     if (reason === "save-denied") return "Notifications on nahi ho sakin. App dobara khol kar try karein.";
     return "Notifications on nahi hui — dobara try karein.";
@@ -2738,7 +2738,7 @@
       if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. Dobara koshish karein.", false); return; }
       txns = txns.filter(function (x) { return x.id !== id; });
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
-      setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
+      setAdminUserMsg("Record hamesha ke liye delete ho gaya.", true);
     }).catch(function (e) { setAdminUserMsg("Record delete nahi ho saka. Dobara try karein.", false); });
   }
   function openAdminUser(id) {
@@ -4483,7 +4483,7 @@
 
   function addTxn(e) {
     e.preventDefault();
-    if (!dbReady) { setTxnMsg("Database setup baaqi hai.", false); return; }
+    if (!dbReady) { setTxnMsg("App abhi tayyar nahi. Barah-e-karam support se rabta karein.", false); return; }
     var person = $("txnPerson").value;
     var dir = (document.querySelector('input[name="txnDir"]:checked') || {}).value || "given";
     var amount = parseFloat($("txnAmount").value);
@@ -4945,7 +4945,7 @@
       // v24: guest mode mein koi "Sync pending" nahi hota — sirf asli
       // offline honay par badge dikhe (sab kuch local hai).
       b.hidden = navigator.onLine;
-      b.textContent = "Offline";
+      b.textContent = "Internet nahi hai";
       return;
     }
     var pending = loadOutbox().length;
@@ -4956,7 +4956,7 @@
       // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
       // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
       b.hidden = false;
-      b.textContent = pending > 0 ? "Internet nahi hai · "+pending+" changes baqi" : "Offline";
+      b.textContent = pending > 0 ? "Internet nahi hai · "+pending+" changes baqi" : "Internet nahi hai";
     } else if (pending > 0) {
       b.hidden = false;
       b.textContent = pending+" changes baqi hain";
