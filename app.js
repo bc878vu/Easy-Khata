@@ -734,9 +734,11 @@
   function communityOnboardingKey(email) {
     return "easykhata_community_onboarding_v1_" + String(email || "").trim().toLowerCase();
   }
+  var signupCommunityIntentMemory = null;
   function signupCommunityIntentKey(email) { return "easykhata_signup_community_intent_v1_" + String(email||"").trim().toLowerCase(); }
   function saveSignupCommunityIntent(intent, username) {
-    try { window.localStorage.setItem(signupCommunityIntentKey($("authEmail").value), JSON.stringify({intent:intent,username:username||""})); } catch(e) {}
+    signupCommunityIntentMemory = {intent:intent,username:username||""};
+    try { window.localStorage.setItem(signupCommunityIntentKey($("authEmail").value), JSON.stringify(signupCommunityIntentMemory)); } catch(e) {}
   }
   function loadSignupCommunityDirectory(search) {
     var list=$("signupCommunityDirectory"); if(!list)return;
@@ -816,7 +818,7 @@
     if (password.length < 6) { setAuthMsg("Password kam se kam 6 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
     var isSignup = authMode === "signup";
-    if(isSignup){try{var pendingIntent=window.localStorage.getItem(signupCommunityIntentKey(email));if(!pendingIntent)saveSignupCommunityIntent("join","");}catch(e){}}
+    if(isSignup){try{if(signupCommunityIntentMemory)window.localStorage.setItem(signupCommunityIntentKey(email),JSON.stringify(signupCommunityIntentMemory));var pendingIntent=window.localStorage.getItem(signupCommunityIntentKey(email));if(!pendingIntent)saveSignupCommunityIntent("join","");}catch(e){}}
     btn.disabled = true;
     var p = isSignup
       ? authCall("/signup", { email: email, password: password, data: { full_name: name, phone: phone || "", app: "easy-khata" } })
