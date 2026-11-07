@@ -1391,10 +1391,6 @@
   function restoreHiddenTxn(id) {
     if (!hiddenTxnIds[id] || guestMode) return;
     delete hiddenTxnIds[id]; saveCache(); renderAll(); renderHiddenTxns();
-    if (!navigator.onLine) {
-      if (!removePendingInsert("khata_txn_hidden", id)) queueOp({ key: newUuid(), op: "unhide", table: "khata_txn_hidden", id: id, ts: Date.now() });
-      return;
-    }
     sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" })
       .then(function (res) {
         if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Restore nahi hua (" + res.status + ").", false); }
@@ -1614,11 +1610,11 @@
     rtTimer = setTimeout(function () { rtTimer = null; liveReload(); }, 300);
   }
   function scheduleRealtimeRetry() {
-    if (guestMode || !session || !navigator.onLine || rtRetryTimer) return;
+    if (guestMode || !session || rtRetryTimer) return;
     rtRetryTimer = setTimeout(function () {
       rtRetryTimer = null;
       if (!rtChannel && session && !guestMode && navigator.onLine) setupRealtime();
-    }, 5000);
+    }, 15000);
   }
   function setupRealtime() {
     try {
@@ -2579,7 +2575,6 @@
     if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
-    if (!navigator.onLine) { setAdminMsg("Admin kaam ke liye internet chahiye.", false); return; }
     if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band hoga aur workspace access suspend hoga. Ledger records aur history mehfooz rahenge.")) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
@@ -2602,7 +2597,6 @@
   // foran login kar sakta hai. Admin ka kaam online-only hai.
   function createAdminUser() {
     if (!isAdmin()) return;
-    if (!navigator.onLine) { setAdminAddMsg("Admin kaam ke liye internet chahiye.", false); return; }
     var name = $("adminAddName").value.trim();
     var email = $("adminAddEmail").value.trim();
     var phone = $("adminAddPhone").value.trim();
@@ -2664,7 +2658,7 @@
     $("adminUserTxns").innerHTML = html;
   }
   function adminEditTxn(id) {
-    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin edit ke liye internet chahiye.", false); return; }
+    if (!isAdmin()) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
     var amount = window.prompt("Nayi raqam (Rs):", String(t.amount)); if (amount === null) return;
@@ -2679,7 +2673,7 @@
     }).catch(function (e) { setAdminUserMsg("Admin edit request fail: " + e.message, false); });
   }
   function adminDeleteTxn(id) {
-    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin delete ke liye internet chahiye.", false); return; }
+    if (!isAdmin()) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
     if (!window.confirm("Ye record permanently dono users ki history aur database se delete hoga. Ye wapas nahi hoga. Continue?")) return;
@@ -2739,7 +2733,6 @@
   }
   function saveAdminEdit() {
     if (!isAdmin() || !adminCurrentUser) return;
-    if (!navigator.onLine) { setAdminEditMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var name = $("adminEditName").value.trim();
     var phone = $("adminEditPhone").value.trim();
     if (!name) { setAdminEditMsg("Naam khaali nahi ho sakta.", false); return; }
@@ -2759,7 +2752,6 @@
   }
   function saveAdminPass() {
     if (!isAdmin() || !adminCurrentUser) return;
-    if (!navigator.onLine) { setAdminPassMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var p1 = $("adminNewPass1").value;
     var p2 = $("adminNewPass2").value;
     if (!p1 || p1.length < 6) { setAdminPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
@@ -2780,7 +2772,6 @@
     var u = adminCurrentUser;
     if (u.id === myId()) { setAdminUserMsg("Khud ko block nahi kar sakte.", false); return; }
     var blocking = !u.blocked;
-    if (!navigator.onLine) { setAdminUserMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     if (!window.confirm(blocking
       ? ("'" + (u.name || u.email) + "' — BLOCK karein?\n\nWo dobara login nahi kar sakega (un ka data mehfooz rahega).")
       : ("'" + (u.name || u.email) + "' — UNBLOCK karein?"))) return;
@@ -2803,7 +2794,6 @@
   }
   function saveAdminSet() {
     if (!isAdmin() || !adminCurrentUser) return;
-    if (!navigator.onLine) { setAdminSetMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var amount = parseFloat($("adminSetAmount").value);
     if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setAdminSetMsg("Raqam 0 se zyada aur maximum 2 decimal places mein honi chahiye.", false); return; }
     amount = moneyFromMinor(moneyToMinor(amount));
@@ -4861,7 +4851,9 @@
       return;
     }
     var pending = loadOutbox().length;
-    if (!navigator.onLine || offlineMode) {
+    var recentlyReachable = lastNetworkResponseAt && (Date.now()-lastNetworkResponseAt)<20000;
+    var actuallyOffline = offlineMode || (!navigator.onLine && !recentlyReachable);
+    if (actuallyOffline) {
       // offlineMode = load fail hua aur cache se dikhaya ja raha hai
       // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
       // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
