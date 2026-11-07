@@ -1483,17 +1483,37 @@
   }
   function linkContactToProfile(c, target) {
     var me = myId();
-    return sb("khata_transactions?payer_id=eq." + encodeURIComponent(c.id) + "&created_by=eq." + encodeURIComponent(me),
-      { method: "PATCH", body: { payer_id: target.id } })
-      .then(function () {
-        return sb("khata_transactions?receiver_id=eq." + encodeURIComponent(c.id) + "&created_by=eq." + encodeURIComponent(me),
-          { method: "PATCH", body: { receiver_id: target.id } });
-      }).then(function () {
-        return sb("khata_contacts?id=eq." + encodeURIComponent(c.id), { method: "DELETE" });
-      }).then(function () {
-        myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
-        return true;
-      }).catch(function () { return false; });
+    // Never delete the manual contact until every matching ledger row has
+    // actually been migrated. PostgREST can return 2xx with zero rows under RLS.
+    function moveParty(field) {
+      var filter = field + "=eq." + encodeURIComponent(c.id) + "&created_by=eq." + encodeURIComponent(me);
+      return sb("khata_transactions?select=id&" + filter)
+        .then(function (found) {
+          if (!found.ok) throw new Error("contact-link-read-failed");
+          var rows = Array.isArray(found.body) ? found.body : [];
+          if (!rows.length) return true;
+          return sb("khata_transactions?" + filter, {
+            method: "PATCH",
+            prefer: "return=representation",
+            body: (function () { var x = {}; x[field] = target.id; return x; })()
+          }).then(function (updated) {
+            if (!updated.ok || !Array.isArray(updated.body) || updated.body.length !== rows.length) {
+              throw new Error("contact-link-update-incomplete");
+            }
+            return true;
+          });
+        });
+    }
+    return moveParty("payer_id").then(function () {
+      return moveParty("receiver_id");
+    }).then(function () {
+      return sb("khata_contacts?id=eq." + encodeURIComponent(c.id) +
+        "&owner_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=representation" });
+    }).then(function (removed) {
+      if (!removed.ok) throw new Error("contact-link-cleanup-failed");
+      myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
+      return true;
+    }).catch(function () { return false; });
   }
   function refreshTxns() {
     return sb("khata_transactions?select=*&order=txn_date.desc&order=created_at.desc&limit=500")
