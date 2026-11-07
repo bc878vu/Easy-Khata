@@ -923,14 +923,18 @@
     sel.value=currentWorkspaceId;
     $("workspaceInviteBtn").hidden=!active||active.type!=="business";
     $("workspaceMembersBtn").hidden=!active||active.type!=="business";
-    $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed;
+    $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed||active.current_role!=="owner";
   }
   function loadWorkspaces(){
     return sb("khata_workspaces?select=id,name,type,created_by,status,community_username,community_listed&status=eq.active&order=created_at.asc").then(function(res){
       if(!res.ok)throw new Error("workspaces load failed");
       workspaces=Array.isArray(res.body)?res.body:[];
       if(!workspaces.some(function(w){return w.id===currentWorkspaceId;}))throw new Error("active workspace inaccessible");
-      renderWorkspaceBar();return workspaces;
+      return sb("khata_workspace_members?select=workspace_id,role&user_id=eq."+encodeURIComponent(myId())+"&status=eq.active").then(function(mr){
+        var roles=mr.ok&&Array.isArray(mr.body)?mr.body:[];
+        workspaces.forEach(function(w){var m=roles.filter(function(x){return x.workspace_id===w.id;})[0];w.current_role=m?m.role:""});
+        renderWorkspaceBar();return workspaces;
+      });
     });
   }
   function switchWorkspace(id){
@@ -1056,7 +1060,7 @@
         var name=document.createElement("strong");name.textContent=p.name||p.email||"Member";
         var role=document.createElement("small");role.textContent=(m.role||"staff")+(m.user_id===myId()?" · You":"");
         card.appendChild(name);card.appendChild(role);
-        if(m.user_id!==myId()&&["owner","admin"].indexOf((myRole()||""))>=0){
+        if(m.user_id!==myId()&&["owner","admin"].indexOf((workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0]||{}).current_role)>=0){
           var actions=document.createElement("div");actions.className="community-request-actions";
           var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
           remove.addEventListener("click",function(){if(!window.confirm("Member ka access remove karein? Purana ledger record mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
