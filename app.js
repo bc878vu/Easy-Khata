@@ -331,6 +331,54 @@
     return id === myId() ? myName() : "Naam nahi mila";
   }
 
+  function partyNameMarkup(id) {
+    var name = "";
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i].id === id) { name = profiles[i].name || profiles[i].email || ""; break; }
+    }
+    if (!name) {
+      for (var j = 0; j < myContacts.length; j++) {
+        if (myContacts[j].id === id) { name = myContacts[j].name || ""; break; }
+      }
+    }
+    if (!name && id === myId()) name = myName();
+    return name ? esc(name) : '<button class="btn-danger" type="button" data-missing-name="' + esc(id) + '">Naam set karein</button>';
+  }
+  function saveMissingPartyName(id) {
+    if (!id || !myId()) return;
+    var name = window.prompt("Is record mein is shakhs ka asal naam likhein:");
+    if (name === null) return;
+    name = name.trim();
+    if (!name) { setTxnMsg("Naam khali nahi ho sakta.", false); return; }
+    if (name.length > 80) { setTxnMsg("Naam 80 haroof se chhota rakhein.", false); return; }
+    var contact = { id: id, owner_id: myId(), name: name, phone: null, manual: true, created_at: new Date().toISOString() };
+    if (guestMode) {
+      myContacts = myContacts.filter(function (x) { return x.id !== id; });
+      myContacts.push(contact);
+      saveGuestStore();
+      renderAll();
+      setTxnMsg("Naam save ho gaya — ab har record mein yehi naam nazar aayega.", true);
+      return;
+    }
+    function applyName() {
+      myContacts = myContacts.filter(function (x) { return x.id !== id; });
+      myContacts.push(contact);
+      saveCache();
+      renderAll();
+      setTxnMsg("Naam save ho gaya — ab har record mein yehi naam nazar aayega.", true);
+    }
+    if (isOffline()) {
+      queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: id, body: { id: id, owner_id: myId(), name: name, phone: null }, ts: Date.now() });
+      applyName();
+      setTxnMsg("Naam offline save ho gaya — internet aate hi sync hoga.", true);
+      return;
+    }
+    sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), name: name, phone: null } })
+      .then(function (res) {
+        if (!res.ok) { setTxnMsg("Naam save nahi hua (" + res.status + ") — dobara try karein.", false); return; }
+        applyName();
+      }).catch(function () { setTxnMsg("Naam save nahi hua — internet check karein.", false); });
+  }
   function initials(name) {
     var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return "?";
@@ -3690,7 +3738,7 @@
         // normal view mein aam user hai — isAdmin() branch hata di gayi.
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
-      html += '<div class="txn"><div class="t-main">' + esc(profileName(t.payer_id)) + ' → ' + esc(profileName(t.receiver_id)) + '</div>' +
+      html += '<div class="txn"><div class="t-main">' + partyNameMarkup(t.payer_id) + ' → ' + partyNameMarkup(t.receiver_id) + '</div>' +
         '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
         '<div class="t-foot"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
     });
@@ -4136,6 +4184,8 @@
     if (row) openPersonDetail(row.getAttribute("data-person"));
   });
   $("txnList").addEventListener("click", function (e) {
+    var missing = e.target.closest ? e.target.closest("[data-missing-name]") : null;
+    if (missing) { saveMissingPartyName(missing.getAttribute("data-missing-name")); return; }
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
