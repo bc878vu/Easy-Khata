@@ -1016,7 +1016,15 @@
   }
   function switchWorkspace(id){
     if(!id||id===currentWorkspaceId)return;
-    if(loadOutbox().length){setTxnMsg("Workspace badalne se pehle pending records sync karein.",false);renderWorkspaceBar();return;}
+    // Pin pre-tenant legacy queued inserts to the workspace they were created in
+    // before switching. New operations already carry workspace_id.
+    var pendingOps=loadOutbox(),pinned=false;
+    pendingOps.forEach(function(op){
+      if(op.body&&!op.body.workspace_id&&(op.table==="khata_transactions"||op.table==="khata_contacts")&&currentWorkspaceId){
+        op.body.workspace_id=currentWorkspaceId;pinned=true;
+      }
+    });
+    if(pinned)saveOutbox(pendingOps);
     $("workspaceSelect").disabled=true;
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
