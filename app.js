@@ -3688,10 +3688,13 @@
       var rangeText = txnFromDate || txnToDate
         ? "Muddat: " + (txnFromDate ? fmtDate(txnFromDate) : "Shuru se") + " se " + (txnToDate ? fmtDate(txnToDate) : "Aaj tak")
         : "Muddat: Tamam tareekhein";
+      var extraFilters = [];
+      if (txnFilterPerson) extraFilters.push("Dost: " + profileName(txnFilterPerson));
+      if (txnSearchText.trim()) extraFilters.push("Search: " + txnSearchText.trim());
 
       base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
       base.metaLine("Naam: " + myName() + "  |  Community: " + spaceName);
-      base.metaLine(rangeText + "  |  Aap ke records: " + list.length);
+      base.metaLine(rangeText + (extraFilters.length ? "  |  " + extraFilters.join("  |  ") : "") + "  |  Aap ke records: " + list.length);
       base.summaryCards([
         { label: "Aap ne diye", value: fmtRs(given), color: C.red },
         { label: "Aap ko mile", value: fmtRs(taken), color: C.green },
