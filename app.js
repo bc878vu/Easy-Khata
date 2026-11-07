@@ -367,7 +367,7 @@
       return true;
     } catch (e) {
       try { console.error("Easy Khata: offline queue could not be saved", e); } catch (e2) {}
-      setTxnMsg("Phone storage full hai — record sync queue mein save nahi ho saka. Storage khaali karke dobara try karein.", false);
+      setTxnMsg("Phone mein jagah kam hai. Kuch space khaali karke dobara try karein.", false);
       renderOffline();
       return false;
     }
@@ -839,7 +839,7 @@
       afterAuth(res, isSignup);
     }).catch(function () {
       btn.disabled = false;
-      setAuthMsg("Internet ya server se rabta nahi ho raha.", false);
+      setAuthMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
     });
   }
 
@@ -886,7 +886,7 @@
         setForgotMsg("Reset link bhej diya — apna inbox (aur spam/junk bhi) check karein.", true);
       }).catch(function () {
         btn.disabled = false;
-        setForgotMsg("Internet ya server se rabta nahi ho raha.", false);
+        setForgotMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
       });
   }
   function updatePassword(pw) {
@@ -919,7 +919,7 @@
       setPassMsg("Password badal gaya!", true);
     }).catch(function () {
       btn.disabled = false;
-      setPassMsg("Internet ya server se rabta nahi ho raha.", false);
+      setPassMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
     });
   }
   function doReset() {
@@ -939,7 +939,7 @@
       setAuthMsg("Password badal gaya — naye password se login karein.", true);
     }).catch(function () {
       btn.disabled = false;
-      setResetMsg("Internet ya server se rabta nahi ho raha.", false);
+      setResetMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
     });
   }
   // If the app is opened from an email reset/confirm link, grab that session.
@@ -1061,11 +1061,11 @@
     $("workspaceSelect").disabled=true;
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
-      if(!res.ok){setTxnMsg("Workspace switch nahi hua — access verify karein.",false);renderWorkspaceBar();return;}
+      if(!res.ok){setTxnMsg("Community change nahi ho saki. Dobara koshish karein.",false);renderWorkspaceBar();return;}
       currentWorkspaceId=id;
       try { window.localStorage.setItem(ACTIVE_WS_KEY,id); } catch(e) {}
       profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
-    }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Workspace switch nahi hua — internet check karein.",false);});
+    }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Community change nahi ho saki. Internet check karke dobara koshish karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
   function openCommunityModal(tab){
@@ -1548,7 +1548,7 @@
         renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
-        setTxnMsg("Connection temporarily unavailable — is community ka last synced data dikhaya ja raha hai.", false);
+        setTxnMsg("Connection nahi mil raha. Filhal aapko is community ka aakhri saved hisaab dikhaya ja raha hai.", false);
         renderOffline();
         return;
       }
@@ -1610,7 +1610,7 @@
       loadAll(); // pehle load (ye txnMsg saaf karta hai), phir kamyabi ka message
       setTxnMsg("Guest hisaab cloud mein save ho gaya! ✓", true);
     }).catch(function () {
-      setTxnMsg("Migration nahi hui — internet check karein. Guest hisaab mehfooz hai.", false);
+      setTxnMsg("Hisaab transfer nahi ho saka. Internet check karke dobara koshish karein. Aapka mehmaan wala hisaab mehfooz hai.", false);
     });
   }
 
@@ -1988,7 +1988,7 @@
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) {
-        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server connection issue — dost offline queue mein save ho gaya; sync baad mein hogi.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
+        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Internet nahi hai. Dost ka naam phone mein save ho gaya; internet aate hi update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
         setContactMsg("Dost save nahi hua ("+res.status+") — dobara try karein.", false); return;
       }
       var created = res.body && res.body[0];
@@ -2004,7 +2004,7 @@
       var createdOffline = offlineContactInsert(contactBody);
       $("newContactName").value = "";
       $("newContactPhone").value = "";
-      setContactMsg("Dost offline add ho gaya — online hote hi sync hoga.", true);
+      setContactMsg("Dost ka naam save ho gaya. Internet aate hi update ho jayega.", true);
       renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       $("txnPerson").value = createdOffline.id;
@@ -2047,7 +2047,7 @@
         saveCache();
         renderSummary();
         renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
-        setPeopleMsg("Contact offline remove ho gaya — online hote hi sync hoga.", true);
+        setPeopleMsg("Dost ka naam remove ho gaya. Internet aate hi update ho jayega.", true);
       };
       var deleteTxnsOffline = function () {
         // v24.11: mere + is dost ke saare visible records (banane wala koi bhi ho) — sirf mere liye hide, delete nahi. Locked wale pehle hi rok diye gaye.
@@ -2478,7 +2478,7 @@
         renderAdminDashboard();
         loadAdminWorkspaceManagement();
         setAdminMsg("Dashboard updated · "+new Date().toLocaleTimeString(), true);
-      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { setAdminMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function adminSetCommunityEditMsg(message, ok) {
     var el=$("adminCommunityEditMsg"); if(!el)return;
@@ -2633,7 +2633,7 @@
           showView("admin");
         }
         loadAll();
-      }).catch(function () { setAdminMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { setAdminMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function setAdminAddMsg(text, ok) {
     var el = $("adminAddMsg");
@@ -2674,7 +2674,7 @@
         $("adminAddUserBox").hidden = true;
         setAdminAddMsg("User ban gaya! " + name + " ab login kar sakta hai.", true);
         renderAdmin();
-      }).catch(function () { btn.disabled = false; setAdminAddMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { btn.disabled = false; setAdminAddMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function setAdminUserMsg(text, ok) {
     var el = $("adminUserMsg");
@@ -2714,7 +2714,7 @@
     var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim()) { setAdminUserMsg("Raqam 2 decimal places tak, note aur date sahi likhein.", false); return; }
     sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
-      if (!res.ok) { setAdminUserMsg("Admin edit reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. " + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
       t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record update ho gaya; audit log save ho gaya.", true);
@@ -2726,7 +2726,7 @@
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
     if (!window.confirm("Ye record permanently dono users ki history aur database se delete hoga. Ye wapas nahi hoga. Continue?")) return;
     sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
-      if (!res.ok) { setAdminUserMsg("Delete reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. " + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
       txns = txns.filter(function (x) { return x.id !== id; });
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
@@ -2796,7 +2796,7 @@
         $("adminUserPhone").textContent = phone || "—";
         setAdminEditMsg("User update ho gaya.", true);
         loadAll();
-      }).catch(function () { btn.disabled = false; setAdminEditMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { btn.disabled = false; setAdminEditMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function saveAdminPass() {
     if (!isAdmin() || !adminCurrentUser) return;
@@ -2813,7 +2813,7 @@
         $("adminNewPass1").value = "";
         $("adminNewPass2").value = "";
         setAdminPassMsg("Password badal gaya — user naye password se login kar sakta hai.", true);
-      }).catch(function () { btn.disabled = false; setAdminPassMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { btn.disabled = false; setAdminPassMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function toggleAdminBlock() {
     if (!isAdmin() || !adminCurrentUser) return;
@@ -2832,7 +2832,7 @@
           (blocking ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
         setAdminUserMsg(blocking ? "User block ho gaya — ab login nahi kar sakega." : "User unblock ho gaya.", true);
         loadAll();
-      }).catch(function () { setAdminUserMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { setAdminUserMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
 
   function setAdminSetMsg(text, ok) {
@@ -2871,7 +2871,7 @@
         setAdminSetMsg("Raqam set ho gayi!", true);
         openAdminUser(u.id);
         loadAll();
-      }).catch(function () { btn.disabled = false; setAdminSetMsg("Internet ya server se rabta nahi ho raha.", false); });
+      }).catch(function () { btn.disabled = false; setAdminSetMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
 
   function renderMonthStats() {
@@ -3364,7 +3364,7 @@
         loadAll();
       }).catch(function () {
         offlineTxnInsert(body);
-        setPeopleMsg("Settlement offline save ho gayi — online hote hi sync hogi.", true);
+        setPeopleMsg("Hisaab save ho gaya. Internet aate hi update ho jayega.", true);
       });
     });
   }
@@ -4444,7 +4444,7 @@
       if (i >= ids.length) {
         btn.disabled = false;
         if (failed) setTxnMsg(done + " records save ho gaye, " + failed + " fail — dobara check karein.", false);
-        else if (offlineSaved) { setTxnMsg(ids.length + " records offline save ho gaye — online hote hi sync honge!", true); resetTxnForm(); }
+        else if (offlineSaved) { setTxnMsg(ids.length + " records phone mein save ho gaye. Internet aate hi update ho jayenge!", true); resetTxnForm(); }
         else { setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); }
         loadAll();
         return;
@@ -4536,7 +4536,7 @@
         .then(function (res) {
           btn.disabled = false;
           if (!res.ok) {
-            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Connection issue — edit offline queue mein save ho gayi; sync baad mein hogi.",true);btn.disabled=false;return;}
+            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Internet nahi hai. Tabdeeli phone mein save ho gayi; internet aate hi update ho jayegi.",true);btn.disabled=false;return;}
             setTxnMsg("Edit save nahi hui ("+res.status+") — dobara try karein.", false); return;
           }
           resetTxnForm();
@@ -4546,7 +4546,7 @@
           btn.disabled = false;
           offlineTxnUpdate(editId, body);
           resetTxnForm();
-          setTxnMsg("Edit offline save ho gayi — online hote hi sync hogi.", true);
+          setTxnMsg("Tabdeeli save ho gayi. Internet aate hi update ho jayegi.", true);
         });
       return;
     }
@@ -4554,7 +4554,7 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Database connection issue — record offline queue mein save ho gaya; sync baad mein hogi.",true);btn.disabled=false;return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Internet nahi hai. Record phone mein save ho gaya; internet aate hi update ho jayega.",true);btn.disabled=false;return;}
           setTxnMsg("Record save nahi hua ("+res.status+") — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
@@ -4568,7 +4568,7 @@
         offlineTxnInsert(Object.assign({ id: recId }, body));
         $("txnAmount").value = "";
         $("txnNote").value = "";
-        setTxnMsg("Record offline save ho gaya — online hote hi sync hoga.", true);
+        setTxnMsg("Record save ho gaya. Internet aate hi update ho jayega.", true);
       });
   }
 
@@ -4580,7 +4580,7 @@
     return sb("khata_txn_hidden", { method: "POST", prefer: "return=minimal", body: { txn_id: id, user_id: myId() } })
       .then(function (res) {
         if (!res.ok && res.status !== 409) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnHide(id);setTxnMsg("Connection issue — hide action offline queue mein save ho gayi.",true);return true;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnHide(id);setTxnMsg("Internet nahi hai. Record hide kar diya gaya; internet aate hi update ho jayega.",true);return true;}
           setTxnMsg("Record hataya nahi gaya — dobara try karein.", false); return false;
         }
         hiddenTxnIds[id] = true;
@@ -4590,7 +4590,7 @@
         return true;
       }).catch(function () {
         offlineTxnHide(id);
-        setTxnMsg("Record history se hide ho gaya — balance same rahega. Online hote hi sync hoga.", true);
+        setTxnMsg("Record history se hide ho gaya. Balance par koi asar nahi padega.", true);
         return true;
       });
   }
