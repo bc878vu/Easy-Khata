@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=39">
+<link rel="stylesheet" href="styles.css?v=40">
 </head>
 <body>
 
@@ -250,8 +250,9 @@ window.addEventListener("error", function () {
             <input id="txnAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="Example: 500" required>
           </div>
           <div class="field">
-            <label for="txnNote">Kis liye? (khana, chai, lunch...)</label>
-            <input id="txnNote" type="text" placeholder="Example: Lunch — biryani" maxlength="120">
+            <label for="txnNote">Detail / category <span class="optional-label">Optional</span></label>
+            <input id="txnNote" type="text" placeholder="Khana, Cash, Other ya kuch bhi likhein" maxlength="120" autocomplete="off">
+            <p class="contact-field-hint">Jo aap likhenge, wohi record mein save hoga — app khud category change nahi karegi.</p>
           </div>
           <div class="field">
             <label for="txnDate">Tareekh</label>
@@ -616,6 +617,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=48"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>
