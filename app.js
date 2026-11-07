@@ -4902,7 +4902,7 @@
     $("txnSearch").value = ""; $("txnFilterPerson").value = ""; $("txnFrom").value = ""; $("txnTo").value = "";
     renderTxns();
   });
-  $("exportCsvBtn").addEventListener("click", exportCsv);
+  $("exportCsvBtn").addEventListener("click", exportFilteredLedgerPdf);
   $("txnSplit").addEventListener("change", function (e) { setSplitMode(e.target.checked); });
   $("txnAmount").addEventListener("input", function () { if (splitMode) updateSplitHint(); });
   $("splitList").addEventListener("change", function () { updateSplitHint(); });
