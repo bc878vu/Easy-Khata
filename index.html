@@ -168,6 +168,7 @@ window.addEventListener("error", function () {
     <select id="workspaceSelect" aria-label="Active workspace"></select>
     <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Business</button>
     <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite</button>
+    <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Members</button>
   </div>
 
   <main class="wrap">
@@ -547,7 +548,7 @@ window.addEventListener("error", function () {
           <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
           <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
           <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
-          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Delete user</button>
+          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Deactivate user</button>
         </div>
         <div id="adminEditBox" hidden>
           <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
