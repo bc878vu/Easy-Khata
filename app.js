@@ -25,9 +25,17 @@
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
+  function moneyToMinor(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round((n + Number.EPSILON) * 100);
+  }
+  function moneyFromMinor(value) {
+    return (Number(value) || 0) / 100;
+  }
   function fmtRs(n) {
-    var v = Math.round(Number(n) * 100) / 100;
-    return "Rs " + v.toLocaleString("en-US");
+    var v = moneyFromMinor(moneyToMinor(n));
+    return "Rs " + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
   function fmtDate(iso) {
     if (!iso) return "";
@@ -444,10 +452,10 @@
       // v24.4: avatar_url bhi map karo — warna DOST list mein pic kabhi nahi
       // dikhti (peopleMap avatar_url drop kar deta tha, is liye renderPeople
       // ko hamesha undefined milta tha aur sirf initials dikhte the).
-      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, given: 0, taken: 0, first: null, last: null };
+      if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, first: null, last: null };
     });
     myContacts.forEach(function (c) {
-      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", given: 0, taken: 0, manual: true, first: null, last: null };
+      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, manual: true, first: null, last: null };
     });
     function bump(p, d) {
       if (!d) return;
@@ -455,10 +463,15 @@
       if (!p.last || d > p.last) p.last = d;
     }
     balanceTxns().forEach(function (t) {
-      var a = Number(t.amount) || 0;
+      var a = moneyToMinor(t.amount);
       var d = String(t.txn_date || "");
-      if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].given += a; bump(map[t.receiver_id], d); }
-      if (t.receiver_id === me && map[t.payer_id]) { map[t.payer_id].taken += a; bump(map[t.payer_id], d); }
+      if (t.payer_id === me && map[t.receiver_id]) { map[t.receiver_id].givenMinor += a; bump(map[t.receiver_id], d); }
+      if (t.receiver_id === me && map[t.payer_id]) { map[t.payer_id].takenMinor += a; bump(map[t.payer_id], d); }
+    });
+    Object.keys(map).forEach(function (id) {
+      map[id].given = moneyFromMinor(map[id].givenMinor);
+      map[id].taken = moneyFromMinor(map[id].takenMinor);
+      map[id].net = moneyFromMinor(map[id].givenMinor - map[id].takenMinor);
     });
     return map;
   }
@@ -2259,7 +2272,8 @@
     var users = adminUsers || [], rows = txns || [];
     var blocked = users.filter(function (u) { return !!u.blocked; }).length;
     var active = users.length - blocked;
-    var totalAmount = rows.reduce(function (sum, t) { return sum + (Number(t.amount) || 0); }, 0);
+    var totalAmountMinor = rows.reduce(function (sum, t) { return sum + moneyToMinor(t.amount); }, 0);
+    var totalAmount = moneyFromMinor(totalAmountMinor);
     var today = todayLocal();
     var todayCount = rows.filter(function (t) { return adminDateKey(t.txn_date) === today; }).length;
     var kpis = [
@@ -2284,7 +2298,8 @@
     for(var m=5;m>=0;m--){
       var md=new Date(); md.setDate(1); md.setMonth(md.getMonth()-m);
       var mk=md.getFullYear()+"-"+pad(md.getMonth()+1);
-      var amount=rows.filter(function(t){return adminDateKey(t.txn_date).slice(0,7)===mk;}).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+      var amountMinor=rows.filter(function(t){return adminDateKey(t.txn_date).slice(0,7)===mk;}).reduce(function(s,t){return s+moneyToMinor(t.amount);},0);
+      var amount=moneyFromMinor(amountMinor);
       monthItems.push({label:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][md.getMonth()],value:amount});
     }
     $("adminMonthlyChart").innerHTML=adminChartBars(monthItems,function(v){return v>=100000?(v/1000).toFixed(0)+"k":v.toLocaleString("en-US");},true);
@@ -2439,7 +2454,7 @@
     var amount = window.prompt("Nayi raqam (Rs):", String(t.amount)); if (amount === null) return;
     var note = window.prompt("Note:", t.note || "Food"); if (note === null) return;
     var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !note.trim()) { setAdminUserMsg("Raqam, note ya date sahi nahi.", false); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim()) { setAdminUserMsg("Raqam 2 decimal places tak, note aur date sahi likhein.", false); return; }
     sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
       if (!res.ok) { setAdminUserMsg("Admin edit reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
       t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
@@ -2483,16 +2498,18 @@
     setAdminUserMsg("");
     $("adminBlockBtn").textContent = u.blocked ? "Unblock" : "Block";
     var mine = txns.filter(function (t) { return t.payer_id === u.id || t.receiver_id === u.id; });
-    var given = 0, taken = 0;
+    var givenMinor = 0, takenMinor = 0;
     mine.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === u.id) given += a;
-      if (t.receiver_id === u.id) taken += a;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === u.id) givenMinor += a;
+      if (t.receiver_id === u.id) takenMinor += a;
     });
+    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
+    var net = moneyFromMinor(givenMinor - takenMinor);
     $("adminUserSummary").innerHTML =
       '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
       '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
-      '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
+      '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(net)) + '</strong></div>';
     adminHiddenStatusLoaded = false;
     renderAdminUserTxnRows(u, mine);
     sb("rpc/admin_list_txn_hides", { method: "POST", body: {} }).then(function (res) {
@@ -2572,7 +2589,8 @@
     if (!isAdmin() || !adminCurrentUser) return;
     if (!navigator.onLine) { setAdminSetMsg("Admin kaam ke liye internet chahiye.", false); return; } // v24.8: online-only
     var amount = parseFloat($("adminSetAmount").value);
-    if (!amount || amount <= 0) { setAdminSetMsg("Sahi raqam likhein.", false); return; }
+    if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setAdminSetMsg("Raqam 0 se zyada aur maximum 2 decimal places mein honi chahiye.", false); return; }
+    amount = moneyFromMinor(moneyToMinor(amount));
     var dir = (document.querySelector('input[name="adminSetDir"]:checked') || {}).value || "take";
     var note = $("adminSetNote").value.trim() || "Admin ne raqam set ki";
     var me = myId();
@@ -2605,15 +2623,16 @@
   function renderMonthStats() {
     var el = $("monthStats");
     var now = todayLocal().slice(0, 7);
-    var given = 0, taken = 0, count = 0;
+    var givenMinor = 0, takenMinor = 0, count = 0;
     visibleTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
       if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
-      var a = Number(t.amount) || 0;
+      var a = moneyToMinor(t.amount);
       count++;
-      if (t.payer_id === myId()) given += a;
-      if (t.receiver_id === myId()) taken += a;
+      if (t.payer_id === myId()) givenMinor += a;
+      if (t.receiver_id === myId()) takenMinor += a;
     });
+    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
     if (!visibleTxns().length) { el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML =
@@ -2630,18 +2649,18 @@
     var me = myId();
     var mine = visibleTxns().filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
     if (!mine.length) { el.hidden = true; return; }
-    var biggest = mine[0], total = 0;
+    var biggest = mine[0], totalMinor = 0;
     var counts = {};
     mine.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      total += a;
-      if (a > (Number(biggest.amount) || 0)) biggest = t;
+      var a = moneyToMinor(t.amount);
+      totalMinor += a;
+      if (a > moneyToMinor(biggest.amount)) biggest = t;
       var other = t.payer_id === me ? t.receiver_id : t.payer_id;
       counts[other] = (counts[other] || 0) + 1;
     });
     var topId = null, topN = 0;
     Object.keys(counts).forEach(function (id) { if (counts[id] > topN) { topN = counts[id]; topId = id; } });
-    var avg = Math.round(total / mine.length * 100) / 100;
+    var avg = moneyFromMinor(Math.round(totalMinor / mine.length));
     el.hidden = false;
     el.innerHTML =
       '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📊</span><div><strong>Hisaab ki jhalak</strong><small>Aap ke tamam visible records</small></div></div>' +
@@ -2901,26 +2920,27 @@
     // TOTAL BALANCE: two cards — what I have to receive (lene hain, green)
     // and what I have to give (dene hain, red). Per-person nets, not totals.
     var map = peopleMap();
-    var toReceive = 0, toPay = 0, rc = 0, pc = 0;
+    var toReceiveMinor = 0, toPayMinor = 0, rc = 0, pc = 0;
     Object.keys(map).forEach(function (id) {
-      var net = map[id].given - map[id].taken;
-      if (net > 0) { toReceive += net; rc++; }
-      else if (net < 0) { toPay += -net; pc++; }
+      var netMinor = map[id].givenMinor - map[id].takenMinor;
+      if (netMinor > 0) { toReceiveMinor += netMinor; rc++; }
+      else if (netMinor < 0) { toPayMinor += -netMinor; pc++; }
     });
-    $("sumReceive").textContent = fmtRs(toReceive);
+    $("sumReceive").textContent = fmtRs(moneyFromMinor(toReceiveMinor));
     $("sumReceiveCount").textContent = rc ? rc + (rc === 1 ? " dost se" : " doston se") : "Koi nahi";
-    $("sumPay").textContent = fmtRs(toPay);
+    $("sumPay").textContent = fmtRs(moneyFromMinor(toPayMinor));
     $("sumPayCount").textContent = pc ? pc + (pc === 1 ? " dost ko" : " doston ko") : "Koi nahi";
   }
 
   function personStats(id) {
-    var given = 0, taken = 0;
+    var givenMinor = 0, takenMinor = 0;
     balanceTxns().forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === myId() && t.receiver_id === id) given += a;
-      if (t.receiver_id === myId() && t.payer_id === id) taken += a;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === myId() && t.receiver_id === id) givenMinor += a;
+      if (t.receiver_id === myId() && t.payer_id === id) takenMinor += a;
     });
-    return { given: given, taken: taken, net: given - taken }; // +: they owe me, -: I owe them
+    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
+    return { given: given, taken: taken, net: moneyFromMinor(givenMinor - takenMinor) }; // +: they owe me, -: I owe them
   }
   function latestTxnWith(id) {
     // Most recent record between me and this person (by date, then by creation time).
@@ -3093,13 +3113,14 @@
     });
   }
   function shareAll() {
-    var given = 0, taken = 0;
+    var givenMinor = 0, takenMinor = 0;
     balanceTxns().forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === myId()) given += a;
-      if (t.receiver_id === myId()) taken += a;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === myId()) givenMinor += a;
+      if (t.receiver_id === myId()) takenMinor += a;
     });
-    var net = given - taken; // +: I am owed, -: I owe
+    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
+    var net = moneyFromMinor(givenMinor - takenMinor); // +: I am owed, -: I owe
     var netLine = net > 0 ? "Net: " + fmtRs(net) + " — I will receive."
       : net < 0 ? "Net: " + fmtRs(-net) + " — I have to pay." : "Net: settled up — no balance.";
     var latest = latestLine(latestTxn());
@@ -3135,7 +3156,7 @@
     var html = "";
     ids.forEach(function (id) {
       var p = map[id];
-      var net = p.given - p.taken; // +: they owe me, -: I owe them
+      var net = p.net; // +: they owe me, -: I owe them
       var cls = net > 0 ? "pos" : net < 0 ? "neg" : "zero";
       var netText = net > 0 ? "+ " + fmtRs(net) : net < 0 ? "− " + fmtRs(-net) : "Settled";
       var last = p.last ? "Aakhri len-den: " + fmtDateLong(p.last) : "Abhi koi len-den nahi";
@@ -3236,13 +3257,13 @@
     });
     // Running balance, oldest first, then show newest first.
     var asc = sorted.slice().reverse();
-    var run = 0;
+    var runMinor = 0;
     var balById = {};
     asc.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === me) run += a;
-      else if (t.receiver_id === me) run -= a;
-      balById[t.id] = run;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === me) runMinor += a;
+      else if (t.receiver_id === me) runMinor -= a;
+      balById[t.id] = moneyFromMinor(runMinor);
     });
     var html = '<div class="dtable-head"><span>TIME</span><span>DIYE</span><span>LIYE</span></div>';
     sorted.forEach(function (t) {
@@ -3369,17 +3390,18 @@
   // PDF mein sirf Roman Urdu/Latin text hota hai (jsPDF standard font).
   function fullReportData() {
     var me = myId();
-    var given = 0, taken = 0;
+    var givenMinor = 0, takenMinor = 0;
     var list = visibleTxns().slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
     list.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === me) given += a;
-      if (t.receiver_id === me) taken += a;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === me) givenMinor += a;
+      if (t.receiver_id === me) takenMinor += a;
     });
+    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
     var map = peopleMap();
-    var people = Object.keys(map).map(function (k) { return map[k]; }).filter(function (p) { return (p.given + p.taken) > 0; });
-    people.sort(function (a, b) { return (b.given - b.taken) - (a.given - a.taken); });
-    return { list: list, given: given, taken: taken, net: given - taken, people: people };
+    var people = Object.keys(map).map(function (k) { return map[k]; }).filter(function (p) { return p.givenMinor + p.takenMinor > 0; });
+    people.sort(function (a, b) { return b.net - a.net; });
+    return { list: list, given: given, taken: taken, net: moneyFromMinor(givenMinor - takenMinor), people: people };
   }
   // v24.9: per-person report data (PDF + Excel dono use karte hain) —
   // newest-first list + oldest-first running balance (renderDetailTxns logic).
@@ -3391,12 +3413,12 @@
       return String(b.created_at || "").localeCompare(String(a.created_at || ""));
     });
     var asc = sorted.slice().reverse();
-    var run = 0, balById = {};
+    var runMinor = 0, balById = {};
     asc.forEach(function (t) {
-      var a = Number(t.amount) || 0;
-      if (t.payer_id === me) run += a;
-      else if (t.receiver_id === me) run -= a;
-      balById[t.id] = run;
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === me) runMinor += a;
+      else if (t.receiver_id === me) runMinor -= a;
+      balById[t.id] = moneyFromMinor(runMinor);
     });
     return { sorted: sorted, balById: balById };
   }
@@ -3622,7 +3644,7 @@
       if (!people.length) { base.emptyBox("Abhi koi dost ya record nahi."); }
       people.forEach(function (p, i) {
         if (base.needPage(14)) peopleHead();
-        var b = p.given - p.taken;
+        var b = p.net;
         base.tableRow([
           { t: p.name || "Unknown", x: M, maxW: 200 },
           { t: fmtRs(p.given), x: 310, align: "right", maxW: 64 },
@@ -3651,10 +3673,10 @@
       }
       histHeader();
       if (!list.length) { base.emptyBox("Abhi koi record nahi."); }
-      var histTotal = 0;
+      var histTotalMinor = 0;
       list.forEach(function (t, i) {
         if (base.needPage(14)) histHeader();
-        histTotal += Number(t.amount) || 0;
+        histTotalMinor += moneyToMinor(t.amount);
         base.tableRow([
           { t: fmtDate(t.txn_date), x: M, maxW: 58 },
           { t: profileName(t.payer_id), x: 104, maxW: 92 },
@@ -3668,7 +3690,7 @@
           { t: "Total", x: M, maxW: 58 },
           { t: "", x: 104 },
           { t: "", x: 202 },
-          { t: fmtRs(histTotal), x: 380, align: "right", maxW: 80 },
+          { t: fmtRs(moneyFromMinor(histTotalMinor)), x: 380, align: "right", maxW: 80 },
           { t: "", x: 388 }
         ]);
       }
@@ -3923,7 +3945,7 @@
       aoa.push(["Dost", "Diye", "Liye", "Balance"]);
       var pFirst = aoa.length;
       people.forEach(function (p) {
-        aoa.push([p.name || "Unknown", p.given, p.taken, p.given - p.taken]);
+        aoa.push([p.name || "Unknown", p.given, p.taken, p.net]);
       });
       var pTotal = aoa.length;
       aoa.push(["Total", given, taken, net]);
@@ -3933,13 +3955,13 @@
       var hHead = aoa.length;
       aoa.push(["Date", "Dene wala", "Lene wala", "Amount", "Note"]);
       var hFirst = aoa.length;
-      var histTotal = 0;
+      var histTotalMinor = 0;
       list.forEach(function (t) {
-        histTotal += Number(t.amount) || 0;
+        histTotalMinor += moneyToMinor(t.amount);
         aoa.push([fmtDate(t.txn_date), profileName(t.payer_id), profileName(t.receiver_id), Number(t.amount) || 0, t.note || "Food"]);
       });
       var hTotal = aoa.length;
-      aoa.push(["Total", "", "", histTotal, ""]);
+      aoa.push(["Total", "", "", moneyFromMinor(histTotalMinor), ""]);
       var wb = X.utils.book_new();
       var ws = X.utils.aoa_to_sheet(aoa);
       ws["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 15 }, { wch: 40 }];
@@ -3963,7 +3985,7 @@
         xCell(ws, col + (pHead + 1), xHeadStyle(i >= 1));
       });
       people.forEach(function (p, i) {
-        var r = pFirst + 1 + i, zebra = i % 2 === 1, bal = p.given - p.taken;
+        var r = pFirst + 1 + i, zebra = i % 2 === 1, bal = p.net;
         xCell(ws, "A" + r, xDataStyle(zebra, false, false, true));
         xCell(ws, "B" + r, xDataStyle(zebra, true, false), "#,##0");
         xCell(ws, "C" + r, xDataStyle(zebra, true, false), "#,##0");
@@ -4211,7 +4233,8 @@
     var note = $("txnNote").value.trim();
     var date = $("txnDate").value;
     if (!splitMode && !person) { setTxnMsg("Pehle dost chunein.", false); return; }
-    if (!amount || amount <= 0) { setTxnMsg("Sahi raqam likhein.", false); return; }
+    if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setTxnMsg("Raqam 0 se zyada aur maximum 2 decimal places mein likhein.", false); return; }
+    amount = moneyFromMinor(moneyToMinor(amount));
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
     if (splitMode && !editingId) {
       if (guestMode) { guestAddSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]')); return; }
