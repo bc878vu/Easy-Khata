@@ -740,6 +740,27 @@
     signupCommunityIntentMemory = {intent:intent,username:username||""};
     try { window.localStorage.setItem(signupCommunityIntentKey($("authEmail").value), JSON.stringify(signupCommunityIntentMemory)); } catch(e) {}
   }
+  function openPendingCommunityOnboarding() {
+    var email=(session&&session.user&&session.user.email)||"";
+    var shouldOpen=false, intent=null;
+    try {
+      if(window.localStorage.getItem(communityOnboardingKey(email))) {
+        shouldOpen=true;
+        window.localStorage.removeItem(communityOnboardingKey(email));
+      }
+      if(shouldOpen) {
+        intent=JSON.parse(window.localStorage.getItem(signupCommunityIntentKey(email))||"null");
+        window.localStorage.removeItem(signupCommunityIntentKey(email));
+      }
+    } catch(e) {}
+    if(!shouldOpen)return;
+    setTimeout(function(){
+      if(!session||guestMode)return;
+      var tab=intent&&intent.intent==="create"?"create":"join";
+      openCommunityModal(tab);
+      if(tab==="join"&&intent&&intent.username) $("joinCommunityUsername").value=String(intent.username).toLowerCase();
+    },900);
+  }
   function loadSignupCommunityDirectory(search) {
     var list=$("signupCommunityDirectory"); if(!list)return;
     list.innerHTML='<p class="muted">Communities load ho rahi hain…</p>';
@@ -787,23 +808,10 @@
       showApp();
       loadAll();
       maybeOfferGuestMigration();
-      var email = (session && session.user && session.user.email) || "";
-      var needsCommunitySetup = !!isSignup;
-      try {
-        if (window.localStorage.getItem(communityOnboardingKey(email))) needsCommunitySetup = true;
-        if (needsCommunitySetup) window.localStorage.removeItem(communityOnboardingKey(email));
-      } catch(e) {}
-      if (needsCommunitySetup) {
-        var signupIntent=null;
-        try { signupIntent=JSON.parse(window.localStorage.getItem(signupCommunityIntentKey(email))||"null"); window.localStorage.removeItem(signupCommunityIntentKey(email)); } catch(e) {}
-        setTimeout(function () {
-          if (session && !guestMode) {
-            var tab=signupIntent&&signupIntent.intent==="create"?"create":"join";
-            openCommunityModal(tab);
-            if(tab==="join"&&signupIntent&&signupIntent.username) $("joinCommunityUsername").value=String(signupIntent.username).toLowerCase();
-          }
-        }, 900);
+      if(isSignup) {
+        try { window.localStorage.setItem(communityOnboardingKey(email), "1"); } catch(e) {}
       }
+      openPendingCommunityOnboarding();
     });
   }
 
@@ -987,6 +995,7 @@
       if (user && session) { session.user = user; saveSession(session); }
       showApp();
       loadAll();
+      openPendingCommunityOnboarding(); // signup email confirmation ke baad bhi community setup khule
       maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
     }).catch(function (e) {
       // v24.8: network fail (offline) session EXPIRE nahi hota — sirf
