@@ -1450,11 +1450,22 @@
     for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
     return out;
   }
+  // v24.5: per-USER subscription rows — on_conflict ab (endpoint, user_id)
+  // hai, sirf endpoint nahi. Wajah (live sabit, Awais case): endpoint/token
+  // DEVICE se bandha hota hai, account se nahi — ek hi phone par Asad ki
+  // row pehle se hoti hai, to Awais ka upsert usi row ko UPDATE karne lagta
+  // tha aur RLS (USING: user_id = auth.uid()) 403 deta tha. Composite
+  // unique index (endpoint, user_id) ke saath har account ki apni row banti
+  // hai. + res.ok check: pehle sb() ka resolve (403 par bhi) seedha "on"
+  // kar deta tha — VAPID path par jhootha "On ✓" (FCM path par ye check
+  // pehle se tha).
   function savePushSub(sub) {
     var k = sub.toJSON();
-    return sb("khata_push_subs?on_conflict=endpoint", {
+    return sb("khata_push_subs?on_conflict=endpoint,user_id", {
       method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
       body: { user_id: myId(), endpoint: sub.endpoint, p256dh: k.keys.p256dh, auth: k.keys.auth }
+    }).then(function (res) {
+      if (!res.ok) { var e = new Error("save failed: " + res.status); e.status = res.status; throw e; }
     });
   }
   // v22: Account mein "Notifications On karein" button wapas — user khud
@@ -1510,11 +1521,17 @@
     return navigator.serviceWorker.register("firebase-messaging-sw.js", { scope: "/firebase-cloud-messaging-push-scope" })
       .then(function (reg) { fcmReg = reg; return reg; });
   }
+  // v24.5: per-USER rows — on_conflict ab (fcm_token, user_id) hai (wajah
+  // upar savePushSub wali: FCM token bhi device se bandha hota hai).
+  // Error mein ab HTTP status bhi hota hai taake 401/403 (permission) ko
+  // network failure se alag dikhaya ja sake.
   function saveFcmToken(token) {
-    return sb("khata_push_subs?on_conflict=fcm_token", {
+    return sb("khata_push_subs?on_conflict=fcm_token,user_id", {
       method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
       body: { user_id: myId(), fcm_token: token }
-    }).then(function (res) { if (!res.ok) throw new Error("save failed"); });
+    }).then(function (res) {
+      if (!res.ok) { var e = new Error("save failed: " + res.status); e.status = res.status; throw e; }
+    });
   }
   // FCM token ki maujoodgi check (self-heal: token milte hi DB mein save).
   // v23.1: "on" sirf tab jab DB save CONFIRM ho — pehle token milte hi
@@ -1556,11 +1573,18 @@
         return saveFcmToken(token).then(function () {
           pushState = "on"; updatePushToggleLabel();
           return { ok: true };
-        }, function () { return { ok: false, reason: "save-failed" }; });
+        }, function (e) { return { ok: false, reason: saveReason(e) }; });
       }).catch(function (e) {
         return { ok: false, reason: "fcm-token-failed", detail: String((e && e.message) || e) };
       });
     }).catch(function () { return { ok: false, reason: "permission-default" }; });
+  }
+  // v24.5: save fail ki ASAL wajah — fetch throw (network, status nahi) vs
+  // HTTP 401/403 (permission). 403 ka matlab "internet nahi" NAHI hota —
+  // yehi ghalat message Awais ke case mein dikh raha tha.
+  function saveReason(e) {
+    if (e && (e.status === 401 || e.status === 403)) return "save-denied";
+    return "save-failed";
   }
   // Har failure ki ASAL wajah — v22 ka generic "dobara khol kar try karein"
   // chhupa deta tha ke kaunsa step fail hua (user ko 23:11 PKT wahi mila tha).
@@ -1573,6 +1597,7 @@
     if (reason === "fcm-init-failed") return "Firebase start nahi hua" + (detail ? " (" + detail + ")" : "") + " — app refresh kar ke dobara try karein.";
     if (reason === "fcm-token-failed") return "Firebase token nahi bana" + (detail ? " (" + detail + ")" : "") + " — internet check karein aur dobara try karein.";
     if (reason === "save-failed") return "Internet ya server se rabta nahi ho raha — dobara try karein.";
+    if (reason === "save-denied") return "Notifications save nahi hui — server ne is account ke liye permission nahi di. App band kar ke dobara kholein, phir try karein.";
     return "Notifications on nahi hui — dobara try karein.";
   }
   function refreshPushState() {
@@ -1644,7 +1669,7 @@
           return savePushSub(sub).then(function () {
             pushState = "on"; updatePushToggleLabel();
             return { ok: true };
-          }, function () { return { ok: false, reason: "save-failed" }; });
+          }, function (e) { return { ok: false, reason: saveReason(e) }; });
         }, function (e) { return { ok: false, reason: "subscribe-failed", detail: String((e && e.message) || e) }; });
       });
     }).catch(function () {
@@ -2614,6 +2639,130 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
+  function setAcctBackupMsg(text, ok) {
+    var el = $("acctBackupMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  // v24.5: PDF Report — poora hisaab ek saaf professional PDF mein (Account
+  // menu mein CSV backup ke saath). jsPDF CDN se (UMD) — load na ho to saaf
+  // error, kabhi silent fail ya crash nahi. Sirf in-memory data use hoti
+  // hai, is liye guest mode mein bhi chalta hai (koi server call nahi).
+  // PDF mein sirf Roman Urdu/Latin text hota hai (jsPDF standard font).
+  function exportPdf() {
+    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+    if (!PdfCtor) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+    try {
+      var doc = new PdfCtor({ unit: "pt", format: "a4" });
+      var W = 595, M = 40, R = W - M, y = 52;
+      function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+      function hline(yy) { doc.setDrawColor(180, 180, 180); doc.line(M, yy, R, yy); }
+      function needPage(minY) {
+        if (y + minY > 775) { doc.addPage(); y = 52; return true; }
+        return false;
+      }
+      function section(title) {
+        needPage(34);
+        y += 14;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+        doc.text(title, M, y); y += 8;
+        hline(y); y += 16;
+      }
+      var me = myId();
+      var given = 0, taken = 0;
+      var list = txns.slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
+      list.forEach(function (t) {
+        var a = Number(t.amount) || 0;
+        if (t.payer_id === me) given += a;
+        if (t.receiver_id === me) taken += a;
+      });
+      var net = given - taken;
+      // Header
+      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+      doc.text("Easy Khata — Hisaab Report", M, y); y += 22;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text("Naam: " + myName(), M, y); y += 16;
+      doc.text("Date: " + fmtDateLong(todayLocal()) + "  ·  Records: " + list.length, M, y); y += 10;
+      hline(y); y += 18;
+      // Totals
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+      doc.text("Kull hisaab", M, y); y += 18;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text("Kull diye: " + fmtRs(given), M, y); y += 16;
+      doc.text("Kull liye: " + fmtRs(taken), M, y); y += 16;
+      var netTxt = "Net: " + fmtRs(Math.abs(net)) + (net > 0 ? " (doston se milne hain)" : net < 0 ? " (doston ko dene hain)" : " (barabar hai)");
+      doc.text(netTxt, M, y); y += 8;
+      // Per-person balances
+      section("Doston ka hisaab");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      doc.text("(+ ka matlab dost ko aap ko dene hain, − ka matlab aap ko dost ko dene hain)", M, y); y += 16;
+      var map = peopleMap();
+      var people = Object.keys(map).map(function (k) { return map[k]; }).filter(function (p) { return (p.given + p.taken) > 0; });
+      people.sort(function (a, b) { return (b.given - b.taken) - (a.given - a.taken); });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.text("Dost", M, y);
+      doc.text("Diye", 300, y, { align: "right" });
+      doc.text("Liye", 390, y, { align: "right" });
+      doc.text("Balance", R, y, { align: "right" });
+      y += 6; hline(y); y += 14;
+      doc.setFont("helvetica", "normal");
+      if (!people.length) { doc.text("Abhi koi dost ya record nahi.", M, y); y += 14; }
+      people.forEach(function (p) {
+        needPage(14);
+        var b = p.given - p.taken;
+        doc.text(trunc(p.name || "Unknown", 32), M, y);
+        doc.text(fmtRs(p.given), 300, y, { align: "right" });
+        doc.text(fmtRs(p.taken), 390, y, { align: "right" });
+        doc.text((b >= 0 ? "+ " : "− ") + fmtRs(Math.abs(b)), R, y, { align: "right" });
+        y += 14;
+      });
+      // History
+      section("Record history (" + list.length + " records)");
+      function histHeader() {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+        doc.text("Date", M, y);
+        doc.text("Dene wala", 105, y);
+        doc.text("Lene wala", 220, y);
+        doc.text("Amount", 350, y, { align: "right" });
+        doc.text("Note", 410, y);
+        y += 6; hline(y); y += 14;
+        doc.setFont("helvetica", "normal");
+      }
+      histHeader();
+      if (!list.length) { doc.text("Abhi koi record nahi.", M, y); y += 14; }
+      list.forEach(function (t) {
+        if (needPage(14)) histHeader();
+        doc.setFontSize(10);
+        doc.text(fmtDate(t.txn_date), M, y);
+        doc.text(trunc(profileName(t.payer_id), 19), 105, y);
+        doc.text(trunc(profileName(t.receiver_id), 19), 220, y);
+        doc.text(fmtRs(t.amount), 350, y, { align: "right" });
+        doc.text(trunc(t.note || "Food", 24), 410, y);
+        y += 14;
+      });
+      // Footer har page par
+      var pages = doc.getNumberOfPages();
+      for (var i = 1; i <= pages; i++) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.setTextColor(130, 130, 130);
+        doc.text("Easy Khata — Developed by Asad", M, 822);
+        doc.text("Page " + i + " / " + pages, R, 822, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+      }
+      var blob = doc.output("blob");
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "easy-khata-report-" + todayLocal() + ".pdf";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      setAcctBackupMsg("PDF Report download ho gaya (" + list.length + " records).", true);
+    } catch (e) {
+      setAcctBackupMsg("PDF nahi ban saka — dobara try karein.", false);
+    }
+  }
   // Scrollable history boxes (v21): box tab scrollable ho (scrollHeight >
   // clientHeight) to neeche wali hint dikhate hain — user ko pata chale ke
   // andar scroll karke purane records dekh sakta hai.
@@ -3033,14 +3182,17 @@
     if (card) setTimeout(function () { card.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
   });
   $("acctBackupBtn").addEventListener("click", exportCsv);
+  $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", function () {
     shareText("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL);
   });
   $("acctWaBtn").addEventListener("click", function () {
-    // WhatsApp helpline — Asad ka apna number (03098851445).
-    openWaLink("https://wa.me/923098851445?text=" + encodeURIComponent("Easy Khata — madad chahiye"));
+    // WhatsApp helpline — Asad ka apna number (03098851445). v24.5 mein
+    // verify kiya: live code mein number pehle se yahi tha, is liye number
+    // nahi badla — sirf prefilled message proper/professional/modern kiya.
+    openWaLink("https://wa.me/923098851445?text=" + encodeURIComponent("Assalam o Alaikum! Easy Khata app ke baare mein madad chahiye — barah-e-karam rehnumai farmayein. Shukriya!"));
   });
   $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
   $("savePassBtn").addEventListener("click", doChangePass);

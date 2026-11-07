@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=28">
+<link rel="stylesheet" href="styles.css?v=29">
 </head>
 <body>
 
@@ -377,9 +377,16 @@
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
         <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
+        <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
+        <p id="acctBackupMsg" class="msg" role="status"></p>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
-          <p>Aap ka hisaab sirf aap ke account mein hai. Har record aap ke apne Supabase account mein save hota hai — koi aur aap ke records nahi dekh sakta. App aap ka data kisi teesri party ko nahi bechta aur na hi share karta hai.</p>
+          <p><strong>Privacy Policy — Easy Khata</strong></p>
+          <p><strong>Aap ka hisaab, aap ka data.</strong> Aap ke records sirf aap ke apne account mein save hote hain (Supabase cloud) — koi aur user aap ke records nahi dekh sakta. Bina login ke (guest mode) hisaab sirf is phone/browser par save hota hai, kahin upload nahi hota.</p>
+          <p><strong>Kya save hota hai:</strong> aap ka naam, phone, doston ke naam aur un ke saath len-den (amount, date, note), profile photo aur notification token (sirf aap ko popup bhejne ke liye).</p>
+          <p><strong>Kya share nahi hota:</strong> aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.</p>
+          <p><strong>Profile photo:</strong> aap ki photo koi bhi dekh sakta hai, lekin edit ya delete sirf aap kar sakte hain.</p>
+          <p><strong>Account delete:</strong> account delete karwana ho to WhatsApp helpline par rabta karein — admin aap ka account aur data delete kar dega.</p>
         </div>
         <button id="acctShareMenuBtn" class="menu-item" type="button"><span class="mi-ico">📤</span><span>Share Easy Khata</span><span class="menu-right">›</span></button>
         <button id="acctRateBtn" class="menu-item" type="button"><span class="mi-ico">⭐</span><span>Rate Easy Khata</span><span class="menu-right">›</span></button>
@@ -495,6 +502,9 @@
      VAPID web-push path. -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<!-- jsPDF (v24.5): PDF Report ke liye. Agar CDN fail ho to app phir bhi
+     chalti hai — exportPdf() saaf error dikhata hai, crash nahi hota. -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <div id="confirmOverlay" class="confirm-overlay" hidden>
     <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm?</h3>
@@ -512,6 +522,6 @@
      par dikhta hai, baaki views par hidden. Text bilkul wahi: "Developed by Asad". -->
 <p class="version" id="versionFooter" hidden>Developed by Asad</p>
 
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
