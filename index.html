@@ -95,6 +95,20 @@ window.addEventListener("error", function () {
       </div>
       <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
     </div>
+    <section id="signupCommunityBox" class="community-onboarding" hidden aria-label="Community options">
+      <h3>Apni community choose karein</h3>
+      <p class="muted">Account banane se pehle community dhoondhein, ya apni nayi community banayein. Join request account banne ke baad submit hogi.</p>
+      <div class="community-onboarding-actions">
+        <button id="signupJoinCommunityBtn" class="btn btn-soft" type="button">Find / Join community</button>
+        <button id="signupCreateCommunityBtn" class="btn btn-soft" type="button">Create community</button>
+      </div>
+      <div id="signupJoinCommunityPanel" hidden>
+        <div class="field"><label for="signupCommunitySearch">Community search</label><input id="signupCommunitySearch" type="search" placeholder="Community name ya username"></div>
+        <div id="signupCommunityDirectory" class="community-directory"><p class="muted">Community list load karne ke liye search karein.</p></div>
+        <p id="signupCommunityChoice" class="msg" role="status"></p>
+      </div>
+      <p id="signupCommunityCreateHint" class="muted" hidden>Account create hote hi community creation form khul jayega. Aap owner/admin honge.</p>
+    </section>
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
     <!-- v24: GUEST MODE — bina login ke personal manual hisaab. Koi email,
@@ -724,6 +738,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=58"></script>
+<script src="app.js?v=59"></script>
 </body>
 </html>
