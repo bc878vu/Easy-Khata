@@ -167,6 +167,7 @@
         body: opts.body ? JSON.stringify(opts.body) : undefined
       }, navigator.onLine ? 12000 : 6000).then(function (r) {
         lastNetworkResponseAt = Date.now();
+        if(r.ok) offlineMode = false;
         return r.text().then(function (t) {
           var j = null;
           try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
@@ -1613,7 +1614,7 @@
     if (guestMode || !session || rtRetryTimer) return;
     rtRetryTimer = setTimeout(function () {
       rtRetryTimer = null;
-      if (!rtChannel && session && !guestMode && navigator.onLine) setupRealtime();
+      if (!rtChannel && session && !guestMode) setupRealtime();
     }, 15000);
   }
   function setupRealtime() {
@@ -1667,6 +1668,7 @@
       scheduleLiveReload();
       if (!rtChannel) setupRealtime();
     }
+    if (session && !guestMode && loadOutbox().length) flushOutbox();
   }, 30000);
   function fmtNotifTime(ts) {
     try {
