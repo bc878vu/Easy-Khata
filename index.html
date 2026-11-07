@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Easy Khata — Food Money Ledger</title>
+<title>Easy Khata — Rozmarra ka Hisaab</title>
 <meta name="description" content="Easy Khata — track food money with friends. Who paid how much, and everyone's balance in one place.">
 <!-- Open Graph + Twitter Card (v21): WhatsApp/Facebook par share karne par
      link ek pyara preview card dikhaye — title, description aur icon ke saath.
@@ -113,7 +113,7 @@ window.addEventListener("error", function () {
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
     <!-- v24: GUEST MODE — bina login ke personal manual hisaab. Koi email,
          password ya account nahi chahiye; data sirf is phone/browser par
-         localStorage (easykhata_guest_v1) mein rehta hai, server ko kuch
+         sirf isi device par rehta hai; kahin online save nahi hota
          nahi jata. -->
     <div class="guest-divider"><span>ya</span></div>
     <button id="guestBtn" class="btn btn-ghost btn-block" type="button">Bina Login Ke Istemal Karein</button>
@@ -178,13 +178,13 @@ window.addEventListener("error", function () {
   </header>
 
   <div id="workspaceBar" class="workspace-bar" hidden>
-    <label for="workspaceSelect">Meri spaces</label>
-    <select id="workspaceSelect" aria-label="Active workspace"></select>
-    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Communities</button>
-    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Create</button>
-    <button id="workspaceSetupBtn" class="btn btn-ghost" type="button" hidden>Set password</button>
-    <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite</button>
-    <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Members</button>
+    <label for="workspaceSelect">Hisaab / Community</label>
+    <select id="workspaceSelect" aria-label="Hisaab ya community select karein"></select>
+    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Find Community</button>
+    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Nayi Community</button>
+    <button id="workspaceSetupBtn" class="btn btn-ghost" type="button" hidden>Community Password</button>
+    <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite Member</button>
+    <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Manage Members</button>
   </div>
 
   <main class="wrap">
