@@ -463,6 +463,7 @@
     showView("khata");
     $("txnDate").value = todayLocal();
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
+    notifFirstLoad = true;
     loadNotifs();
     refreshPushState().then(function () { maybeAskPushPermission(); });
     setupRealtime();
@@ -486,14 +487,16 @@
     $("notifView").hidden = name !== "notifs";
     $("adminView").hidden = name !== "admin";
     $("adminUserView").hidden = name !== "adminUser";
+    if ($("hiddenView")) $("hiddenView").hidden = name !== "hidden";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
-    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
     // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
     // baaki views par sirf hidden karna kaafi hai (koi fixed bar nahi).
     var vf = $("versionFooter");
     if (vf) vf.hidden = name !== "account";
+    if (name === "hidden") renderHiddenTxns();
     window.scrollTo(0, 0);
   }
   function showAppView() {
@@ -838,6 +841,8 @@
         p = sb(op.table, { method: "POST", prefer: "return=representation", body: op.body });
       } else if (op.op === "update") {
         p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "PATCH", prefer: "return=minimal", body: op.body });
+      } else if (op.op === "unhide") {
+        p = sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(op.id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" });
       } else {
         p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "DELETE" });
       }
@@ -964,6 +969,33 @@
     queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: rec.id, body: { id: rec.id, owner_id: rec.owner_id, name: rec.name, phone: rec.phone }, ts: Date.now() });
     saveCache();
     return rec;
+  }
+
+  function renderHiddenTxns() {
+    var list = txns.filter(function (t) { return !!hiddenTxnIds[t.id]; });
+    if (!list.length) { $("hiddenTxnList").innerHTML = '<p class="empty">Koi hidden record nahi.</p>'; return; }
+    var html = "";
+    list.sort(function (a,b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); }).forEach(function (t) {
+      var other = t.payer_id === myId() ? t.receiver_id : t.payer_id;
+      html += '<div class="txn"><div class="t-main">' + esc(profileName(other)) + '</div><div class="t-sub">' +
+        esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div><div class="t-foot"><span class="t-amt">' +
+        esc(fmtRs(t.amount)) + '</span><button class="btn btn-soft" type="button" data-restore-hidden="' + esc(t.id) + '">Restore</button></div></div>';
+    });
+    $("hiddenTxnList").innerHTML = html;
+  }
+  function restoreHiddenTxn(id) {
+    if (!hiddenTxnIds[id] || guestMode) return;
+    delete hiddenTxnIds[id]; saveCache(); renderAll(); renderHiddenTxns();
+    if (!navigator.onLine) {
+      if (!removePendingInsert("khata_txn_hidden", id)) queueOp({ key: newUuid(), op: "unhide", table: "khata_txn_hidden", id: id, ts: Date.now() });
+      return;
+    }
+    sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" })
+      .then(function (res) {
+        if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Restore nahi hua (" + res.status + ").", false); }
+      }).catch(function () {
+        queueOp({ key: newUuid(), op: "unhide", table: "khata_txn_hidden", id: id, ts: Date.now() });
+      });
   }
 
   function loadHiddenIds() {
@@ -1207,12 +1239,52 @@
       title: title, body: notifBodyFor(txn, userId)
     } }).catch(function () {});
   }
+  var notifAudioCtx = null, notifAudioUnlocked = false, notifFirstLoad = true, seenNotifIds = {};
+  function unlockNotifAudio() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!notifAudioCtx) notifAudioCtx = new Ctx();
+      if (notifAudioCtx.state === "suspended") {
+        var resume = notifAudioCtx.resume();
+        if (resume && resume.then) resume.then(function () { notifAudioUnlocked = notifAudioCtx.state === "running"; });
+      }
+      notifAudioUnlocked = true;
+    } catch (e) { notifAudioUnlocked = false; }
+  }
+  function playNotifSound() {
+    if (!notifAudioUnlocked || !notifAudioCtx || notifAudioCtx.state !== "running") return;
+    try {
+      var ctx = notifAudioCtx, now = ctx.currentTime;
+      [880, 1174].forEach(function (hz, i) {
+        var osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = "sine"; osc.frequency.value = hz;
+        gain.gain.setValueAtTime(0.0001, now + i * 0.13);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + i * 0.13 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.13 + 0.11);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now + i * 0.13); osc.stop(now + i * 0.13 + 0.12);
+      });
+    } catch (e) {}
+  }
+  document.addEventListener("pointerdown", unlockNotifAudio, { passive: true });
+  document.addEventListener("keydown", unlockNotifAudio);
   function loadNotifs() {
     if (!session || !session.access_token) return;
     sb("khata_notifications?select=*&user_id=eq." + encodeURIComponent(myId()) + "&order=created_at.desc&limit=50")
       .then(function (res) {
         if (!res.ok) return;
-        notifs = Array.isArray(res.body) ? res.body : [];
+        var incoming = Array.isArray(res.body) ? res.body : [];
+        var fresh = incoming.filter(function (n) { return n.id && !seenNotifIds[n.id]; });
+        if (notifFirstLoad) { incoming.forEach(function (n) { if (n.id) seenNotifIds[n.id] = true; }); notifFirstLoad = false; }
+        else if (fresh.length) {
+          fresh.forEach(function (n) { seenNotifIds[n.id] = true; });
+          playNotifSound();
+          if (document.visibilityState === "visible" && window.Notification && Notification.permission === "granted") {
+            fresh.slice(0, 3).forEach(function (n) { try { new Notification(n.title || "Easy Khata", { body: n.body || "Nayi notification aayi hai.", icon: "icons/icon.svg", tag: "easy-khata-" + n.id }); } catch (e) {} });
+          }
+        }
+        notifs = incoming;
         renderNotifBadge();
         syncAppBadge(); // v24.4: icon badge = asal unread count
         if (!$("notifView").hidden) renderNotifList();
@@ -1897,6 +1969,47 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
+  var adminHiddenByTxn = {};
+  function renderAdminUserTxnRows(u, mine) {
+    if (!mine.length) { $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>'; return; }
+    var html = "";
+    mine.forEach(function (t) {
+      var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
+      var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
+      var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
+      var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : '<div class="t-sub">Visible in both histories</div>';
+      var controls = lock ? '<span class="t-lock">🔒 Settled</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
+      html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
+    });
+    $("adminUserTxns").innerHTML = html;
+  }
+  function adminEditTxn(id) {
+    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin edit ke liye internet chahiye.", false); return; }
+    var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
+    if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
+    var amount = window.prompt("Nayi raqam (Rs):", String(t.amount)); if (amount === null) return;
+    var note = window.prompt("Note:", t.note || "Food"); if (note === null) return;
+    var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !note.trim()) { setAdminUserMsg("Raqam, note ya date sahi nahi.", false); return; }
+    sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
+      if (!res.ok) { setAdminUserMsg("Admin edit reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
+      renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
+      setAdminUserMsg("Record update ho gaya; audit log save ho gaya.", true);
+    }).catch(function (e) { setAdminUserMsg("Admin edit request fail: " + e.message, false); });
+  }
+  function adminDeleteTxn(id) {
+    if (!isAdmin() || !navigator.onLine) { setAdminUserMsg("Admin delete ke liye internet chahiye.", false); return; }
+    var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
+    if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
+    if (!window.confirm("Ye record permanently dono users ki history aur database se delete hoga. Ye wapas nahi hoga. Continue?")) return;
+    sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
+      if (!res.ok) { setAdminUserMsg("Delete reject hui (" + res.status + "): " + ((res.body && res.body.message) || "server error"), false); return; }
+      txns = txns.filter(function (x) { return x.id !== id; });
+      renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
+      setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
+    }).catch(function (e) { setAdminUserMsg("Admin delete request fail: " + e.message, false); });
+  }
   function openAdminUser(id) {
     if (!isAdmin()) return;
     var u = null;
@@ -1931,20 +2044,13 @@
       '<div class="sum-card"><span class="sum-label">Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
       '<div class="sum-card"><span class="sum-label">Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
       '<div class="sum-card net"><span class="sum-label">Net (diye − liye)</span><strong>' + esc(fmtRs(given - taken)) + '</strong></div>';
-    if (!mine.length) {
-      $("adminUserTxns").innerHTML = '<p class="empty">Is user ka koi record nahi.</p>';
-    } else {
-      var html = "";
-      mine.forEach(function (t) {
-        var other = t.payer_id === u.id ? profileName(t.receiver_id) : profileName(t.payer_id);
-        var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
-        var lock = isTxnLocked(t) ? ' <span class="t-lock">🔒 Settled</span>' : "";
-        html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div>' +
-          '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
-          '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + lock + '</div></div>';
-      });
-      $("adminUserTxns").innerHTML = html;
-    }
+    renderAdminUserTxnRows(u, mine);
+    sb("rpc/admin_list_txn_hides", { method: "POST", body: {} }).then(function (res) {
+      if (!res.ok) return;
+      adminHiddenByTxn = {};
+      (res.body || []).forEach(function (row) { if (!adminHiddenByTxn[row.txn_id]) adminHiddenByTxn[row.txn_id] = []; adminHiddenByTxn[row.txn_id].push(row.user_name || row.user_id); });
+      if (adminCurrentUser && adminCurrentUser.id === u.id) renderAdminUserTxnRows(u, mine);
+    }).catch(function () {});
     showView("adminUser");
   }
   function saveAdminEdit() {
@@ -3931,11 +4037,18 @@
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
     if (b) deleteTxn(b.getAttribute("data-del"));
   });
+  $("hiddenTxnList").addEventListener("click", function (e) { var b = e.target.closest ? e.target.closest("[data-restore-hidden]") : null; if (b) restoreHiddenTxn(b.getAttribute("data-restore-hidden")); });
   $("detailTxns").addEventListener("click", function (e) {
     var ed = e.target.closest ? e.target.closest("[data-edit]") : null;
     if (ed) { startEditTxn(ed.getAttribute("data-edit")); return; }
     var b = e.target.closest ? e.target.closest("[data-del]") : null;
     if (b) deleteTxn(b.getAttribute("data-del"));
+  });
+  $("adminUserTxns").addEventListener("click", function (e) {
+    var edit = e.target.closest ? e.target.closest("[data-admin-txn-edit]") : null;
+    if (edit) { adminEditTxn(edit.getAttribute("data-admin-txn-edit")); return; }
+    var del = e.target.closest ? e.target.closest("[data-admin-txn-del]") : null;
+    if (del) adminDeleteTxn(del.getAttribute("data-admin-txn-del"));
   });
   $("adminUserList").addEventListener("click", function (e) {
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
@@ -3968,6 +4081,8 @@
   });
   if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
   $("notifBtn").addEventListener("click", showNotifView);
+  $("acctHiddenBtn").addEventListener("click", function () { showView("hidden"); renderHiddenTxns(); });
+  $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
   $("notifList").addEventListener("click", function (e) {
