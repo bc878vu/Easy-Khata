@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
 
@@ -311,6 +311,10 @@ window.addEventListener("error", function () {
         <span id="detailAvatar" class="avatar">?</span>
       </div>
       <div id="detailBanner" class="detail-banner"></div>
+      <div class="detail-bottom detail-top-actions">
+        <button id="detailDiyeBtn" class="btn btn-diye" type="button">↑ Mainey Diye</button>
+        <button id="detailLiyeBtn" class="btn btn-liye" type="button">↓ Mainey Liye</button>
+      </div>
       <div class="detail-actions-row">
         <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span>Share</span></button>
         <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span>WhatsApp</span></button>
@@ -326,10 +330,6 @@ window.addEventListener("error", function () {
       <p id="detailPdfMsg" class="msg" role="status"></p>
       <div id="detailTxns" class="dtable scroll-box"></div>
       <p id="detailScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane len-den dekhne ke liye</p>
-      <div class="detail-bottom">
-        <button id="detailDiyeBtn" class="btn btn-diye" type="button">↑ Mainey Diye</button>
-        <button id="detailLiyeBtn" class="btn btn-liye" type="button">↓ Mainey Liye</button>
-      </div>
       <button id="detailRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden>Dost ko remove karein</button>
     </section>
 
@@ -624,6 +624,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=50"></script>
+<script src="app.js?v=51"></script>
 </body>
 </html>
