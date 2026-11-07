@@ -466,7 +466,7 @@
     }
     sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null } })
       .then(function (res) {
-        if (!res.ok) { setTxnMsg("Naam save nahi hua (" + res.status + ") — dobara try karein.", false); return; }
+        if (!res.ok) { setTxnMsg("Naam save nahi hua. Dobara try karein.", false); return; }
         applyName();
       }).catch(function () { setTxnMsg("Naam save nahi hua — internet check karein.", false); });
   }
@@ -777,13 +777,13 @@
         var pick=document.createElement("button");pick.type="button";pick.className="btn btn-primary community-join-pick";pick.textContent="Select community";
         pick.addEventListener("click",function(){
           saveSignupCommunityIntent("join",w.community_username);
-          $("signupCommunityChoice").textContent="Selected: "+w.community_name+" (@"+w.community_username+"). Account create hone ke baad community password enter karke join request bhej dein.";
+          $("signupCommunityChoice").textContent="Community select ho gayi: "+w.community_name+" (@"+w.community_username+"). Account banane ke baad password darj karke join request bhej dein.";
           $("signupCommunityChoice").className="msg ok";
           $("signupCommunityChoice").className="msg ok";
         });
         card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(pick);list.appendChild(card);
       });
-    }).catch(function(){list.innerHTML='<p class="community-empty">Community list load nahi hui. Internet check karein.</p>';});
+    }).catch(function(){list.innerHTML='<p class="community-empty">Community list nahi khul saki. Internet check karke dobara try karein.</p>';});
   }
 
   function afterAuth(res, isSignup) {
@@ -794,7 +794,7 @@
         if (isSignup) {
           try { window.localStorage.setItem(communityOnboardingKey(pendingUser.email), "1"); } catch(e) {}
         }
-        setAuthMsg("Account ban gaya! Confirmation link email par bheja hai. Confirm karke login karein; phir Personal Space ke saath Create Community aur Find/Join Community options khul jayenge.", true);
+        setAuthMsg("Account ban gaya! Email mein bheja gaya confirmation link khol kar account confirm karein, phir login karein. Us ke baad aap apna hisaab shuru kar sakte hain ya community bana/join kar sakte hain.", true);
         authMode = "login";
         renderAuthMode();
         return;
@@ -1276,7 +1276,7 @@
     if (converted) saveOutbox(ops);
     if (!ops.length) return Promise.resolve(false);
     syncing = true;
-    setTxnMsg("Sync ho raha hai…", true);
+    setTxnMsg("Aap ke pending records update ho rahe hain…", true);
     var done = 0, skipped = 0, skippedSettled = 0;
     function dropOp(key) {
       var rest = loadOutbox().filter(function (o) { return o.key !== key; });
@@ -1288,7 +1288,7 @@
         renderOffline();
         if (loadOutbox().length) return flushOutbox(); // sync ke dauran naye ops aa gaye
         loadAll();
-        var msg = "Sync ho gaya! " + done + " record sync hue.";
+        var msg = "Ho gaya! " + done + " record update ho gaye.";
         if (skipped) msg += " " + skipped + " skip hue" + (skipped === skippedSettled ? " (settled history)." : ".");
         setTxnMsg(msg, true);
         return Promise.resolve(true);
@@ -1323,7 +1323,7 @@
         if (res.status === 401 || res.status === 403) {
           syncing = false;
           renderOffline();
-          setTxnMsg("Sync ruk gaya — dobara login karein.", false);
+          setTxnMsg("Records update nahi ho sake. Dobara login karke try karein.", false);
           return Promise.resolve(false);
         }
         var errMsg = (res.body && res.body.message) || "";
@@ -1338,7 +1338,7 @@
         if (res.status >= 500 && errMsg.indexOf("Settled") === -1) {
           syncing = false;
           renderOffline();
-          setTxnMsg("Sync ruk gaya — internet aate hi dobara hoga.", false);
+          setTxnMsg("Internet aate hi pending records khud update ho jayenge.", false);
           return Promise.resolve(false);
         }
         skipped++;
@@ -1446,7 +1446,7 @@
     delete hiddenTxnIds[id]; saveCache(); renderAll(); renderHiddenTxns();
     sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" })
       .then(function (res) {
-        if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Record wapas nahi aa saka. " + res.status + ").", false); }
+        if (!res.ok) { hiddenTxnIds[id] = true; saveCache(); renderAll(); renderHiddenTxns(); setTxnMsg("Record wapas nahi aa saka. Dobara try karein.", false); }
       }).catch(function () {
         queueOp({ key: newUuid(), op: "unhide", table: "khata_txn_hidden", id: id, ts: Date.now() });
       });
@@ -2258,15 +2258,15 @@
   // Har failure ki ASAL wajah — v22 ka generic "dobara khol kar try karein"
   // chhupa deta tha ke kaunsa step fail hua (user ko 23:11 PKT wahi mila tha).
   function pushReasonText(reason, detail) {
-    if (reason === "unsupported") return "Is browser mein notifications nahi chalti — Chrome use karein.";
+    if (reason === "unsupported") return "Is browser mein notifications available nahi hain. Chrome mein app khol kar try karein.";
     if (reason === "permission-denied") return "Notifications block hain — Chrome ki site settings mein ja kar Easy Khata ke liye Notifications allow karein.";
     if (reason === "permission-default") return "Chrome ne permission ka popup nahi dikhaya — aap ne pehle kai dafa mana kiya hoga, is liye Chrome ne prompt band kar diya hai. Chrome ke address bar mein lock 🔒 icon par tap karein → Site settings → Notifications → Allow karein, phir dobara try karein.";
     if (reason === "sw-not-ready") return "Service worker ready nahi hua — app band kar ke dobara kholein, phir try karein.";
     if (reason === "subscribe-failed") return "Subscription nahi bani" + (detail ? " (" + detail + ")" : "") + " — Chrome mein kholein (WhatsApp/Facebook ke andar wale browser se nahi), internet check karein, phir try karein.";
     if (reason === "fcm-init-failed") return "Firebase start nahi hua" + (detail ? " (" + detail + ")" : "") + " — app refresh kar ke dobara try karein.";
     if (reason === "fcm-token-failed") return "Firebase token nahi bana" + (detail ? " (" + detail + ")" : "") + " — internet check karein aur dobara try karein.";
-    if (reason === "save-failed") return "Internet ya server se rabta nahi ho raha — dobara try karein.";
-    if (reason === "save-denied") return "Notifications save nahi hui — server ne is account ke liye permission nahi di. App band kar ke dobara kholein, phir try karein.";
+    if (reason === "save-failed") return "Internet se rabta nahi ho raha. Dobara try karein.";
+    if (reason === "save-denied") return "Notifications on nahi ho sakin. App dobara khol kar try karein.";
     return "Notifications on nahi hui — dobara try karein.";
   }
   function refreshPushState() {
@@ -2486,7 +2486,7 @@
         adminUsers = Array.isArray(res.body) ? res.body : [];
         renderAdminDashboard();
         loadAdminWorkspaceManagement();
-        setAdminMsg("Dashboard updated · "+new Date().toLocaleTimeString(), true);
+        setAdminMsg("Dashboard update ho gaya · "+new Date().toLocaleTimeString(), true);
       }).catch(function () { setAdminMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
   function adminSetCommunityEditMsg(message, ok) {
@@ -2726,8 +2726,8 @@
       if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. Dobara koshish karein.", false); return; }
       t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
-      setAdminUserMsg("Record update ho gaya; audit log save ho gaya.", true);
-    }).catch(function (e) { setAdminUserMsg("Admin edit request fail: " + e.message, false); });
+      setAdminUserMsg("Record update ho gaya.", true);
+    }).catch(function (e) { setAdminUserMsg("Record update nahi ho saka. Dobara try karein.", false); });
   }
   function adminDeleteTxn(id) {
     if (!isAdmin()) return;
@@ -2739,7 +2739,7 @@
       txns = txns.filter(function (x) { return x.id !== id; });
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record permanently delete ho gaya; audit log save ho gaya.", true);
-    }).catch(function (e) { setAdminUserMsg("Admin delete request fail: " + e.message, false); });
+    }).catch(function (e) { setAdminUserMsg("Record delete nahi ho saka. Dobara try karein.", false); });
   }
   function openAdminUser(id) {
     if (!isAdmin()) return;
@@ -3365,7 +3365,7 @@
       .then(function (res) {
         if (!res.ok) {
           if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Internet nahi hai. Hisaab phone mein save ho gaya; internet aate hi update ho jayega.",true);return;}
-          setPeopleMsg("Settlement save nahi hua ("+res.status+") — dobara try karein.", false); return;
+          setPeopleMsg("Hisaab barabar nahi ho saka. Dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
@@ -4546,7 +4546,7 @@
           btn.disabled = false;
           if (!res.ok) {
             if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Internet nahi hai. Tabdeeli phone mein save ho gayi; internet aate hi update ho jayegi.",true);btn.disabled=false;return;}
-            setTxnMsg("Edit save nahi hui ("+res.status+") — dobara try karein.", false); return;
+            setTxnMsg("Tabdeeli save nahi hui. Dobara try karein.", false); return;
           }
           resetTxnForm();
           setTxnMsg("Record update ho gaya!", true);
@@ -4564,7 +4564,7 @@
         btn.disabled = false;
         if (!res.ok) {
           if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Internet nahi hai. Record phone mein save ho gaya; internet aate hi update ho jayega.",true);btn.disabled=false;return;}
-          setTxnMsg("Record save nahi hua ("+res.status+") — dobara try karein.", false); return;
+          setTxnMsg("Record save nahi hua. Dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person)); }
@@ -4956,10 +4956,10 @@
       // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
       // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
       b.hidden = false;
-      b.textContent = pending > 0 ? "Offline • Sync pending (" + pending + ")" : "Offline";
+      b.textContent = pending > 0 ? "Internet nahi hai · "+pending+" changes baqi" : "Offline";
     } else if (pending > 0) {
       b.hidden = false;
-      b.textContent = "Sync pending (" + pending + ")";
+      b.textContent = pending+" changes baqi hain";
     } else {
       b.hidden = true;
     }
