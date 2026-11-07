@@ -1226,6 +1226,7 @@
       return loadHiddenIds().then(function () {
         renderAll();
         if (currentView === "admin") renderAdminDashboard();
+        setupRealtime();
         loadNotifs();
         loadContacts();
         saveCache();
@@ -1356,7 +1357,7 @@
   }
   function setupRealtime() {
     try {
-      if (!window.supabase || !window.supabase.createClient) return; // CDN failed / offline
+      if (!window.supabase || !window.supabase.createClient || !currentWorkspaceId) return; // CDN failed / offline / workspace not loaded
       if (rtChannel) return; // already subscribed
       var client = window.supabase.createClient(API, ANON);
       try {
@@ -2405,7 +2406,7 @@
     var body = {
       payer_id: dir === "take" ? u.id : me,
       receiver_id: dir === "take" ? me : u.id,
-      amount: amount, note: note, txn_date: todayLocal(), created_by: me
+      amount: amount, note: note, txn_date: todayLocal(), created_by: me, workspace_id: currentWorkspaceId
     };
     var btn = $("adminSetSaveBtn");
     btn.disabled = true;
@@ -2888,7 +2889,8 @@
       amount: amt,
       note: "Settled up — settlement",
       txn_date: todayLocal(),
-      created_by: me
+      created_by: me,
+      workspace_id: currentWorkspaceId
     };
     if (guestMode) {
       // v24: guest settlement — sirf local; settled-lock yahan bhi lagta hai.
