@@ -89,14 +89,10 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
 
   if (url.host === API_HOST) {
-    // Ledger data: network first, last-synced cache when offline.
-    if (url.pathname.indexOf("/rest/v1/khata_") === 0) {
-      e.respondWith(fetch(req).then(function (res) {
-        if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
-        return res;
-      }).catch(function () { return caches.match(req); }));
-    }
-    return; // other API calls (auth etc.): network-only
+    // Tenant API responses are private and user/active-workspace dependent.
+    // Never put them in the shared service-worker cache: app.js maintains a
+    // per-device localStorage cache for offline use instead.
+    return;
   }
 
   if (CDN_LIBS.indexOf(req.url) !== -1) {
