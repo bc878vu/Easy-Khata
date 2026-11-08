@@ -227,6 +227,9 @@
   var adminUsers = []; // admin_list_users RPC rows {id, name, email, phone, created_at, blocked, records}
   var adminWorkspaces = [];
   var adminWorkspaceMembers = [];
+  var lastMemberRows = []; // v80: members modal ki aakhri fetch (search local filter ke liye)
+  var memberSearchQ = "";
+  var adminCommunityMemberShown = 20; // v80: admin member list — pehle 20, phir Show more
   var adminEditingWorkspace = null;
   var adminCurrentUser = null;
   var adminUserSearchText = "";
@@ -1309,57 +1312,107 @@
   }
   function manageWorkspaceMembers(){
     if(!currentWorkspaceId)return;
+    memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
+    var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
+    var sub=$("membersModalSub");if(sub)sub.textContent=active?(active.name||"Community"):"";
     $("membersOverlay").hidden=false;
     loadCommunityJoinRequests();
     loadWorkspaceMemberCards();
   }
+  function cmAvatar(name){
+    var ch=String(name||"?").trim().charAt(0).toUpperCase()||"?";
+    var el=document.createElement("span");el.className="cm-avatar";el.textContent=ch;return el;
+  }
+  function cmRoleChip(role){
+    var r=String(role||"staff").toLowerCase();
+    var label=r.charAt(0).toUpperCase()+r.slice(1);
+    var el=document.createElement("span");el.className="cm-role-chip role-"+r;el.textContent=label;return el;
+  }
   function loadCommunityJoinRequests(){
     var box=$("communityRequestsList");box.innerHTML='<p class="muted">Requests load ho rahi hain…</p>';
+    var countEl=$("communityRequestsCount");if(countEl)countEl.textContent="";
     sb("rpc/khata_list_community_join_requests",{method:"POST",body:{p_workspace_id:currentWorkspaceId}}).then(function(res){
       if(!res.ok)throw new Error("requests");
       var rows=Array.isArray(res.body)?res.body:[];box.innerHTML="";
+      if(countEl)countEl.textContent=rows.length?"("+rows.length+")":"";
       if(!rows.length){var p=document.createElement("p");p.className="community-empty";p.textContent="Koi pending join request nahi.";box.appendChild(p);return;}
       rows.forEach(function(r){
         var card=document.createElement("article");card.className="community-request-card";
+        var top=document.createElement("div");top.className="cm-member-top";
+        top.appendChild(cmAvatar(r.user_name||r.user_email));
+        var main=document.createElement("div");main.className="cm-main";
         var who=document.createElement("strong");who.textContent=r.user_name||"New member";
         var email=document.createElement("small");email.textContent=r.user_email||"";
+        main.appendChild(who);main.appendChild(email);top.appendChild(main);
+        var chip=document.createElement("span");chip.className="cm-role-chip role-pending";chip.textContent="Pending";top.appendChild(chip);
         var actions=document.createElement("div");actions.className="community-request-actions";
         [["Approve",true],["Reject",false]].forEach(function(pair){
           var b=document.createElement("button");b.type="button";b.className="btn "+(pair[1]?"btn-primary":"btn-neutral");b.textContent=pair[0];
           b.addEventListener("click",function(){b.disabled=true;sb("rpc/khata_review_community_join_request",{method:"POST",body:{p_request_id:r.request_id,p_approve:pair[1]}}).then(function(out){if(!out.ok){b.disabled=false;setTxnMsg("Request update nahi hui.",false);return;}loadCommunityJoinRequests();loadWorkspaceMemberCards();});});
           actions.appendChild(b);
         });
-        card.appendChild(who);card.appendChild(email);card.appendChild(actions);box.appendChild(card);
+        card.appendChild(top);card.appendChild(actions);box.appendChild(card);
       });
     }).catch(function(){box.innerHTML='<p class="community-empty">Requests load nahi ho sakin.</p>';});
   }
   function loadWorkspaceMemberCards(){
     var box=$("workspaceMemberCards");box.innerHTML='<p class="muted">Members load ho rahe hain…</p>';
     sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
-      if(!res.ok)throw new Error("members");var rows=Array.isArray(res.body)?res.body:[];box.innerHTML="";
-      rows.forEach(function(m){
-        var p=profiles.filter(function(x){return x.id===m.user_id;})[0]||{};
-        var card=document.createElement("article");card.className="community-member-card";
-        var name=document.createElement("strong");name.textContent=p.name||p.email||"Member";
-        var role=document.createElement("small");role.textContent=(m.role||"staff")+(m.user_id===myId()?" · You":"");
-        card.appendChild(name);card.appendChild(role);
-        if(m.user_id!==myId()&&["owner","admin"].indexOf((workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0]||{}).current_role)>=0){
-          var actions=document.createElement("div");actions.className="community-request-actions";
-          var roleSelect=document.createElement("select");roleSelect.className="member-role-select";
-          ["admin","accountant","staff","viewer"].forEach(function(r){var op=document.createElement("option");op.value=r;op.textContent=r.charAt(0).toUpperCase()+r.slice(1);roleSelect.appendChild(op);});
-          roleSelect.value=m.role==="owner"?"staff":m.role;
-          var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
-          saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
-          var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
-          remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-          actions.appendChild(roleSelect);cdAttach(roleSelect); // v73: role picker bhi custom dropdown
-          actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
-        }
-        box.appendChild(card);
-      });
+      if(!res.ok)throw new Error("members");
+      lastMemberRows=Array.isArray(res.body)?res.body:[];
+      renderWorkspaceMemberCards(lastMemberRows);
     }).catch(function(){box.innerHTML='<p class="community-empty">Members load nahi ho sake.</p>';});
   }
+  function renderWorkspaceMemberCards(rows){
+    var box=$("workspaceMemberCards");if(!box)return;box.innerHTML="";
+    var q=memberSearchQ.trim().toLowerCase();
+    var shown=rows.filter(function(m){
+      if(!q)return true;
+      var p=profiles.filter(function(x){return x.id===m.user_id;})[0]||{};
+      return [p.name,p.email,m.role].join(" ").toLowerCase().indexOf(q)!==-1;
+    });
+    var countEl=$("workspaceMemberCount");if(countEl)countEl.textContent="("+rows.length+")";
+    var sub=$("membersModalSub");
+    if(sub){var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];if(active)sub.textContent=active.name+" · "+rows.length+" members";}
+    if(!shown.length){
+      var p=document.createElement("p");p.className="community-empty";
+      p.textContent=q?"Koi member nahi mila — search badal kar dekhein.":"Abhi koi active member nahi.";
+      box.appendChild(p);return;
+    }
+    var myRole=(workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0]||{}).current_role;
+    var canManage=["owner","admin"].indexOf(myRole)>=0;
+    shown.forEach(function(m){
+      var p=profiles.filter(function(x){return x.id===m.user_id;})[0]||{};
+      var isSelf=m.user_id===myId();
+      var isOwner=String(m.role||"").toLowerCase()==="owner";
+      var card=document.createElement("article");card.className="community-member-card";
+      var top=document.createElement("div");top.className="cm-member-top";
+      top.appendChild(cmAvatar(p.name||p.email));
+      var main=document.createElement("div");main.className="cm-main";
+      var name=document.createElement("strong");name.textContent=(p.name||p.email||"Member")+(isSelf?" · You":"");
+      var meta=document.createElement("small");meta.textContent=(p.email||"")+(m.joined_at?" · Joined "+fmtDate(m.joined_at):"");
+      main.appendChild(name);main.appendChild(meta);top.appendChild(main);
+      top.appendChild(cmRoleChip(m.role));
+      card.appendChild(top);
+      // v80: owner ka role/remove UI mein nahi — owner ko sirf owner badal sakta hai (server rule).
+      // Apna card bhi action-free. Role picker NATIVE select hai (custom dropdown
+      // scrolling list mein overlap karta tha — screenshot wala "St..." masla).
+      if(!isSelf&&!isOwner&&canManage){
+        var actions=document.createElement("div");actions.className="cm-actions";
+        var roleSelect=document.createElement("select");roleSelect.className="member-role-select";roleSelect.setAttribute("aria-label","Role for "+(p.name||p.email||"member"));
+        ["admin","accountant","staff","viewer"].forEach(function(r){var op=document.createElement("option");op.value=r;op.textContent=r.charAt(0).toUpperCase()+r.slice(1);roleSelect.appendChild(op);});
+        roleSelect.value=m.role;
+        var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
+        saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
+        var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
+        remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
+        actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
+      }
+      box.appendChild(card);
+    });
+  }
   function inviteWorkspaceMember(){
+    memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
     $("membersOverlay").hidden=false;
     loadCommunityJoinRequests();loadWorkspaceMemberCards();
     $("workspaceInviteEmail").focus();
@@ -2774,18 +2827,24 @@
       if(communityId&&m.workspace_id!==communityId)return false;
       return !q||[m.workspace_name,m.user_name,m.user_email,m.user_phone,m.role,m.member_status].join(" ").toLowerCase().indexOf(q)!==-1;
     });
+    var countEl=$("adminCommunityMemberCount");
+    if(countEl)countEl.textContent=rows.length?rows.length+" members"+(q||communityId?" — filtered":""):"";
     if(!rows.length){box.innerHTML='<p class="empty">Koi community member nahi mila.</p>';return;}
-    box.innerHTML=rows.map(function(m){
+    var shown=rows.slice(0,adminCommunityMemberShown);
+    box.innerHTML=shown.map(function(m){
       var owner=m.role==="owner";
+      var initial=String(m.user_name||m.user_email||"?").trim().charAt(0).toUpperCase()||"?";
       return '<article class="admin-user-card admin-community-member-card">'+
-        '<div class="admin-community-head"><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
-        '<div class="admin-user-meta"><span>Role: '+esc(m.role)+'</span><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
+        '<div class="admin-community-head"><span class="cm-avatar">'+initial+'</span><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="cm-role-chip role-'+esc(String(m.role||"staff").toLowerCase())+'">'+esc(m.role)+'</span><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
+        '<div class="admin-user-meta"><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
         '<div class="admin-community-member-controls"><select aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
         '<select data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
         '<button class="btn btn-primary btn-mini" data-admin-member-save="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Save</button>'+
         (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
         '</div></article>';
-    }).join("");
+    }).join("")+(rows.length>shown.length?'<button class="btn btn-soft btn-block" id="adminCommunityMemberMoreBtn" type="button">Show more — '+(rows.length-shown.length)+' baqi</button>':"");
+    var moreBtn=$("adminCommunityMemberMoreBtn");
+    if(moreBtn)moreBtn.addEventListener("click",function(){adminCommunityMemberShown+=20;renderAdminCommunityMembers();});
     cdAttachIn(box); // v73: per-row role/status picker bhi custom dropdown
   }
   function editAdminCommunity(id) {
@@ -5656,8 +5715,9 @@
   $("adminCreateCommunityBtn").addEventListener("click",function(){openCommunityModal("create");});
   $("adminCommunitySearch").addEventListener("input",renderAdminCommunities);
   $("adminCommunityStatus").addEventListener("change",renderAdminCommunities);
-  $("adminMemberSearch").addEventListener("input",renderAdminCommunityMembers);
-  $("adminMemberCommunityFilter").addEventListener("change",renderAdminCommunityMembers);
+  $("adminMemberSearch").addEventListener("input",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
+  $("adminMemberCommunityFilter").addEventListener("change",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
+  $("workspaceMemberSearch").addEventListener("input",function(){memberSearchQ=this.value;renderWorkspaceMemberCards(lastMemberRows);});
   $("adminCommunityList").addEventListener("click",function(e){
     var edit=e.target.closest("[data-admin-community-edit]");if(edit){editAdminCommunity(edit.getAttribute("data-admin-community-edit"));return;}
     var status=e.target.closest("[data-admin-community-status]");if(status){setAdminCommunityStatus(status.getAttribute("data-admin-community-status"),status.getAttribute("data-next-status"));return;}

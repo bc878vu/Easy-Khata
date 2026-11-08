@@ -1343,6 +1343,48 @@ input,select,textarea,button{max-width:100%}
 .member-role-select{flex:1}
 @media(max-width:520px){.community-invite-row{grid-template-columns:minmax(0,1fr) 105px}.community-invite-row .btn{grid-column:1/-1;width:100%}}
 
+/* v80: community members — compact rows: avatar + role chip + native picker.
+   Role picker NATIVE hai: custom dropdown scrolling list ke andar overlap karta
+   tha (screenshot wala "St..." + khula dropdown rows ke upar). */
+.cm-search{margin:4px 0 10px}
+.cm-search input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);padding:10px 12px;font:inherit;font-size:13px}
+.cm-count{color:var(--muted);font-size:12px;font-weight:600}
+#membersModalSub{margin:2px 0 0;font-size:12px}
+.community-member-card,.community-request-card{display:block;padding:11px 12px}
+.cm-member-top{display:flex;align-items:center;gap:10px;min-width:0}
+.cm-avatar{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--primary) 14%,var(--bg));color:var(--primary);font-weight:800;font-size:15px}
+.cm-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cm-main strong{font-size:14px;overflow-wrap:anywhere}
+.cm-main small{color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.cm-role-chip{flex:none;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.cm-role-chip.role-owner{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.cm-role-chip.role-admin{background:color-mix(in srgb,var(--primary) 12%,var(--bg));border-color:var(--primary);color:var(--primary)}
+.cm-role-chip.role-accountant{background:#dcfce7;border-color:#22c55e;color:#166534}
+.cm-role-chip.role-pending{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.cm-actions{display:flex;gap:8px;margin-top:10px}
+.cm-actions .member-role-select{flex:1;min-width:140px}
+.cm-actions .btn{flex:1;min-height:34px;font-size:12px}
+@media(max-width:520px){
+ .cm-actions{flex-wrap:wrap}
+ .cm-actions .member-role-select{flex:1 1 100%}
+ .cm-actions .btn{flex:1 1 0}
+ .community-list{max-height:320px}
+}
+
+/* v80: admin community — compact + responsive */
+.admin-community-head{flex-wrap:wrap}
+.admin-community-head>div{flex:1}
+@media(max-width:520px){
+ .admin-community-add-member{grid-template-columns:minmax(0,1fr) 105px}
+ .admin-community-add-member .btn{grid-column:1/-1;width:100%}
+ .admin-community-member-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .admin-community-member-controls .btn{width:100%}
+}
+@media(max-width:359px){
+ .admin-community-add-member{grid-template-columns:minmax(0,1fr)}
+ .admin-community-add-member .btn{grid-column:auto}
+}
+
 
 /* Platform admin: community + member management */
 .admin-community-card,.admin-community-member-card{display:flex;flex-direction:column;gap:10px}

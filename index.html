@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=61">
+<link rel="stylesheet" href="styles.css?v=62">
 </head>
 <body>
 
@@ -111,7 +111,7 @@ window.addEventListener("error", function (e) {
     <div class="field">
       <label for="authPassword">Password</label>
       <div class="pw-wrap">
-        <input id="authPassword" type="password" placeholder="Kam se kam 6 harf" autocomplete="current-password">
+        <input id="authPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="current-password">
         <button id="authEye" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
       </div>
       <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
@@ -159,7 +159,7 @@ window.addEventListener("error", function (e) {
       <div class="field">
         <label for="resetPassword">Naya password</label>
         <div class="pw-wrap">
-          <input id="resetPassword" type="password" placeholder="Kam se kam 6 harf" autocomplete="new-password">
+          <input id="resetPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="new-password">
           <button id="resetEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
         </div>
       </div>
@@ -449,7 +449,7 @@ window.addEventListener("error", function (e) {
           <div class="field">
             <label for="newPass1">Naya password</label>
             <div class="pw-wrap">
-              <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
+              <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf">
               <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
@@ -473,19 +473,6 @@ window.addEventListener("error", function (e) {
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
-        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
-        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
-        <p id="acctGuestTransferMsg" class="msg" role="status"></p>
-        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
-        <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
-        <p id="acctJsonMsg" class="msg" role="status"></p>
-        <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
-        <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
-        <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
-        <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
-        <p id="acctBackupMsg" class="msg" role="status"></p>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
           <p><strong>Privacy Policy — Easy Khata</strong></p>
@@ -582,7 +569,7 @@ window.addEventListener("error", function (e) {
               <div class="field"><label for="adminAddName">Full name</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan"></div>
               <div class="field"><label for="adminAddEmail">Email address</label><input id="adminAddEmail" type="email" placeholder="ali@example.com"></div>
               <div class="field"><label for="adminAddPhone">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="0300 1234567"></div>
-              <div class="field"><label for="adminAddPass">Temporary password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+              <div class="field"><label for="adminAddPass">Temporary password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
             </div>
             <button id="adminAddSaveBtn" class="btn btn-primary" type="button">Create account</button>
             <p id="adminAddMsg" class="msg" role="status"></p>
@@ -608,6 +595,25 @@ window.addEventListener("error", function (e) {
             <select id="adminMemberCommunityFilter" aria-label="Filter members by community"><option value="">All communities</option></select>
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
+          <div id="adminCommunityMemberCount" class="admin-result-count"></div>
+        </article>
+        <article class="admin-panel admin-users-panel">
+          <div class="admin-panel-head"><div><h2>Data tools</h2><p>Apna hisaab — backup, restore, reports aur lock. Ye tools sirf admin ke liye hain; Account menu mein ab nazar nahi aate.</p></div></div>
+          <div class="menu-list">
+            <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
+            <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
+            <p id="acctGuestTransferMsg" class="msg" role="status"></p>
+            <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
+            <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
+            <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
+            <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
+            <p id="acctJsonMsg" class="msg" role="status"></p>
+            <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
+            <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
+            <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
+            <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
+            <p id="acctBackupMsg" class="msg" role="status"></p>
+          </div>
         </article>
         <p class="admin-footnote">Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.</p>
       </div>
@@ -640,7 +646,7 @@ window.addEventListener("error", function (e) {
         <div id="adminPassBox" hidden>
           <div class="field"><label for="adminNewPass1">Naya password</label>
             <div class="pw-wrap">
-              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 6 harf">
+              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf">
               <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
             </div>
           </div>
@@ -752,7 +758,7 @@ window.addEventListener("error", function (e) {
   <div id="membersOverlay" class="modal-overlay" hidden>
     <section class="community-modal members-modal" role="dialog" aria-modal="true" aria-labelledby="membersModalTitle">
       <header class="community-modal-head">
-        <div><span class="eyebrow">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle">Members & requests</h2></div>
+        <div><span class="eyebrow">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle">Members & requests</h2><p id="membersModalSub" class="muted"></p></div>
         <button id="membersModalClose" class="modal-close" type="button" aria-label="Close">×</button>
       </header>
       <div class="community-invite-box">
@@ -765,9 +771,10 @@ window.addEventListener("error", function (e) {
           <button id="workspaceInviteSubmit" class="btn btn-primary" type="button">Copy invite link</button>
         </div>
       </div>
-      <h3>Pending join requests</h3>
+      <h3>Pending join requests <span id="communityRequestsCount" class="cm-count"></span></h3>
       <div id="communityRequestsList" class="community-list"></div>
-      <h3 class="members-section-title">Active members</h3>
+      <h3 class="members-section-title">Active members <span id="workspaceMemberCount" class="cm-count"></span></h3>
+      <div class="cm-search"><input id="workspaceMemberSearch" type="search" placeholder="Member search karein — naam ya email…" aria-label="Search members"></div>
       <div id="workspaceMemberCards" class="community-list"></div>
     </section>
   </div>
@@ -783,6 +790,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=86"></script>
+<script src="app.js?v=87"></script>
 </body>
 </html>
