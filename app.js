@@ -1128,6 +1128,10 @@
       closeCommunityModal();$("newCommunityPassword").value="";currentWorkspaceId=(typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body));
       if(currentWorkspaceId&&typeof currentWorkspaceId==="object")currentWorkspaceId=currentWorkspaceId.khata_create_business_community;
       teardownRealtime();loadAll();
+      if(isAdmin()){
+        setAdminMsg("Community create ho gayi. Admin community list refresh ho rahi hai…",true);
+        loadAdminWorkspaceManagement();
+      }
     }).catch(function(){$("communityCreateSubmit").disabled=false;showCommunityMessage("Community create nahi hui. Internet check karein.",false);});
   }
   function submitCommunityJoin(){
@@ -2502,6 +2506,8 @@
       if(!results[0].ok||!results[1].ok)throw new Error("Community management data could not load");
       adminWorkspaces=Array.isArray(results[0].body)?results[0].body:[];
       adminWorkspaceMembers=Array.isArray(results[1].body)?results[1].body:[];
+      var memberFilter=$("adminMemberCommunityFilter"),previousCommunity=memberFilter?memberFilter.value:"";
+      if(memberFilter){memberFilter.innerHTML='<option value="">All communities</option>'+adminWorkspaces.filter(function(w){return w.type==="business";}).map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>';}).join("");if(adminWorkspaces.some(function(w){return w.id===previousCommunity;}))memberFilter.value=previousCommunity;}
       renderAdminCommunities();renderAdminCommunityMembers();
       return true;
     }).catch(function(){
@@ -2514,8 +2520,10 @@
     var box=$("adminCommunityList");if(!box)return;
     var q=String($("adminCommunitySearch").value||"").trim().toLowerCase();
     var status=$("adminCommunityStatus").value||"all";
-    var rows=adminWorkspaces.filter(function(w){
-      if(w.type!=="business")return false;
+    var communities=adminWorkspaces.filter(function(w){return w.type==="business";});
+    var summary=$("adminCommunitySummary");
+    if(summary){var active=communities.filter(function(w){return w.status==="active";}).length;var listed=communities.filter(function(w){return !!w.community_listed;}).length;var members=communities.reduce(function(n,w){return n+Number(w.member_count||0);},0);summary.innerHTML=[{label:"Total communities",value:communities.length},{label:"Active",value:active},{label:"Directory listed",value:listed},{label:"Community members",value:members}].map(function(x){return '<div class="admin-community-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong></div>';}).join("");}
+    var rows=communities.filter(function(w){
       if(status!=="all"&&w.status!==status)return false;
       return !q||[w.name,w.community_username,w.id].join(" ").toLowerCase().indexOf(q)!==-1;
     });
@@ -2537,7 +2545,9 @@
   function renderAdminCommunityMembers() {
     var box=$("adminCommunityMemberList");if(!box)return;
     var q=String($("adminMemberSearch").value||"").trim().toLowerCase();
+    var communityId=$("adminMemberCommunityFilter")?$("adminMemberCommunityFilter").value:"";
     var rows=adminWorkspaceMembers.filter(function(m){
+      if(communityId&&m.workspace_id!==communityId)return false;
       return !q||[m.workspace_name,m.user_name,m.user_email,m.user_phone,m.role,m.member_status].join(" ").toLowerCase().indexOf(q)!==-1;
     });
     if(!rows.length){box.innerHTML='<p class="empty">Koi community member nahi mila.</p>';return;}
@@ -2546,7 +2556,7 @@
       return '<article class="admin-user-card admin-community-member-card">'+
         '<div class="admin-community-head"><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
         '<div class="admin-user-meta"><span>Role: '+esc(m.role)+'</span><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
-        '<div class="admin-community-member-controls"><select data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["owner","admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
+        '<div class="admin-community-member-controls"><select aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
         '<select data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
         '<button class="btn btn-primary btn-mini" data-admin-member-save="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Save</button>'+
         (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
