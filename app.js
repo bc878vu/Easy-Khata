@@ -216,6 +216,7 @@
   var currentWorkspaceId = "";
   var workspaceInviteBusy = false;
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
+  var txnFullSyncAt = 0; // v86: aakhri FULL txn sync (ms) — delta sync ka 24h bound
   // v24.11: per-user hidden records — Delete kabhi real DELETE nahi karta.
   // Har user ke apne hidden ids (khata_txn_hidden table) — sirf us ki apni
   // history se record hat-ta hai, doosre dost ko koi fark nahi parta.
@@ -416,9 +417,11 @@
   function saveCache() {
     if (guestMode || !profiles || !profiles.length || !currentWorkspaceId) return;
     try {
+      var fullAt = txnFullSyncAt;
+      if (!fullAt) { var prev = loadCache(currentWorkspaceId); if (prev && prev.txnFullSyncAt) fullAt = prev.txnFullSyncAt; }
       var payload = {
         profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
-        workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now()
+        workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now(), txnFullSyncAt: fullAt || 0
       };
       window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
       window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
@@ -454,7 +457,41 @@
   }
 
 
-  function appDialog(message,opts){opts=opts||{};return new Promise(function(resolve){var overlay=$("appDialogOverlay"),title=$("appDialogTitle"),body=$("appDialogMessage"),input=$("appDialogInput"),cancel=$("appDialogCancel"),ok=$("appDialogOk");if(!overlay){resolve(opts.mode==="prompt"?null:false);return;}title.textContent=opts.title||"Easy Khata";body.textContent=String(message||"");input.hidden=opts.mode!=="prompt";input.value=opts.value==null?"":String(opts.value);input.placeholder=opts.placeholder||"";input.type=opts.inputType||"text";cancel.hidden=opts.mode==="notice";cancel.textContent=opts.cancelText||"Cancel";ok.textContent=opts.okText||(opts.mode==="notice"?"OK":opts.mode==="prompt"?"Save":"Continue");overlay.hidden=false;document.body.classList.add("dialog-open");var settled=false;function finish(value){if(settled)return;settled=true;overlay.hidden=true;document.body.classList.remove("dialog-open");cancel.removeEventListener("click",onCancel);ok.removeEventListener("click",onOk);overlay.removeEventListener("click",onBackdrop);document.removeEventListener("keydown",onKey);resolve(value);}function onCancel(){finish(opts.mode==="prompt"?null:false);}function onOk(){finish(opts.mode==="prompt"?input.value:true);}function onBackdrop(e){if(e.target===overlay&&opts.dismissible!==false)onCancel();}function onKey(e){if(e.key==="Escape"&&opts.dismissible!==false)onCancel();if(e.key==="Enter"&&opts.mode==="prompt"&&document.activeElement===input){e.preventDefault();onOk();}}cancel.addEventListener("click",onCancel);ok.addEventListener("click",onOk);overlay.addEventListener("click",onBackdrop);document.addEventListener("keydown",onKey);setTimeout(function(){(opts.mode==="prompt"?input:ok).focus();},30);});}
+  // v86: PIN jaisay multi-step flows mein dialog BLINK na kare — aik hi
+  // dialog reuse hota hai (stayOpen): OK par band nahi hota, agla step usi
+  // overlay mein content badal deta hai. Overlay steps ke darmiyan kabhi
+  // hidden nahi hota, is liye na backdrop jhapakta hai, na keyboard girta
+  // hai, na entrance animation dobara chalti hai.
+  var appDialogCurrent = null; // khule hue dialog ke listeners (reuse par hatane ke liye)
+  function shakeAppDialog() {
+    var card = null;
+    var a = document.querySelector("#appDialogOverlay .app-dialog");
+    var p = document.querySelector("#pinLockOverlay .app-dialog");
+    if (a && !$("appDialogOverlay").hidden) card = a;
+    else if (p && !$("pinLockOverlay").hidden) card = p;
+    else card = a || p;
+    if (!card) return;
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
+    setTimeout(function () { card.classList.remove("shake"); }, 450);
+  }
+  function appDialog(message,opts){opts=opts||{};return new Promise(function(resolve){var overlay=$("appDialogOverlay"),title=$("appDialogTitle"),body=$("appDialogMessage"),input=$("appDialogInput"),cancel=$("appDialogCancel"),ok=$("appDialogOk");if(!overlay){resolve(opts.mode==="prompt"?null:false);return;}
+    // Pichla stayOpen dialog abhi khula ho to us ke listeners hatao (us ka
+    // promise pehle hi resolve ho chuka) — overlay band kiye baghair.
+    if(appDialogCurrent){var prev=appDialogCurrent;appDialogCurrent=null;cancel.removeEventListener("click",prev.onCancel);ok.removeEventListener("click",prev.onOk);overlay.removeEventListener("click",prev.onBackdrop);document.removeEventListener("keydown",prev.onKey);if(prev.onInput)input.removeEventListener("input",prev.onInput);}
+    title.textContent=opts.title||"Easy Khata";body.textContent=String(message||"");input.hidden=opts.mode!=="prompt";input.value=opts.value==null?"":String(opts.value);input.placeholder=opts.placeholder||"";input.type=opts.inputType||"text";input.inputMode=opts.inputmode||"";input.maxLength=opts.maxlength?opts.maxlength:524288;
+    input.autocomplete=opts.autocomplete||"off";cancel.hidden=opts.mode==="notice";cancel.textContent=opts.cancelText||"Cancel";ok.textContent=opts.okText||(opts.mode==="notice"?"OK":opts.mode==="prompt"?"Save":"Continue");overlay.hidden=false;document.body.classList.add("dialog-open");var settled=false;
+    function teardown(){if(!appDialogCurrent)return;var cur=appDialogCurrent;appDialogCurrent=null;cancel.removeEventListener("click",cur.onCancel);ok.removeEventListener("click",cur.onOk);overlay.removeEventListener("click",cur.onBackdrop);document.removeEventListener("keydown",cur.onKey);if(cur.onInput)input.removeEventListener("input",cur.onInput);}
+    function finish(value){if(settled)return;settled=true;overlay.hidden=true;document.body.classList.remove("dialog-open");teardown();resolve(value);}
+    function onCancel(){finish(opts.mode==="prompt"?null:false);}
+    function onOk(){var v=opts.mode==="prompt"?input.value:true;if(opts.stayOpen){resolve(v);return;}finish(v);}
+    function onBackdrop(e){if(e.target===overlay&&opts.dismissible!==false)onCancel();}
+    function onKey(e){if(e.key==="Escape"&&opts.dismissible!==false)onCancel();if(e.key==="Enter"&&opts.mode==="prompt"&&document.activeElement===input){e.preventDefault();onOk();}}
+    var onInput=null;
+    if(opts.autoSubmitLength&&opts.mode==="prompt"){onInput=function(){if((input.value||"").length>=opts.autoSubmitLength)onOk();};input.addEventListener("input",onInput);}
+    appDialogCurrent={onOk:onOk,onCancel:onCancel,onBackdrop:onBackdrop,onKey:onKey,onInput:onInput};
+    cancel.addEventListener("click",onCancel);ok.addEventListener("click",onOk);overlay.addEventListener("click",onBackdrop);document.addEventListener("keydown",onKey);setTimeout(function(){(opts.mode==="prompt"?input:ok).focus();},30);});}
   function appConfirm(message,opts){return appDialog(message,Object.assign({mode:"confirm",title:"Confirm action"},opts||{}));}
   function appPrompt(message,value,opts){return appDialog(message,Object.assign({mode:"prompt",title:"Enter details",value:value},opts||{}));}
 
@@ -1141,6 +1178,31 @@
     document.querySelectorAll(".cd-menu").forEach(function (m) { m.hidden = true; });
     document.querySelectorAll(".cd-btn").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
   }
+  // v86: menu position:fixed hai — button ke viewport rect se lagta hai,
+  // is liye scrolling modal/list ke andar bhi cut nahi hota. Neeche jagah na
+  // ho to upar khulta hai; dayein kinare se bahar nahi jata. jsdom mein
+  // measurements 0 hote hain — wahan fallback (left/top button rect se).
+  function cdPositionMenu(sel) {
+    var wrap = sel.parentElement;
+    if (!wrap || !wrap.classList.contains("cd-wrap")) return;
+    var menu = wrap.querySelector(".cd-menu"), btn = wrap.querySelector(".cd-btn");
+    if (!menu || !btn) return;
+    var r = btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 0, top: 0, bottom: 0, width: 0 };
+    var vw = window.innerWidth || document.documentElement.clientWidth || 360;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 640;
+    menu.style.visibility = "hidden";
+    menu.style.minWidth = Math.min(Math.max(180, r.width || 0), Math.max(180, vw - 16)) + "px";
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    var mw = menu.offsetWidth || 0, mh = menu.offsetHeight || 0;
+    var left = r.left || 0;
+    if (mw > 0) left = Math.max(8, Math.min(left, vw - mw - 8));
+    var top = (r.bottom || 0) + 6;
+    if (mh > 0 && top + mh > vh - 8 && (r.top || 0) - 6 - mh >= 8) top = (r.top || 0) - 6 - mh;
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.visibility = "";
+  }
   function cdToggle(sel) {
     if (!sel) return;
     var wrap = sel.parentElement;
@@ -1150,7 +1212,7 @@
     var willOpen = menu.hidden;
     cdCloseAll();
     closeWorkspaceMenu();
-    if (willOpen) { cdSync(sel); menu.hidden = false; btn.setAttribute("aria-expanded", "true"); }
+    if (willOpen) { cdSync(sel); menu.hidden = false; btn.setAttribute("aria-expanded", "true"); cdPositionMenu(sel); }
   }
   function cdPick(sel, value) {
     if (!sel) return;
@@ -1182,6 +1244,7 @@
     wrap.appendChild(menu);
     // Label (agar select se jura ho) ab button ki taraf ishara kare.
     try { var lab = document.querySelector('label[for="' + sel.id + '"]'); if (lab && sel.id) { btn.id = "cdBtn-" + sel.id; lab.htmlFor = btn.id; } } catch (e) {}
+    sel.addEventListener("change", function () { cdSync(sel); }); // v86: programmatic set par bhi label taaza
     btn.addEventListener("click", function (e) { e.stopPropagation(); cdToggle(sel); });
     menu.addEventListener("click", function (e) {
       var item = e.target.closest ? e.target.closest(".cd-item") : null;
@@ -1191,7 +1254,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter"].forEach(function (id) {
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole"].forEach(function (id) {
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -1399,8 +1462,8 @@
       top.appendChild(cmRoleChip(m.role));
       card.appendChild(top);
       // v80: owner ka role/remove UI mein nahi — owner ko sirf owner badal sakta hai (server rule).
-      // Apna card bhi action-free. Role picker NATIVE select hai (custom dropdown
-      // scrolling list mein overlap karta tha — screenshot wala "St..." masla).
+      // Apna card bhi action-free. Role picker CUSTOM hai (v86) — fixed-position
+      // menu list ke andar overlap/truncate nahi karta; OS ka dark popup nahi.
       if(!isSelf&&!isOwner&&canManage){
         var actions=document.createElement("div");actions.className="cm-actions";
         var roleSelect=document.createElement("select");roleSelect.className="member-role-select";roleSelect.setAttribute("aria-label","Role for "+(p.name||p.email||"member"));
@@ -1410,7 +1473,7 @@
         saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
         var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
         remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-        actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
+        actions.appendChild(roleSelect);cdAttach(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
       }
       box.appendChild(card);
     });
@@ -1681,20 +1744,61 @@
   // Fetch the full ledger in bounded pages so balances never silently stop
   // counting after the first 500 records. A 500-row page stays below the
   // common PostgREST max_rows setting and keeps each response manageable.
+  // v86: DELTA SYNC — har boot par poora hisaab dobara nahi; sirf woh rows
+  // jo aakhri sync ke baad badli hain (updated_at > watermark). Base = is
+  // workspace ki taaza local rows (in-memory agar maujood, warna cache).
+  // FULL fetch: pehli dafa (koi watermark nahi), 24h se purana full sync
+  // (server-side delete kisi aur device se — us ki staleness ka bound),
+  // ya delta par 42703 (PostgREST schema cache mein updated_at abhi nahi).
+  function txnWatermark(rows) {
+    var max = null;
+    (rows || []).forEach(function (t) {
+      var u = t && t.updated_at;
+      if (u && (!max || u > max)) max = u;
+    });
+    return max;
+  }
+  function sortTxnsDesc(rows) {
+    return rows.slice().sort(function (a, b) {
+      if (a.txn_date !== b.txn_date) return a.txn_date < b.txn_date ? 1 : -1;
+      var ca = a.created_at || "\uffff", cb = b.created_at || "\uffff"; // Postgres DESC: NULL pehle
+      if (ca !== cb) return ca < cb ? 1 : -1;
+      return 0;
+    });
+  }
   function loadAllTransactions() {
     var pageSize = 500, offset = 0, rows = [];
+    var cached = loadCache(currentWorkspaceId);
+    var base = [];
+    var mem = (txns || []).filter(function (t) { return t.workspace_id === currentWorkspaceId; });
+    if (mem.length) base = mem;
+    else if (cached && Array.isArray(cached.txns)) base = cached.txns;
+    var watermark = txnWatermark(base);
+    if (cached && cached.txnFullSyncAt) txnFullSyncAt = cached.txnFullSyncAt;
+    var needFull = !watermark || !txnFullSyncAt || (Date.now() - txnFullSyncAt > 24 * 60 * 60 * 1000);
     function loadPage() {
-      return sb("khata_transactions?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&order=txn_date.desc&order=created_at.desc", {
+      var q = "khata_transactions?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId)
+        + (needFull
+          ? "&order=txn_date.desc&order=created_at.desc"
+          : "&updated_at=gt." + encodeURIComponent(watermark) + "&order=updated_at.asc&order=created_at.asc");
+      return sb(q, {
         range: offset + "-" + (offset + pageSize - 1)
       }).then(function (res) {
-        if (!res.ok) throw new Error("txns load failed");
+        if (!res.ok) {
+          if (!needFull && res.body && res.body.code === "42703") { needFull = true; offset = 0; rows = []; return loadPage(); }
+          throw new Error("txns load failed");
+        }
         var page = Array.isArray(res.body) ? res.body : [];
         rows = rows.concat(page);
         if (page.length === pageSize) {
           offset += pageSize;
           return loadPage();
         }
-        return rows;
+        if (needFull) { txnFullSyncAt = Date.now(); return rows; }
+        var byId = {};
+        base.forEach(function (t) { byId[t.id] = t; });
+        rows.forEach(function (t) { byId[t.id] = t; });
+        return sortTxnsDesc(Object.keys(byId).map(function (k) { return byId[k]; }));
       });
     }
     return loadPage();
@@ -2354,8 +2458,7 @@
         txns = txns.filter(function (t) { return !(t.payer_id === id || t.receiver_id === id); });
         myContacts = myContacts.filter(function (x) { return x.id !== id; });
         saveGuestStore();
-        renderSummary();
-        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+        renderAll(); // v86: poora render — khata list + detail bhi taaza (stale rows na rahein)
         setPeopleMsg("Contact remove ho gaya.", true);
         return;
       }
@@ -2850,7 +2953,7 @@
         '<button class="btn btn-soft btn-mini" data-admin-community-status="'+esc(w.id)+'" data-next-status="'+(suspended?'active':'suspended')+'" type="button">'+(suspended?'Restore':'Suspend')+'</button>'+
         '<button class="btn btn-danger btn-mini" data-admin-community-delete="'+esc(w.id)+'" type="button">Delete if empty</button></div>'+
         '<div class="admin-community-add-member"><input type="email" data-admin-add-email="'+esc(w.id)+'" placeholder="Existing user email">'+
-        '<select data-native data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
+        '<select data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
         '<button class="btn btn-primary btn-mini" data-admin-add-member="'+esc(w.id)+'" type="button">Add member</button></div></article>';
     }).join("")+(rows.length>shown.length?'<button class="btn btn-soft btn-block" id="adminCommunityMoreBtn" type="button">Show more — '+(rows.length-shown.length)+' baqi</button>':"");
     var commMoreBtn=$("adminCommunityMoreBtn");
@@ -2875,8 +2978,8 @@
       return '<article class="admin-user-card admin-community-member-card">'+
         '<div class="admin-community-head"><span class="cm-avatar">'+initial+'</span><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="cm-role-chip role-'+esc(String(m.role||"staff").toLowerCase())+'">'+esc(m.role)+'</span><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
         '<div class="admin-user-meta"><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
-        '<div class="admin-community-member-controls"><select data-native aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
-        '<select data-native data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
+        '<div class="admin-community-member-controls"><select aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
+        '<select data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
         '<button class="btn btn-primary btn-mini" data-admin-member-save="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Save</button>'+
         (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
         '</div></article>';
@@ -3069,6 +3172,7 @@
     sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
       if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. Dobara koshish karein.", false); return; }
       txns = txns.filter(function (x) { return x.id !== id; });
+      saveCache(); // v86: cache base bhi foran saaf — delta merge row wapas na laye
       renderAll(); openAdminUser(adminCurrentUser.id); loadAll();
       setAdminUserMsg("Record hamesha ke liye delete ho gaya.", true);
     }).catch(function (e) { setAdminUserMsg("Record delete nahi ho saka. Dobara try karein.", false); });
@@ -3905,6 +4009,7 @@
       $("peopleList").innerHTML = guestMode
         ? '<p class="empty">Abhi koi dost nahi — neeche se pehla dost add karein.</p>'
         : '<p class="empty">Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.</p>';
+      if (detailPersonId) renderPersonDetail(); // v86: aakhri dost gaya to khula detail bhi band ho (warna stale rehta)
       return;
     }
     if (!ids.length) {
@@ -3988,7 +4093,7 @@
   function renderPersonDetail() {
     var id = detailPersonId;
     var p = findPerson(id);
-    if (!p) { detailPersonId = null; showView("khata"); return; }
+    if (!p) { detailPersonId = null; $("detailName").textContent = "—"; $("detailSince").textContent = ""; $("detailTxns").innerHTML = ""; var bn = $("detailBanner"); if (bn) { bn.className = "detail-banner"; bn.innerHTML = ""; } showView("khata"); return; }
     setDetailPdfMsg(""); // dost badle to purana PDF message na rahe
     var s = personStats(id);
     var list = personTxns(id);
@@ -4307,11 +4412,13 @@
     try { window.localStorage.setItem(PIN_KEY, JSON.stringify({ salt: salt, hash: pinHash(pin, salt) })); } catch (e) {}
   }
   function pinClear() { try { window.localStorage.removeItem(PIN_KEY); } catch (e) {} }
-  var pinFails = 0, pinLockedUntil = 0, pinHiddenAt = 0;
+  var pinFails = 0, pinLockedUntil = 0, pinHiddenAt = 0, pinLockCountdownId = 0;
+  function stopPinLockCountdown() { if (pinLockCountdownId) { clearInterval(pinLockCountdownId); pinLockCountdownId = 0; } } // v86
   function showPinLock() {
     var o = $("pinLockOverlay");
     if (!o) return;
     pinFails = 0;
+    stopPinLockCountdown(); // v86: purana countdown na chale
     var msg = $("pinLockMsg"); if (msg) msg.textContent = "";
     var inp = $("pinLockInput");
     inp.value = ""; inp.disabled = false;
@@ -4327,14 +4434,28 @@
     var msg = $("pinLockMsg");
     if (Date.now() < pinLockedUntil) { msg.textContent = "Bohot koshishen — thodi der ruk kar dobara try karein."; return; }
     if (!/^\d{4}$/.test(pin)) { msg.textContent = "4-digit PIN likhein."; return; }
-    if (pinCheck(pin)) { pinFails = 0; hidePinLock(); return; }
+    if (pinCheck(pin)) { pinFails = 0; stopPinLockCountdown(); hidePinLock(); return; }
     pinFails++;
     inp.value = "";
+    shakeAppDialog(); // v86: ghalat PIN par halki si shake
     if (pinFails >= 5) {
       pinLockedUntil = Date.now() + 30000;
-      msg.textContent = "5 dafa ghalat PIN — 30 second ruk kar dobara try karein.";
       $("pinLockUnlockBtn").disabled = true;
-      setTimeout(function () { $("pinLockUnlockBtn").disabled = false; msg.textContent = ""; }, 30000);
+      var remain = 30; // v86: live countdown (30, 29, 28...)
+      msg.textContent = "5 dafa ghalat PIN — " + remain + " second ruk kar dobara try karein.";
+      stopPinLockCountdown();
+      pinLockCountdownId = setInterval(function () {
+        remain--;
+        if (remain <= 0) {
+          stopPinLockCountdown();
+          $("pinLockUnlockBtn").disabled = false;
+          msg.textContent = "";
+          var inp2 = $("pinLockInput");
+          if (inp2) { inp2.value = ""; try { inp2.focus(); } catch (e) {} }
+          return;
+        }
+        msg.textContent = "5 dafa ghalat PIN — " + remain + " second ruk kar dobara try karein.";
+      }, 1000);
     } else {
       msg.textContent = "Ghalat PIN hai (" + pinFails + "/5).";
     }
@@ -4355,14 +4476,36 @@
     hidePinLock();
     showAuth();
   }
+  // v86: PIN setup — aik hi dialog mein saare steps (stayOpen): pehla
+  // PIN dalne ke baad confirm wala page khulte waqt KOI blink/refresh nahi
+  // (overlay band nahi hota, keyboard bhi khula rehta hai). Ghalat PIN ya
+  // mismatch par flow ABORT nahi hota — usi dialog mein dobara mauka milta
+  // hai (shake + error message). 4 digits type karte hi auto-Continue.
   async function managePinLock() {
+    var PIN_OPTS = { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas", stayOpen: true, autoSubmitLength: 4, inputmode: "numeric", maxlength: 4 };
+    function pinStep(msg, okText) {
+      var o = Object.assign({}, PIN_OPTS, { okText: okText || "Continue" });
+      return appPrompt(msg, "", o);
+    }
     if (pinIsSet()) {
-      var cur = await appPrompt("Maujooda PIN likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
-      if (cur === null) return;
-      if (!pinCheck((cur || "").trim())) { await appDialog("Ghalat PIN hai.", { mode: "notice", title: "PIN Lock" }); return; }
-      var next = await appPrompt("Naya 4-digit PIN likhein (PIN band karne ke liye khali chhorein):", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
-      if (next === null) return;
-      next = (next || "").trim();
+      var curMsg = "Maujooda PIN likhein:";
+      while (true) {
+        var cur = await pinStep(curMsg, "Continue");
+        if (cur === null) return;
+        if (pinCheck((cur || "").trim())) break;
+        shakeAppDialog();
+        curMsg = "Ghalat PIN hai — dobara try karein:";
+      }
+      var nextMsg = "Naya 4-digit PIN likhein (PIN band karne ke liye khali chhorein):";
+      var next = "";
+      while (true) {
+        next = await pinStep(nextMsg, "Continue");
+        if (next === null) return;
+        next = (next || "").trim();
+        if (next === "" || /^\d{4}$/.test(next)) break;
+        shakeAppDialog();
+        nextMsg = "PIN sirf 4 digits ka hota hai (jaise 1234):";
+      }
       if (next === "") {
         var off = await appConfirm("PIN Lock band kar dein? Is ke baad app khulte hi PIN nahi poochha jayega.", { title: "PIN Lock", okText: "Band karein", cancelText: "Wapas" });
         if (!off) return;
@@ -4371,22 +4514,37 @@
         await appDialog("PIN Lock band ho gaya.", { mode: "notice", title: "PIN Lock" });
         return;
       }
-      if (!/^\d{4}$/.test(next)) { await appDialog("PIN sirf 4 digits ka hota hai (jaise 1234).", { mode: "notice", title: "PIN Lock" }); return; }
-      var again = await appPrompt("Naya PIN dobara likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Save karein", cancelText: "Wapas" });
-      if (again === null) return;
-      if ((again || "").trim() !== next) { await appDialog("Dono PIN same nahi — dobara koshish karein.", { mode: "notice", title: "PIN Lock" }); return; }
+      var againMsg = "Naya PIN dobara likhein:";
+      while (true) {
+        var again = await pinStep(againMsg, "Save karein");
+        if (again === null) return;
+        if ((again || "").trim() === next) break;
+        shakeAppDialog();
+        againMsg = "Dono PIN same nahi — dobara likhein:";
+      }
       pinSet(next);
       renderPinLockMenu();
       await appDialog("PIN change ho gaya. App agli dafa khulte hi PIN poochhega.", { mode: "notice", title: "PIN Lock" });
       return;
     }
-    var pin1 = await appPrompt("4-digit PIN set karein (jaise 1234):", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
-    if (pin1 === null) return;
-    pin1 = (pin1 || "").trim();
-    if (!/^\d{4}$/.test(pin1)) { await appDialog("PIN sirf 4 digits ka hota hai (jaise 1234).", { mode: "notice", title: "PIN Lock" }); return; }
-    var pin2 = await appPrompt("PIN dobara likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Save karein", cancelText: "Wapas" });
-    if (pin2 === null) return;
-    if ((pin2 || "").trim() !== pin1) { await appDialog("Dono PIN same nahi — dobara koshish karein.", { mode: "notice", title: "PIN Lock" }); return; }
+    var pin1Msg = "4-digit PIN set karein (jaise 1234):";
+    var pin1 = "";
+    while (true) {
+      pin1 = await pinStep(pin1Msg, "Continue");
+      if (pin1 === null) return;
+      pin1 = (pin1 || "").trim();
+      if (/^\d{4}$/.test(pin1)) break;
+      shakeAppDialog();
+      pin1Msg = "PIN sirf 4 digits ka hota hai (jaise 1234):";
+    }
+    var pin2Msg = "PIN dobara likhein:";
+    while (true) {
+      var pin2 = await pinStep(pin2Msg, "Save karein");
+      if (pin2 === null) return;
+      if ((pin2 || "").trim() === pin1) break;
+      shakeAppDialog();
+      pin2Msg = "Dono PIN same nahi — dobara likhein:";
+    }
     pinSet(pin1);
     renderPinLockMenu();
     await appDialog("PIN Lock set ho gaya. App agli dafa khulte hi PIN poochhega — aur Account se abhi bhi lock kar sakte hain.", { mode: "notice", title: "PIN Lock" });
@@ -5651,6 +5809,7 @@
   $("pinLockUnlockBtn").addEventListener("click", tryPinUnlock);
   $("pinLockForgotBtn").addEventListener("click", pinForgot);
   $("pinLockInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); tryPinUnlock(); } });
+  $("pinLockInput").addEventListener("input", function () { if (($("pinLockInput").value || "").length >= 4) tryPinUnlock(); }); // v86: 4 digits = auto unlock
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
@@ -5798,6 +5957,8 @@
   // v73: sab static selects ko custom dropdown banao; bahar click / Escape se band karo.
   cdAttachStatic();
   document.addEventListener("click", function(e){ if(!e.target.closest || !e.target.closest(".cd-wrap")) cdCloseAll(); });
+  document.addEventListener("scroll", function(e){ if(e.target && e.target.closest && e.target.closest(".cd-menu")) return; cdCloseAll(); }, true); // v86: fixed menu scroll par band (menu ke andar scroll nahi)
+  window.addEventListener("resize", function(){ cdCloseAll(); }); // v86
   document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ cdCloseAll(); closeWorkspaceMenu(); } });
   document.addEventListener("click", function(e){var bar=$("workspaceBar");if(bar&&!bar.contains(e.target))closeWorkspaceMenu();});
   document.addEventListener("keydown", function(e){if(e.key==="Escape")closeWorkspaceMenu();});
