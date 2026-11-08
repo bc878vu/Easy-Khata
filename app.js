@@ -4953,6 +4953,7 @@
   $("adminCommunitySearch").addEventListener("input",renderAdminCommunities);
   $("adminCommunityStatus").addEventListener("change",renderAdminCommunities);
   $("adminMemberSearch").addEventListener("input",renderAdminCommunityMembers);
+  $("adminMemberCommunityFilter").addEventListener("change",renderAdminCommunityMembers);
   $("adminCommunityList").addEventListener("click",function(e){
     var edit=e.target.closest("[data-admin-community-edit]");if(edit){editAdminCommunity(edit.getAttribute("data-admin-community-edit"));return;}
     var status=e.target.closest("[data-admin-community-status]");if(status){setAdminCommunityStatus(status.getAttribute("data-admin-community-status"),status.getAttribute("data-next-status"));return;}
