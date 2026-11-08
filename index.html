@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=52">
+<link rel="stylesheet" href="styles.css?v=53">
 </head>
 <body>
 
@@ -212,7 +212,10 @@ window.addEventListener("error", function (e) {
 
     <!-- Khata (main) -->
     <section id="khataView">
-      <p class="total-label">TOTAL BALANCE</p>
+      <div class="total-head">
+        <p class="total-label">TOTAL BALANCE</p>
+        <button id="balanceEyeBtn" class="eye-btn" type="button" aria-label="Balance chhupayein" aria-pressed="false" title="Balance chhupayein / dikhayein">👁️</button>
+      </div>
       <div class="total-cards">
         <div class="total-card receive">
           <span class="tc-icon">↓</span>
@@ -763,6 +766,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=74"></script>
+<script src="app.js?v=75"></script>
 </body>
 </html>

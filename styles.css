@@ -272,19 +272,26 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 
 /* ---------- total balance ---------- */
 .total-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:4px 2px 6px}
+.total-head{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 6px}
+.total-head .total-label{margin:0}
+.eye-btn{width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);font-size:16px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.eye-btn:active{transform:scale(.94)}
+.eye-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .total-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .total-card{
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  box-shadow:var(--shadow);padding:14px;display:flex;gap:10px;align-items:flex-start;
+  box-shadow:var(--shadow);padding:16px 14px;display:flex;gap:10px;align-items:flex-start;
 }
+.total-card.receive{border-top:3px solid var(--green)}
+.total-card.give{border-top:3px solid var(--red)}
 .tc-icon{
-  width:34px;height:34px;flex:0 0 34px;border-radius:50%;
-  display:inline-flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700;
+  width:40px;height:40px;flex:0 0 40px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:700;
 }
 .total-card.receive .tc-icon{background:var(--green-soft);color:var(--green-dark)}
 .total-card.give .tc-icon{background:var(--red-soft);color:var(--red-dark)}
 .tc-text{display:flex;flex-direction:column;min-width:0}
-.tc-text strong{font-size:1.05rem;line-height:1.2;overflow-wrap:anywhere}
+.tc-text strong{font-size:1.28rem;font-weight:800;line-height:1.2;overflow-wrap:anywhere}
 .tc-text>span{font-size:.82rem;color:var(--muted)}
 .tc-text .tc-sub{font-size:.72rem}
 .total-card.receive strong{color:var(--green)}

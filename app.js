@@ -3198,6 +3198,31 @@
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
 
+  /* ---------- Balance hide/show (v66) ---------- */
+  // TOTAL BALANCE ke upar chhota eye button: tap karo to dono cardon ki
+  // raqam chhup jati hai ("Rs ••••••") — aas-paas koi dekh raha ho to kaam
+  // aata hai. Pasand is device par save rehti hai (localStorage), dobara
+  // kholo to wahi haal milta hai. Sirf TOTAL BALANCE card chhupte hain;
+  // DOST list ki raqam waisi hi dikhti hai.
+  var BALANCE_HIDE_KEY = "easykhata_hide_balance";
+  function balanceHidden() {
+    try { return window.localStorage.getItem(BALANCE_HIDE_KEY) === "1"; } catch (e) { return false; }
+  }
+  function renderBalanceEye() {
+    var btn = $("balanceEyeBtn");
+    if (!btn) return;
+    var hidden = balanceHidden();
+    btn.textContent = hidden ? "🙈" : "👁️";
+    btn.setAttribute("aria-pressed", hidden ? "true" : "false");
+    btn.setAttribute("aria-label", hidden ? "Balance dikhayein" : "Balance chhupayein");
+    btn.title = hidden ? "Balance dikhayein" : "Balance chhupayein";
+  }
+  function toggleBalanceEye() {
+    try { window.localStorage.setItem(BALANCE_HIDE_KEY, balanceHidden() ? "0" : "1"); } catch (e) {}
+    renderBalanceEye();
+    renderSummary();
+  }
+
   function renderSummary() {
     // TOTAL BALANCE: two cards — what I have to receive (lene hain, green)
     // and what I have to give (dene hain, red). Per-person nets, not totals.
@@ -3208,10 +3233,12 @@
       if (netMinor > 0) { toReceiveMinor += netMinor; rc++; }
       else if (netMinor < 0) { toPayMinor += -netMinor; pc++; }
     });
-    $("sumReceive").textContent = fmtRs(moneyFromMinor(toReceiveMinor));
+    var hide = balanceHidden();
+    $("sumReceive").textContent = hide ? "Rs ••••••" : fmtRs(moneyFromMinor(toReceiveMinor));
     $("sumReceiveCount").textContent = rc ? rc + (rc === 1 ? " dost se" : " doston se") : "Koi nahi";
-    $("sumPay").textContent = fmtRs(moneyFromMinor(toPayMinor));
+    $("sumPay").textContent = hide ? "Rs ••••••" : fmtRs(moneyFromMinor(toPayMinor));
     $("sumPayCount").textContent = pc ? pc + (pc === 1 ? " dost ko" : " doston ko") : "Koi nahi";
+    renderBalanceEye();
   }
 
   function personStats(id) {
@@ -4946,6 +4973,7 @@
   $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
   $("shareAllBtn").addEventListener("click", shareAll);
+  $("balanceEyeBtn").addEventListener("click", toggleBalanceEye); // v66: balance chhupayein/dikhayein
   $("savePhoneBtn").addEventListener("click", saveProfile);
   $("profilePicInput").addEventListener("change", function () {
     var f = $("profilePicInput").files && $("profilePicInput").files[0];
