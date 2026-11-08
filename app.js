@@ -2905,25 +2905,15 @@
 
   function renderMonthStats() {
     var el = $("monthStats");
-    var now = todayLocal().slice(0, 7);
-    var givenMinor = 0, takenMinor = 0, count = 0;
-    visibleTxns().forEach(function (t) {
-      if (String(t.txn_date || "").slice(0, 7) !== now) return;
-      if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
-      var a = moneyToMinor(t.amount);
-      count++;
-      if (t.payer_id === myId()) givenMinor += a;
-      if (t.receiver_id === myId()) takenMinor += a;
-    });
-    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
     if (!visibleTxns().length) { el.hidden = true; return; }
+    var s = monthStats(); // v69: computation shared with the share sheet
     el.hidden = false;
     el.innerHTML =
-      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📅</span><div><strong>Is mahine ka hisaab</strong><small>' + esc(monthName(now + "-01")) + '</small></div></div>' +
+      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📅</span><div><strong>Is mahine ka hisaab</strong><small>' + esc(s.label) + '</small></div></div>' +
       '<div class="khata-stat-grid">' +
-        '<div class="khata-stat-cell is-given"><span>Diye</span><strong>' + esc(fmtRs(given)) + '</strong></div>' +
-        '<div class="khata-stat-cell is-taken"><span>Liye</span><strong>' + esc(fmtRs(taken)) + '</strong></div>' +
-        '<div class="khata-stat-cell"><span>Records</span><strong>' + count + '</strong></div>' +
+        '<div class="khata-stat-cell is-given"><span>Diye</span><strong>' + esc(fmtRs(s.given)) + '</strong></div>' +
+        '<div class="khata-stat-cell is-taken"><span>Liye</span><strong>' + esc(fmtRs(s.taken)) + '</strong></div>' +
+        '<div class="khata-stat-cell"><span>Records</span><strong>' + s.count + '</strong></div>' +
       '</div>';
   }
 
@@ -3444,6 +3434,79 @@
     if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
     copyText(text).then(function () { setTxnMsg("Link copy ho gaya — kisi bhi app mein paste karein.", true); });
   }
+
+  /* ---------- Share sheet (v69) ---------- */
+  // "Apna balance share karein" button pehle shareAll() chalata tha — v63
+  // ke baad woh sirf link bhejta tha, jab ke button ka naam balance kehta
+  // hai. Ab sheet khulti hai: user chune ke kya share karna hai, preview
+  // dekhe, phir share kare. Default "Sirf app link" (safe) — balance sirf
+  // tab jaye jab user khud use chune aur preview dekh le (v63 privacy barkarar).
+  function myTotals() {
+    // Gross totals (TOTAL BALANCE cards wale netted sums NAHI — woh per-person
+    // net ka sum hain; yahan kul diye / kul liye chahiye, jaise purana
+    // "My Food Balance" text karta tha).
+    var givenMinor = 0, takenMinor = 0;
+    visibleTxns().forEach(function (t) {
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === myId()) givenMinor += a;
+      if (t.receiver_id === myId()) takenMinor += a;
+    });
+    return { given: moneyFromMinor(givenMinor), taken: moneyFromMinor(takenMinor), net: moneyFromMinor(givenMinor - takenMinor) };
+  }
+  function myBalanceShareText() {
+    var s = myTotals();
+    var netLine = s.net > 0 ? "Net: " + fmtRs(s.net) + " — I will receive."
+      : s.net < 0 ? "Net: " + fmtRs(-s.net) + " — I have to pay." : "Net: settled up — no balance.";
+    var latest = latestLine(latestTxn());
+    return "Easy Khata — My Food Balance\n" + myName() + "\n\n" +
+      "Debit (I gave): " + fmtRs(s.given) + "\n" +
+      "Credit (I took): " + fmtRs(s.taken) + "\n\n" +
+      netLine + "\n" +
+      (latest ? "\n" + latest + "\n" : "") +
+      "\nEasy Khata: " + APP_SHORT_URL;
+  }
+  function monthStats() {
+    var now = todayLocal().slice(0, 7);
+    var givenMinor = 0, takenMinor = 0, count = 0;
+    visibleTxns().forEach(function (t) {
+      if (String(t.txn_date || "").slice(0, 7) !== now) return;
+      if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
+      var a = moneyToMinor(t.amount);
+      count++;
+      if (t.payer_id === myId()) givenMinor += a;
+      if (t.receiver_id === myId()) takenMinor += a;
+    });
+    return { label: monthName(now + "-01"), given: moneyFromMinor(givenMinor), taken: moneyFromMinor(takenMinor), count: count };
+  }
+  function monthShareText() {
+    var s = monthStats();
+    return "Easy Khata — Is mahine ka hisaab (" + s.label + ")\n" + myName() + "\n\n" +
+      "Diye: " + fmtRs(s.given) + "\n" +
+      "Liye: " + fmtRs(s.taken) + "\n" +
+      "Records: " + s.count + "\n\n" +
+      "Easy Khata: " + APP_SHORT_URL;
+  }
+  var shareSheetKind = "link";
+  function shareSheetText(kind) {
+    if (kind === "balance") return myBalanceShareText();
+    if (kind === "month") return monthShareText();
+    return "Easy Khata — apna rozmarra ka hisaab aasani se rakhein!\n\nEasy Khata: " + APP_SHORT_URL;
+  }
+  function renderShareSheet() {
+    var opts = document.querySelectorAll("#shareSheetOverlay .share-sheet-opt");
+    opts.forEach(function (o) {
+      var active = o.getAttribute("data-share-kind") === shareSheetKind;
+      o.classList.toggle("is-active", active);
+      o.setAttribute("aria-checked", active ? "true" : "false");
+    });
+    $("shareSheetPreview").textContent = shareSheetText(shareSheetKind);
+  }
+  function openShareSheet() {
+    shareSheetKind = "link";
+    renderShareSheet();
+    $("shareSheetOverlay").hidden = false;
+  }
+  function closeShareSheet() { $("shareSheetOverlay").hidden = true; }
 
   /* ---------- Rate Easy Khata (v64) ---------- */
   // "Rate Easy Khata" pehle sirf promo text share karta tha — ab asal star
@@ -4990,7 +5053,13 @@
   $("txnForm").addEventListener("submit", addTxn);
   $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
-  $("shareAllBtn").addEventListener("click", shareAll);
+  $("shareAllBtn").addEventListener("click", openShareSheet); // v69: sheet khole, seedha link na bheje
+  document.querySelectorAll("#shareSheetOverlay .share-sheet-opt").forEach(function (btn) {
+    btn.addEventListener("click", function () { shareSheetKind = btn.getAttribute("data-share-kind"); renderShareSheet(); });
+  });
+  $("shareSheetCancelBtn").addEventListener("click", closeShareSheet);
+  $("shareSheetSendBtn").addEventListener("click", function () { closeShareSheet(); shareText(shareSheetText(shareSheetKind)); });
+  $("shareSheetOverlay").addEventListener("click", function (e) { if (e.target === $("shareSheetOverlay")) closeShareSheet(); });
   $("balanceEyeBtn").addEventListener("click", toggleBalanceEye); // v66: balance chhupayein/dikhayein
   $("savePhoneBtn").addEventListener("click", saveProfile);
   $("profilePicInput").addEventListener("change", function () {
