@@ -1031,7 +1031,7 @@
       showApp();
       loadAll();
       openPendingCommunityOnboarding(); // signup email confirmation ke baad bhi community setup khule
-      maybeOfferGuestMigration(); // v24: guest hisaab ho to cloud mein save karne ki offer
+      // v74: refresh par dobara offer NAHI — sirf login/signup ke waqt (afterAuth).
     }).catch(function (e) {
       // v24.8: network fail (offline) session EXPIRE nahi hota — sirf
       // "expired" (401 / refresh fail) par session wipe + guest. Offline
@@ -1732,11 +1732,23 @@
     if (guestMigrationOffered || guestMode) return;
     if (!guestHasData()) return;
     guestMigrationOffered = true;
+    offerGuestMigration();
+  }
+  // v74: DOHRI confirmation — pehle "Save karein", phir "Pakka save karein?"
+  // (Haan, save karein) — tab jaa kar doGuestMigration chalta hai. Cancel
+  // kisi bhi step par = kuch nahi hota, guest hisaab mehfooz rehta hai.
+  function offerGuestMigration() {
+    if (guestMode) return;
+    if (!guestHasData()) return;
     var g = loadGuestStore();
     var n = (g.txns || []).length, c = (g.contacts || []).length;
     askConfirm("Guest hisaab save karein?",
       "Aap ke guest mode ke " + n + " records aur " + c + " dost is account mein save ho jayenge — phir ye cloud par mehfooz rahenge.",
-      "Save karein", doGuestMigration);
+      "Save karein", function () {
+        askConfirm("Pakka save karein?",
+          "Ye " + n + " records aur " + c + " dost aap ke account mein save ho jayenge, aur guest mode se hat jayenge. Ye wapas nahi hoga.",
+          "Haan, save karein", doGuestMigration);
+      });
   }
   function doGuestMigration() {
     var g = loadGuestStore();
@@ -3790,6 +3802,17 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
+    // v74: Settings mein guest hisaab transfer ka option — sirf logged-in
+    // mode mein; label mein is device ke guest records/dost ki ginti.
+    var gt = $("acctGuestTransferBtn");
+    if (gt) {
+      gt.hidden = guestMode;
+      var gg = loadGuestStore();
+      var gn = gg ? (gg.txns || []).length : 0, gc = gg ? (gg.contacts || []).length : 0;
+      $("acctGuestTransferLabel").textContent = (gn || gc)
+        ? ("Guest hisaab transfer karein — " + gn + " records · " + gc + " dost")
+        : "Guest hisaab transfer karein";
+    }
     renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
     renderWorkspaceBar();
   }
@@ -5364,6 +5387,12 @@
   if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
   $("notifBtn").addEventListener("click", showNotifView);
   $("acctHiddenBtn").addEventListener("click", function () { showView("hidden"); renderHiddenTxns(); });
+  // v74: Settings se guest hisaab transfer — wohi dohri confirmation.
+  $("acctGuestTransferBtn").addEventListener("click", function () {
+    if (!guestHasData()) { $("acctGuestTransferMsg").textContent = "Is device par koi guest hisaab nahi hai."; return; }
+    $("acctGuestTransferMsg").textContent = "";
+    offerGuestMigration();
+  });
   $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
