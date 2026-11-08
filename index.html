@@ -473,6 +473,19 @@ window.addEventListener("error", function (e) {
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
+        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
+        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
+        <p id="acctGuestTransferMsg" class="msg" role="status"></p>
+        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
+        <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
+        <p id="acctJsonMsg" class="msg" role="status"></p>
+        <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
+        <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
+        <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
+        <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
+        <p id="acctBackupMsg" class="msg" role="status"></p>
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
           <p><strong>Privacy Policy — Easy Khata</strong></p>
@@ -596,24 +609,6 @@ window.addEventListener("error", function (e) {
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
           <div id="adminCommunityMemberCount" class="admin-result-count"></div>
-        </article>
-        <article class="admin-panel admin-users-panel">
-          <div class="admin-panel-head"><div><h2>Data tools</h2><p>Apna hisaab — backup, restore, reports aur lock. Ye tools sirf admin ke liye hain; Account menu mein ab nazar nahi aate.</p></div></div>
-          <div class="menu-list">
-            <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
-            <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
-            <p id="acctGuestTransferMsg" class="msg" role="status"></p>
-            <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
-            <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
-            <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
-            <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
-            <p id="acctJsonMsg" class="msg" role="status"></p>
-            <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
-            <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
-            <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
-            <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
-            <p id="acctBackupMsg" class="msg" role="status"></p>
-          </div>
         </article>
         <p class="admin-footnote">Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.</p>
       </div>
@@ -790,6 +785,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=87"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>

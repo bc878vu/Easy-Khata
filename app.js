@@ -230,6 +230,8 @@
   var lastMemberRows = []; // v80: members modal ki aakhri fetch (search local filter ke liye)
   var memberSearchQ = "";
   var adminCommunityMemberShown = 20; // v80: admin member list — pehle 20, phir Show more
+  var adminUserShown = 20; // v81: admin user list — pehle 20, phir Show more
+  var adminCommunityShown = 20; // v81: admin community list — pehle 20, phir Show more
   var adminEditingWorkspace = null;
   var adminCurrentUser = null;
   var adminUserSearchText = "";
@@ -2007,12 +2009,31 @@
   }
   document.addEventListener("pointerdown", unlockNotifAudio, { passive: true });
   document.addEventListener("keydown", unlockNotifAudio);
+  var notifCleanupDone = false; // v81: 90-din purani PARHI notifications — session mein sirf aik dafa
+  var cleanedNotifIds = {}; // v81: DELETE-confirmed ids — dobara fetch (boot 2 dafa
+  // loadNotifs chalata hai) par wapas na aayein; DELETE fail ho to set nahi hota
+  function cleanupOldReadNotifs(rows){
+    if(notifCleanupDone||guestMode||!session||!session.access_token)return;
+    notifCleanupDone=true;
+    var cutoffIso=new Date(Date.now()-90*24*3600*1000).toISOString();
+    var stale=rows.filter(function(n){return n.is_read&&n.created_at&&new Date(n.created_at)<new Date(cutoffIso);});
+    if(!stale.length)return;
+    sb("khata_notifications?user_id=eq."+encodeURIComponent(myId())+"&is_read=eq.true&created_at=lt."+encodeURIComponent(cutoffIso),{method:"DELETE"}).then(function(res){
+      if(!res.ok)return; // delete fail ho to rows agle fetch par wapas aa jayengi — local se nahi hatate
+      var staleIds={};stale.forEach(function(n){staleIds[n.id]=true;cleanedNotifIds[n.id]=true;});
+      notifs=notifs.filter(function(n){return !staleIds[n.id];});
+      renderNotifBadge();syncAppBadge();
+      if(!$("notifView").hidden)renderNotifList();
+      saveCache();
+    }).catch(function(){});
+  }
   function loadNotifs() {
     if (guestMode || !session || !session.access_token) return; // v71: guest mode mein kabhi account notifs nahi
     sb("khata_notifications?select=*&user_id=eq." + encodeURIComponent(myId()) + "&order=created_at.desc&limit=50")
       .then(function (res) {
         if (!res.ok) return;
         var incoming = Array.isArray(res.body) ? res.body : [];
+        incoming = incoming.filter(function (n) { return !(n.id && cleanedNotifIds[n.id]); }); // v81: delete-confirmed wapas nahi
         var fresh = incoming.filter(function (n) { return n.id && !seenNotifIds[n.id]; });
         if (notifFirstLoad) { incoming.forEach(function (n) { if (n.id) seenNotifIds[n.id] = true; }); notifFirstLoad = false; }
         else if (fresh.length) {
@@ -2027,6 +2048,7 @@
           }
         }
         notifs = incoming;
+        cleanupOldReadNotifs(incoming); // v81: 90 din se purani PARHI notifications saaf (unread kabhi nahi)
         renderNotifBadge();
         syncAppBadge(); // v24.4: icon badge = asal unread count
         if (!$("notifView").hidden) renderNotifList();
@@ -2739,13 +2761,16 @@
       if(adminUserSortMode==="name") return String(x.name||x.email||"").localeCompare(String(y.name||y.email||""));
       return String(y.created_at||"").localeCompare(String(x.created_at||""));
     });
-    $("adminUserCount").textContent="Showing "+list.length+" of "+(adminUsers||[]).length+" users";
+    var shown=list.slice(0,adminUserShown);
+    $("adminUserCount").textContent="Showing "+shown.length+" of "+list.length+" users";
     if(!list.length){$("adminUserList").innerHTML='<p class="empty">Is filter ke mutabiq koi user nahi mila.</p>';return;}
     var me=myId();
-    $("adminUserList").innerHTML=list.map(function(u){
+    $("adminUserList").innerHTML=shown.map(function(u){
       var isMe=u.id===me;
       return '<article class="admin-user-card"><button class="admin-user-open" type="button" data-admin-open="'+esc(u.id)+'"><span class="admin-user-avatar">'+esc(initials(u.name||u.email))+'</span><span class="admin-user-copy"><strong>'+esc(u.name||u.email||"Unknown")+'</strong><small>'+esc(u.email||"No email")+'</small><small>'+esc(u.phone||"Phone not added")+'</small></span><span class="admin-user-status '+(u.blocked?'blocked':'active')+'">'+(u.blocked?'Blocked':'Active')+'</span></button><div class="admin-user-meta"><span>'+esc(Number(u.records)||0)+' records</span><span>Joined '+esc(fmtDate(u.created_at)||"—")+'</span><span>'+(isMe?'Administrator':'Member')+'</span></div><div class="admin-user-actions"><button class="btn btn-soft btn-mini" type="button" data-admin-open="'+esc(u.id)+'">Manage account →</button>'+(isMe?'':'<button class="btn btn-danger btn-mini" type="button" data-admin-del="'+esc(u.id)+'">Delete</button>')+'</div></article>';
-    }).join('');
+    }).join('')+(list.length>shown.length?'<button class="btn btn-soft btn-block" id="adminUserMoreBtn" type="button">Show more — '+(list.length-shown.length)+' baqi</button>':"");
+    var moreBtn=$("adminUserMoreBtn");
+    if(moreBtn)moreBtn.addEventListener("click",function(){adminUserShown+=20;renderAdminUserList();});
   }
   function exportAdminUsers() {
     if(!isAdmin()) return;
@@ -2804,7 +2829,8 @@
       return !q||[w.name,w.community_username,w.id].join(" ").toLowerCase().indexOf(q)!==-1;
     });
     if(!rows.length){box.innerHTML='<p class="empty">Koi community nahi mili.</p>';return;}
-    box.innerHTML=rows.map(function(w){
+    var shown=rows.slice(0,adminCommunityShown);
+    box.innerHTML=shown.map(function(w){
       var suspended=w.status!=="active";
       return '<article class="admin-user-card admin-community-card">'+
         '<div class="admin-community-head"><div><strong>'+esc(w.name)+'</strong><small>@'+esc(w.community_username||"not-set")+'</small></div><span class="admin-user-status '+(suspended?'blocked':'active')+'">'+esc(w.status)+'</span></div>'+
@@ -2816,7 +2842,9 @@
         '<div class="admin-community-add-member"><input type="email" data-admin-add-email="'+esc(w.id)+'" placeholder="Existing user email">'+
         '<select data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
         '<button class="btn btn-primary btn-mini" data-admin-add-member="'+esc(w.id)+'" type="button">Add member</button></div></article>';
-    }).join("");
+    }).join("")+(rows.length>shown.length?'<button class="btn btn-soft btn-block" id="adminCommunityMoreBtn" type="button">Show more — '+(rows.length-shown.length)+' baqi</button>':"");
+    var commMoreBtn=$("adminCommunityMoreBtn");
+    if(commMoreBtn)commMoreBtn.addEventListener("click",function(){adminCommunityShown+=20;renderAdminCommunities();});
     cdAttachIn(box); // v73: per-row role picker bhi custom dropdown
   }
   function renderAdminCommunityMembers() {
@@ -5707,14 +5735,14 @@
     var del = e.target.closest ? e.target.closest("[data-admin-txn-del]") : null;
     if (del) adminDeleteTxn(del.getAttribute("data-admin-txn-del"));
   });
-  $("adminUserSearch").addEventListener("input",function(e){adminUserSearchText=e.target.value||"";renderAdminUserList();});
-  $("adminUserStatus").addEventListener("change",function(e){adminUserStatusFilter=e.target.value||"all";renderAdminUserList();});
-  $("adminUserSort").addEventListener("change",function(e){adminUserSortMode=e.target.value||"recent";renderAdminUserList();});
+  $("adminUserSearch").addEventListener("input",function(e){adminUserSearchText=e.target.value||"";adminUserShown=20;renderAdminUserList();});
+  $("adminUserStatus").addEventListener("change",function(e){adminUserStatusFilter=e.target.value||"all";adminUserShown=20;renderAdminUserList();});
+  $("adminUserSort").addEventListener("change",function(e){adminUserSortMode=e.target.value||"recent";adminUserShown=20;renderAdminUserList();});
   $("adminRefreshBtn").addEventListener("click",function(){loadAll();renderAdmin();});
   $("adminExportUsersBtn").addEventListener("click",exportAdminUsers);
   $("adminCreateCommunityBtn").addEventListener("click",function(){openCommunityModal("create");});
-  $("adminCommunitySearch").addEventListener("input",renderAdminCommunities);
-  $("adminCommunityStatus").addEventListener("change",renderAdminCommunities);
+  $("adminCommunitySearch").addEventListener("input",function(){adminCommunityShown=20;renderAdminCommunities();});
+  $("adminCommunityStatus").addEventListener("change",function(){adminCommunityShown=20;renderAdminCommunities();});
   $("adminMemberSearch").addEventListener("input",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
   $("adminMemberCommunityFilter").addEventListener("change",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
   $("workspaceMemberSearch").addEventListener("input",function(){memberSearchQ=this.value;renderWorkspaceMemberCards(lastMemberRows);});
