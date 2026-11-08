@@ -343,24 +343,24 @@ window.addEventListener("error", function (e) {
           <h2>All Records</h2>
           <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
         </div>
-        <p class="muted">All records — newest first.</p>
+        <p class="muted">Browse and manage your latest transactions.</p>
         <div class="toolbar">
           <div class="tb-row tb-search-row">
             <span class="search-wrap tb-search">
               <span class="search-icon" aria-hidden="true">🔍</span>
-              <input id="txnSearch" type="search" placeholder="Search name, food or amount...">
+              <input id="txnSearch" type="search" autocomplete="off" aria-label="Search records" placeholder="Search name, note or amount...">
             </span>
-            <select id="txnFilterPerson"><option value="">All</option></select>
+            <select id="txnFilterPerson" aria-label="Filter by person"><option value="">All people</option></select>
           </div>
           <div class="tb-row tb-dates-row">
-            <label class="date-cell"><span>From</span><input id="txnFrom" type="date" title="From (date)"></label>
-            <label class="date-cell"><span>To</span><input id="txnTo" type="date" title="To (date)"></label>
+            <label class="date-cell"><span>From date</span><input id="txnFrom" type="date" title="Start date" aria-label="Start date"></label>
+            <label class="date-cell"><span>To date</span><input id="txnTo" type="date" title="End date" aria-label="End date"></label>
           </div>
           <div class="tb-row tb-actions-row">
             <button id="clearFilterBtn" class="btn btn-ghost" type="button">Clear filters</button>
             <button id="exportCsvBtn" class="btn btn-soft" type="button">📄 Download PDF Report</button>
           </div>
-          <p id="filterCount" class="filter-count" hidden></p>
+          <p id="filterCount" class="filter-count" role="status" aria-live="polite" hidden></p>
         </div>
         <div id="txnList" class="txns scroll-box"></div>
         <p id="txnScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane records dekhne ke liye</p>
