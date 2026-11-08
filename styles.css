@@ -1363,3 +1363,20 @@ input,select,textarea,button{max-width:100%}
   .community-onboarding-actions{grid-template-columns:1fr}
   .auth-chips span{font-size:.66rem}
 }
+
+
+/* Admin community management v2: live overview, dense filters, touch-safe responsive controls. */
+.admin-community-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0 14px}
+.admin-community-stat{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--tab-bg)}
+.admin-community-stat span{font-size:.72rem;color:var(--muted);font-weight:650}
+.admin-community-stat strong{font-size:1.25rem;line-height:1.2;overflow-wrap:anywhere}
+.admin-community-toolbar{grid-template-columns:minmax(180px,1fr) 170px}
+.admin-community-member-card{min-width:0}
+.admin-community-member-controls select,.admin-community-add-member input,.admin-community-add-member select{min-height:42px;font-size:.82rem}
+.admin-community-member-controls .btn,.admin-community-add-member .btn{min-height:42px}
+.admin-community-card .admin-user-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.admin-community-card .admin-user-actions .btn{min-width:0;white-space:normal}
+#adminCommunityEditOverlay .community-modal{box-sizing:border-box;padding:clamp(16px,3vw,24px)}
+@media(max-width:700px){.admin-community-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-community-toolbar{grid-template-columns:minmax(0,1fr) 140px}}
+@media(max-width:520px){.admin-community-toolbar{grid-template-columns:1fr}.admin-community-card .admin-user-actions{grid-template-columns:1fr 1fr}.admin-community-card .admin-user-actions .btn:last-child{grid-column:1/-1}.admin-community-member-controls{grid-template-columns:1fr 1fr}.admin-community-member-controls select{min-height:44px}.admin-community-add-member{grid-template-columns:minmax(0,1fr) 1fr}.admin-community-add-member .btn{grid-column:1/-1;width:100%}}
+@media(max-width:360px){.admin-community-summary{gap:6px}.admin-community-stat{padding:10px}.admin-community-stat strong{font-size:1.1rem}}
