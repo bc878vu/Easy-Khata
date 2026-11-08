@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=56">
+<link rel="stylesheet" href="styles.css?v=57">
 </head>
 <body>
 
@@ -199,13 +199,16 @@ window.addEventListener("error", function (e) {
   </header>
 
   <div id="workspaceBar" class="workspace-bar" hidden>
-    <label for="workspaceSelect">Hisaab / Community</label>
+    <span id="workspaceIcon" class="ws-icon" aria-hidden="true">🏢</span>
     <select id="workspaceSelect" aria-label="Hisaab ya community select karein"></select>
-    <button id="workspaceExploreBtn" class="btn btn-neutral" type="button">Find Community</button>
-    <button id="workspaceCreateBtn" class="btn btn-soft" type="button">＋ Nayi Community</button>
-    <button id="workspaceSetupBtn" class="btn btn-ghost" type="button" hidden>Community Password</button>
-    <button id="workspaceInviteBtn" class="btn btn-ghost" type="button" hidden>Invite Member</button>
-    <button id="workspaceMembersBtn" class="btn btn-ghost" type="button" hidden>Manage Members</button>
+    <button id="workspaceMenuBtn" class="ws-menu-btn" type="button" aria-expanded="false" aria-controls="workspaceMenu" aria-label="Community options">⋯</button>
+    <div id="workspaceMenu" class="ws-menu" hidden role="menu" aria-label="Community options">
+      <button id="workspaceExploreBtn" class="ws-menu-item" type="button" role="menuitem">🔍 Find Community</button>
+      <button id="workspaceCreateBtn" class="ws-menu-item" type="button" role="menuitem">＋ Nayi Community</button>
+      <button id="workspaceSetupBtn" class="ws-menu-item" type="button" role="menuitem" hidden>🔒 Community Password</button>
+      <button id="workspaceInviteBtn" class="ws-menu-item" type="button" role="menuitem" hidden>✉️ Invite Member</button>
+      <button id="workspaceMembersBtn" class="ws-menu-item" type="button" role="menuitem" hidden>👥 Manage Members</button>
+    </div>
   </div>
 
   <main class="wrap">
@@ -767,6 +770,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=77"></script>
+<script src="app.js?v=78"></script>
 </body>
 </html>

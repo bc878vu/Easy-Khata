@@ -1223,18 +1223,26 @@ input,select,textarea,button{max-width:100%}
 }
 
 
-/* Multi-tenant workspace switcher */
-.workspace-bar{display:flex;align-items:center;gap:8px;max-width:1180px;width:calc(100% - 24px);margin:10px auto 0;padding:9px 11px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 8px rgba(20,30,50,.04)}
+/* v70: Workspace bar 2.0 — compact single row: icon + switcher + ⋯ menu.
+   Sirf zaroori cheez bahar (workspace switcher); baaki community actions
+   menu ke andar. Bar kabhi wrap nahi karta — har screen par aik hi row. */
+.workspace-bar{position:relative;display:flex;align-items:center;gap:10px;max-width:1180px;width:calc(100% - 24px);margin:10px auto 0;padding:8px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 8px rgba(20,30,50,.04)}
 .workspace-bar[hidden]{display:none}
-.workspace-bar label{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
-.workspace-bar select{flex:1;min-width:0;max-width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
-.workspace-bar .btn{min-height:36px;padding:7px 10px;white-space:nowrap;font-size:12px}
-@media(max-width:520px){.workspace-bar{gap:6px;padding:8px}.workspace-bar label{display:none}.workspace-bar select{font-size:12px}.workspace-bar .btn{padding:7px 8px;font-size:11px}}
+.ws-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,var(--bg));font-size:18px;line-height:1}
+.workspace-bar select{flex:1;min-width:0;height:36px;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:14px;font-weight:700;text-overflow:ellipsis;cursor:pointer}
+.workspace-bar select:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.ws-menu-btn{flex:0 0 auto;width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:20px;line-height:1;letter-spacing:1px;cursor:pointer}
+.ws-menu-btn:hover{border-color:var(--primary)}
+.ws-menu-btn[aria-expanded="true"]{background:color-mix(in srgb,var(--primary) 12%,var(--bg));border-color:var(--primary)}
+.ws-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:60;min-width:230px;max-width:calc(100vw - 32px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 12px 32px rgba(10,20,40,.18)}
+.ws-menu[hidden]{display:none}
+.ws-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.ws-menu-item:hover{background:var(--bg)}
+.ws-menu-item[hidden]{display:none}
+@media(max-width:520px){.workspace-bar{gap:8px;padding:7px 10px}.ws-icon{width:30px;height:30px;font-size:16px}.workspace-bar select{font-size:13px}.ws-menu-btn{width:34px;height:34px}}
 
 
 /* Public community flow — compact responsive cards and native-feeling dialogs */
-.workspace-bar{flex-wrap:wrap}
-.workspace-bar .btn{flex:0 0 auto}
 .modal-overlay{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(12,18,30,.62);backdrop-filter:blur(5px)}
 .modal-overlay[hidden]{display:none}
 .community-modal{width:min(100%,560px);max-height:min(88dvh,850px);overflow:auto;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
@@ -1267,9 +1275,6 @@ input,select,textarea,button{max-width:100%}
 .members-section-title{margin-top:18px!important}
 #communityMsg{margin:12px 0 0}
 @media(max-width:520px){
- .workspace-bar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
- .workspace-bar select{grid-column:1/-1;width:100%}
- .workspace-bar .btn{font-size:11px;padding:7px 8px}
  .community-modal{padding:15px;border-radius:18px;max-height:90dvh}
  .community-card{padding:10px;gap:4px 8px}
 }

@@ -1049,10 +1049,20 @@
     var sel=$("workspaceSelect"), active=null; sel.innerHTML="";
     workspaces.forEach(function(w){var o=document.createElement("option");o.value=w.id;o.textContent=(w.type==="personal"?"Personal · ":"Business · ")+w.name;sel.appendChild(o);if(w.id===currentWorkspaceId)active=w;});
     sel.value=currentWorkspaceId;
+    // v70: bar icon follows the active workspace — business 🏢, personal 👤.
+    var ic=$("workspaceIcon"); if(ic)ic.textContent=active&&active.type==="business"?"🏢":"👤";
+    closeWorkspaceMenu();
     $("workspaceInviteBtn").hidden=!active||active.type!=="business";
     $("workspaceMembersBtn").hidden=!active||active.type!=="business";
     $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed||active.current_role!=="owner";
   }
+  /* ---------- Workspace menu (v70) ---------- */
+  // Bar par sirf switcher + ⋯ dikhta hai; baaki community actions menu ke
+  // andar hain (page ke andar, aik tap door). Buttons ki ids/handlers wahi
+  // hain — sirf markup badla hai, is liye koi binding nahi badli.
+  function openWorkspaceMenu(){var m=$("workspaceMenu");if(!m)return;m.hidden=false;$("workspaceMenuBtn").setAttribute("aria-expanded","true");}
+  function closeWorkspaceMenu(){var m=$("workspaceMenu");if(!m||m.hidden)return;m.hidden=true;$("workspaceMenuBtn").setAttribute("aria-expanded","false");}
+  function toggleWorkspaceMenu(){$("workspaceMenu").hidden?openWorkspaceMenu():closeWorkspaceMenu();}
   function loadWorkspaces(){
     return sb("khata_workspaces?select=id,name,type,created_by,status,community_username,community_listed&status=eq.active&order=created_at.asc").then(function(res){
       if(!res.ok)throw new Error("workspaces load failed");
@@ -5174,6 +5184,10 @@
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
   $("saveContactBtn").addEventListener("click", addContact);
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
+  $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();toggleWorkspaceMenu();});
+  $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  document.addEventListener("click", function(e){var bar=$("workspaceBar");if(bar&&!bar.contains(e.target))closeWorkspaceMenu();});
+  document.addEventListener("keydown", function(e){if(e.key==="Escape")closeWorkspaceMenu();});
   $("workspaceCreateBtn").addEventListener("click", createBusinessWorkspace);
   $("workspaceExploreBtn").addEventListener("click", function(){openCommunityModal("join");});
   $("workspaceSetupBtn").addEventListener("click", function(){openCommunityModal("setup");});
