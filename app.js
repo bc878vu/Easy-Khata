@@ -367,6 +367,7 @@
     saveGuestStore(); // pehli dafa: guest id persist ho jaye taake reload par wahi rahe
     showApp();
     renderAll();
+    maybeShowPinLock(); // v78: PIN set ho to boot par lock screen
   }
   // v24.1: reload par bhi seedha guest mode (saved hisaab ho ya naya) —
   // enterGuestMode() saved store ho to wahi load karta hai, warna naya
@@ -1029,6 +1030,7 @@
       if (user && session) { session.user = user; saveSession(session); }
       showApp();
       loadAll();
+      maybeShowPinLock(); // v78: purani session restore — PIN set ho to lock screen
       openPendingCommunityOnboarding(); // signup email confirmation ke baad bhi community setup khule
       // v74: refresh par dobara offer NAHI — sirf login/signup ke waqt (afterAuth).
     }).catch(function (e) {
@@ -1044,6 +1046,7 @@
       if (session && session.access_token && loadCache()) {
         showApp();
         loadAll();
+        maybeShowPinLock(); // v78: offline cache boot — PIN set ho to lock screen
         return;
       }
       saveSession(null);
@@ -3817,6 +3820,7 @@
     }
     renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
     renderWorkspaceBar();
+    renderPinLockMenu(); // v78: PIN set ho to label "change / band" + "Abhi lock" dikhao
   }
   function openPersonDetail(id) {
     if (!findPerson(id)) return;
@@ -4114,6 +4118,134 @@
     reader.onerror = function () { setAcctJsonMsg("File parhi nahi gayi — dobara koshish karein.", false); };
     reader.readAsText(file);
   }
+  // v78: PIN Lock — 4-digit app lock. Phone kisi ko do to hisaab na dikhe.
+  // IMAANDARI NOTE: PIN sirf casual snooping se bachata hai — ye encryption
+  // NAHI hai. PIN ka raw text KAHIN save nahi hota, sirf salt+hash
+  // (cyrb53) localStorage mein rehta hai. Asal recovery account ka password
+  // hai: PIN bhool jao to logout → dobara login → PIN dobara set karo.
+  // Guest mode mein koi password nahi hota, is liye wahan PIN bhool jane ka
+  // matlab hai guest hisaab DELETE (reset se pehle saaf bataya jata hai).
+  var PIN_KEY = "easykhata_pin_v1";
+  function pinHash(pin, salt) {
+    var s = salt + ":" + pin, h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h2 >>> 0).toString(16) + (h1 >>> 0).toString(16);
+  }
+  function pinStored() {
+    try {
+      var r = JSON.parse(window.localStorage.getItem(PIN_KEY) || "null");
+      return (r && typeof r.salt === "string" && typeof r.hash === "string") ? r : null;
+    } catch (e) { return null; }
+  }
+  function pinIsSet() { return !!pinStored(); }
+  function pinCheck(pin) { var s = pinStored(); return !!s && pinHash(pin, s.salt) === s.hash; }
+  function pinSet(pin) {
+    var salt = newUuid();
+    try { window.localStorage.setItem(PIN_KEY, JSON.stringify({ salt: salt, hash: pinHash(pin, salt) })); } catch (e) {}
+  }
+  function pinClear() { try { window.localStorage.removeItem(PIN_KEY); } catch (e) {} }
+  var pinFails = 0, pinLockedUntil = 0, pinHiddenAt = 0;
+  function showPinLock() {
+    var o = $("pinLockOverlay");
+    if (!o) return;
+    pinFails = 0;
+    var msg = $("pinLockMsg"); if (msg) msg.textContent = "";
+    var inp = $("pinLockInput");
+    inp.value = ""; inp.disabled = false;
+    $("pinLockUnlockBtn").disabled = false;
+    o.hidden = false;
+    setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
+  }
+  function hidePinLock() { var o = $("pinLockOverlay"); if (o) o.hidden = true; }
+  function maybeShowPinLock() { if (pinIsSet()) showPinLock(); }
+  function tryPinUnlock() {
+    var inp = $("pinLockInput");
+    var pin = (inp.value || "").trim();
+    var msg = $("pinLockMsg");
+    if (Date.now() < pinLockedUntil) { msg.textContent = "Bohot koshishen — thodi der ruk kar dobara try karein."; return; }
+    if (!/^\d{4}$/.test(pin)) { msg.textContent = "4-digit PIN likhein."; return; }
+    if (pinCheck(pin)) { pinFails = 0; hidePinLock(); return; }
+    pinFails++;
+    inp.value = "";
+    if (pinFails >= 5) {
+      pinLockedUntil = Date.now() + 30000;
+      msg.textContent = "5 dafa ghalat PIN — 30 second ruk kar dobara try karein.";
+      $("pinLockUnlockBtn").disabled = true;
+      setTimeout(function () { $("pinLockUnlockBtn").disabled = false; msg.textContent = ""; }, 30000);
+    } else {
+      msg.textContent = "Ghalat PIN hai (" + pinFails + "/5).";
+    }
+  }
+  async function pinForgot() {
+    if (guestMode) {
+      var okG = await appConfirm("Guest mode mein PIN bhool jane par hisaab wapas NAHI mil sakta. Reset karne se is device ka guest hisaab DELETE ho jayega. Pakka reset karein?", { title: "PIN bhool gaye?", okText: "Haan, reset karein", cancelText: "Wapas" });
+      if (!okG) return;
+      pinClear();
+      try { window.localStorage.removeItem(GUEST_KEY); } catch (e) {}
+      window.location.reload();
+      return;
+    }
+    var ok = await appConfirm("PIN reset karne ke liye logout hona parega. Dobara login karne ke baad PIN dobara set kar sakte hain. Aap ka hisaab account mein mehfooz hai.", { title: "PIN bhool gaye?", okText: "Logout karein", cancelText: "Wapas" });
+    if (!ok) return;
+    pinClear();
+    saveSession(null);
+    hidePinLock();
+    showAuth();
+  }
+  async function managePinLock() {
+    if (pinIsSet()) {
+      var cur = await appPrompt("Maujooda PIN likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
+      if (cur === null) return;
+      if (!pinCheck((cur || "").trim())) { await appDialog("Ghalat PIN hai.", { mode: "notice", title: "PIN Lock" }); return; }
+      var next = await appPrompt("Naya 4-digit PIN likhein (PIN band karne ke liye khali chhorein):", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
+      if (next === null) return;
+      next = (next || "").trim();
+      if (next === "") {
+        var off = await appConfirm("PIN Lock band kar dein? Is ke baad app khulte hi PIN nahi poochha jayega.", { title: "PIN Lock", okText: "Band karein", cancelText: "Wapas" });
+        if (!off) return;
+        pinClear();
+        renderPinLockMenu();
+        await appDialog("PIN Lock band ho gaya.", { mode: "notice", title: "PIN Lock" });
+        return;
+      }
+      if (!/^\d{4}$/.test(next)) { await appDialog("PIN sirf 4 digits ka hota hai (jaise 1234).", { mode: "notice", title: "PIN Lock" }); return; }
+      var again = await appPrompt("Naya PIN dobara likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Save karein", cancelText: "Wapas" });
+      if (again === null) return;
+      if ((again || "").trim() !== next) { await appDialog("Dono PIN same nahi — dobara koshish karein.", { mode: "notice", title: "PIN Lock" }); return; }
+      pinSet(next);
+      renderPinLockMenu();
+      await appDialog("PIN change ho gaya. App agli dafa khulte hi PIN poochhega.", { mode: "notice", title: "PIN Lock" });
+      return;
+    }
+    var pin1 = await appPrompt("4-digit PIN set karein (jaise 1234):", "", { title: "PIN Lock", inputType: "password", okText: "Continue", cancelText: "Wapas" });
+    if (pin1 === null) return;
+    pin1 = (pin1 || "").trim();
+    if (!/^\d{4}$/.test(pin1)) { await appDialog("PIN sirf 4 digits ka hota hai (jaise 1234).", { mode: "notice", title: "PIN Lock" }); return; }
+    var pin2 = await appPrompt("PIN dobara likhein:", "", { title: "PIN Lock", inputType: "password", okText: "Save karein", cancelText: "Wapas" });
+    if (pin2 === null) return;
+    if ((pin2 || "").trim() !== pin1) { await appDialog("Dono PIN same nahi — dobara koshish karein.", { mode: "notice", title: "PIN Lock" }); return; }
+    pinSet(pin1);
+    renderPinLockMenu();
+    await appDialog("PIN Lock set ho gaya. App agli dafa khulte hi PIN poochhega — aur Account se abhi bhi lock kar sakte hain.", { mode: "notice", title: "PIN Lock" });
+  }
+  function renderPinLockMenu() {
+    var label = $("acctPinLockLabel");
+    if (label) label.textContent = pinIsSet() ? "PIN Lock — change / band karein" : "PIN Lock set karein";
+    var lockBtn = $("acctLockNowBtn");
+    if (lockBtn) lockBtn.hidden = !pinIsSet();
+  }
+  // Auto-relock: app 10 minute se zyada background mein rahi to wapas aate
+  // hi PIN poochho (phone kisi ko dene wali surat mein).
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { pinHiddenAt = Date.now(); }
+    else if (pinHiddenAt && Date.now() - pinHiddenAt > 10 * 60 * 1000) { pinHiddenAt = 0; maybeShowPinLock(); }
+  });
   // v75: report libs LAZY load — jsPDF (~364KB) + xlsx-js-style (~425KB)
   // pehli visit par download NAHI hote; sirf jab export button dabao.
   // SRI hash wahi jo index.html ke (hataye gaye) tags par tha. SW CDN_LIBS
@@ -5357,6 +5489,11 @@
   $("acctJsonBackupBtn").addEventListener("click", exportJsonBackup); // v77: JSON backup
   $("acctJsonRestoreBtn").addEventListener("click", function () { $("acctJsonRestoreInput").click(); });
   $("acctJsonRestoreInput").addEventListener("change", onJsonRestoreFile);
+  $("acctPinLockBtn").addEventListener("click", managePinLock); // v78: PIN set/change/band
+  $("acctLockNowBtn").addEventListener("click", showPinLock); // v78: abhi lock karein
+  $("pinLockUnlockBtn").addEventListener("click", tryPinUnlock);
+  $("pinLockForgotBtn").addEventListener("click", pinForgot);
+  $("pinLockInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); tryPinUnlock(); } });
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
