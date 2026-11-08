@@ -473,14 +473,7 @@ window.addEventListener("error", function (e) {
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
-        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
-        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
-        <p id="acctGuestTransferMsg" class="msg" role="status"></p>
-        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
-        <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
-        <p id="acctJsonMsg" class="msg" role="status"></p>
+        <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup</span><span class="menu-right">›</span></button>
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
         <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
         <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
@@ -510,6 +503,16 @@ window.addEventListener("error", function (e) {
     </section>
 
     <section id="hiddenView" hidden><div class="card"><button id="hiddenBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Hidden records</h2><p class="muted">Yahan se record apni history mein restore karein.</p><div id="hiddenTxnList" class="txns"></div></div></section>
+    <section id="backupView" hidden><div class="card"><button id="backupBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Backup</h2><p class="muted">Backup, restore aur transfer — apna hisaab mehfooz rakhein.</p><div class="menu-list">
+        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
+        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
+        <p id="acctGuestTransferMsg" class="msg" role="status"></p>
+        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
+        <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
+        <p id="acctJsonMsg" class="msg" role="status"></p>
+    </div></div></section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
@@ -785,6 +788,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=89"></script>
+<script src="app.js?v=90"></script>
 </body>
 </html>

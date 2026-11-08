@@ -703,8 +703,9 @@
     $("adminView").hidden = name !== "admin";
     $("adminUserView").hidden = name !== "adminUser";
     if ($("hiddenView")) $("hiddenView").hidden = name !== "hidden";
+    if ($("backupView")) $("backupView").hidden = name !== "backup";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
-    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
     // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
@@ -5851,6 +5852,8 @@
     offerGuestMigration();
   });
   $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
+  $("acctBackupMenuBtn").addEventListener("click", function () { showView("backup"); });
+  $("backupBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
   $("notifList").addEventListener("click", function (e) {
