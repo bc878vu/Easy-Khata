@@ -397,6 +397,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 @media(max-width:360px){
   #ledgerCard .tb-actions-row{grid-template-columns:1fr}
 }
+/* v105 — All Records: modern professional polish in the app's own design
+   language (reuses --accent/--accent-soft/--tab-bg/--line tokens).
+   Accent top border via .card.accent on the HTML; the filter toolbar becomes
+   one cohesive tinted panel; Refresh is a pill button with a ↻ glyph; the
+   filter count renders as a soft pill (same values as .notif-count); inputs
+   get a primary focus ring; From/To become uppercase micro-labels. Layout
+   (v103 grids + v104 phone stacking) is unchanged. */
+#ledgerCard .toolbar{background:var(--tab-bg);border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0 6px}
+#ledgerCard .toolbar input,#ledgerCard .toolbar select{border-radius:10px}
+#ledgerCard .toolbar input:focus,#ledgerCard .toolbar select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+#ledgerCard .list-head .btn{border:1px solid var(--line);border-radius:999px}
+#refreshBtn::before{content:"↻";margin-right:5px}
+#ledgerCard .filter-count{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:.75rem;font-weight:700}
+#ledgerCard .date-cell span{text-transform:uppercase;letter-spacing:.04em;font-weight:700}
 /* Scrollable history box (v21, fixed v21.1): Poora hisaab + LEN-DEN sirf ~5-7 rows
    dikhate hain, baaki andar scroll hota hai. v21.1: (1) overscroll-behavior:auto
    (contain NAHI) — box ke end par scroll page ko chain karta hai, is liye jab
