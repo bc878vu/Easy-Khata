@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v89-0";
+var CACHE = "easy-khata-v90-0";
 var SHELL = [
   "./",
   "index.html",
   "styles.css?v=66",
   "config.js?v=4",
-  "app.js?v=95",
+  "app.js?v=96",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg"
@@ -23,8 +23,8 @@ var CDN_LIBS = [
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
-  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js",
-  "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
+  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js?ekv=1",
+  "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js?ekv=1"
 ];
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
 
@@ -96,15 +96,16 @@ self.addEventListener("fetch", function (e) {
   }
 
   if (CDN_LIBS.indexOf(req.url) !== -1) {
-    // v24.8: boot/PDF libs — cache-first, background refresh. Pehli online
-    // load par cache ho jayein, phir offline bhi boot + PDF chalein.
-    e.respondWith(caches.match(req).then(function (cached) {
-      var net = fetch(req).then(function (res) {
-        if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
-        return res;
-      }).catch(function () { return cached; });
-      return cached || net;
-    }));
+    // v90: NETWORK-first + cache fallback (pehle cache-first tha). Cache-first
+    // + SRI nahi milte: koi purani/kharab cached copy (opaque ya truncated
+    // bytes) integrity check fail karwa kar export hamesha rok deti thi, aur
+    // retry bhi wahi bytes deta tha. Ab online honay par hamesha taaza bytes
+    // aate hain (aur cache hotay hain); offline honay par cached copy chalti
+    // hai — PDF/Excel offline-after-first-use barkaraar hai.
+    e.respondWith(fetch(req).then(function (res) {
+      if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
+      return res;
+    }).catch(function () { return caches.match(req); }));
     return;
   }
 
