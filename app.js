@@ -4519,12 +4519,12 @@
   function renderTxnFilterOptions() {
     var sel = $("txnFilterPerson");
     var prev = sel.value;
-    var html = '<option value="">All</option>';
+    var html = '<option value="">All people</option>';
     profiles.forEach(function (p) {
       html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
     myContacts.forEach(function (c) {
-      html += '<option value="' + esc(c.id) + '">' + esc(c.name || "Unknown") + ' (manual)</option>';
+      html += '<option value="' + esc(c.id) + '">' + esc(c.name || "Unknown") + ' (manual contact)</option>';
     });
     sel.innerHTML = html;
     if (prev) sel.value = prev;
