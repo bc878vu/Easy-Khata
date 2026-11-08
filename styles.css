@@ -579,8 +579,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 
 /* ---------- v26 Admin Command Center ---------- */
-.admin-shell{display:grid;gap:16px;max-width:1180px;margin:0 auto}
-.admin-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:22px;border-radius:20px;background:linear-gradient(120deg,#111d39,#1d3d73 58%,#315c9c);color:#fff;box-shadow:0 12px 32px rgba(20,45,90,.18)}
+.admin-shell{display:grid;gap:12px;max-width:1180px;margin:0 auto}
+.admin-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:16px 18px;border-radius:20px;background:linear-gradient(120deg,#111d39,#1d3d73 58%,#315c9c);color:#fff;box-shadow:0 12px 32px rgba(20,45,90,.18)}
 .admin-hero h1{font-size:clamp(1.45rem,3vw,2.15rem);margin:3px 0 5px;letter-spacing:-.04em}
 .admin-hero p{margin:0;color:#d8e5f8;font-size:.9rem}
 .admin-eyebrow{font-size:.68rem!important;font-weight:800;letter-spacing:.14em;color:#a9c9ff!important}
@@ -656,6 +656,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .admin-user-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .admin-footnote{font-size:.68rem;color:var(--muted);margin:0 2px}
 .admin-user-grid .empty{grid-column:1/-1}
+/* v93: Show more buttons span the full grid width (pehle 2-col grid mein aadhi cell mein phans jate thay) */
+#adminUserMoreBtn,#adminCommunityMoreBtn,#adminCommunityMemberMoreBtn{grid-column:1/-1;width:100%}
+/* v93: admin user detail — compact header (v92 recurring pattern: back + title aik row mein) */
+.admin-user-page{padding-top:14px}
+.admin-user-head{display:flex;gap:10px;align-items:flex-start}
+.admin-user-head .btn{flex-shrink:0;margin-top:1px}
+.admin-user-head-text{min-width:0}
+.admin-user-head-text h2{margin:0;font-size:19px;line-height:1.3;overflow-wrap:anywhere}
+.admin-user-head-text p{margin:3px 0 0}
 @media(max-width:760px){
   .admin-hero{align-items:flex-start;flex-direction:column;padding:18px}
   .admin-hero-actions{width:100%}

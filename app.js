@@ -3124,7 +3124,7 @@
     var me=myId();
     $("adminUserList").innerHTML=shown.map(function(u){
       var isMe=u.id===me;
-      return '<article class="admin-user-card"><button class="admin-user-open" type="button" data-admin-open="'+esc(u.id)+'"><span class="admin-user-avatar">'+esc(initials(u.name||u.email))+'</span><span class="admin-user-copy"><strong>'+esc(u.name||u.email||"Unknown")+'</strong><small>'+esc(u.email||"No email")+'</small><small>'+esc(u.phone||"Phone not added")+'</small></span><span class="admin-user-status '+(u.blocked?'blocked':'active')+'">'+(u.blocked?'Blocked':'Active')+'</span></button><div class="admin-user-meta"><span>'+esc(Number(u.records)||0)+' records</span><span>Joined '+esc(fmtDate(u.created_at)||"—")+'</span><span>'+(isMe?'Administrator':'Member')+'</span></div><div class="admin-user-actions"><button class="btn btn-soft btn-mini" type="button" data-admin-open="'+esc(u.id)+'">Manage account →</button>'+(isMe?'':'<button class="btn btn-danger btn-mini" type="button" data-admin-del="'+esc(u.id)+'">Delete</button>')+'</div></article>';
+      return '<article class="admin-user-card"><button class="admin-user-open" type="button" data-admin-open="'+esc(u.id)+'"><span class="admin-user-avatar">'+esc(initials(u.name||u.email))+'</span><span class="admin-user-copy"><strong>'+esc(u.name||u.email||"Unknown")+'</strong><small>'+esc(u.email||"No email")+'</small><small>'+esc(u.phone||"Phone not added")+'</small></span><span class="admin-user-status '+(u.blocked?'blocked':'active')+'">'+(u.blocked?'Blocked':'Active')+'</span></button><div class="admin-user-meta"><span>'+esc(Number(u.records)||0)+' records</span><span>Joined '+esc(fmtDate(u.created_at)||"—")+'</span><span>'+(isMe?'Administrator':'Member')+'</span></div><div class="admin-user-actions"><button class="btn btn-soft btn-mini" type="button" data-admin-open="'+esc(u.id)+'">Manage account →</button>'+(isMe?'':'<button class="btn btn-soft btn-mini" type="button" data-admin-block="'+esc(u.id)+'">'+(u.blocked?'Unblock':'Block')+'</button><button class="btn btn-danger btn-mini" type="button" data-admin-del="'+esc(u.id)+'">Delete</button>')+'</div></article>';
     }).join('')+(list.length>shown.length?'<button class="btn btn-soft btn-block" id="adminUserMoreBtn" type="button">Show more — '+(list.length-shown.length)+' baqi</button>':"");
     var moreBtn=$("adminUserMoreBtn");
     if(moreBtn)moreBtn.addEventListener("click",function(){adminUserShown+=20;renderAdminUserList();});
@@ -3520,8 +3520,35 @@
         $("adminUserBadges").innerHTML = (u.id === myId() ? '<span class="badge-admin">Admin (you)</span> ' : '') +
           (blocking ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
         setAdminUserMsg(blocking ? "User block ho gaya — ab login nahi kar sakega." : "User unblock ho gaya.", true);
+        renderAdminUserList(); // v93: list bhi taaza — warna card par purana status rehta
         loadAll();
       }).catch(function () { setAdminUserMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
+  }
+
+  // v93: list se seedha Block/Unblock — detail khole baghair. Wahi RPC +
+  // wahi confirm jo detail view (toggleAdminBlock) use karta hai.
+  async function blockUserById(id) {
+    if (!isAdmin()) return;
+    var u = null;
+    adminUsers.forEach(function (x) { if (x.id === id) u = x; });
+    if (!u || u.id === myId()) return; // khud ko block nahi kar sakte
+    var blocking = !u.blocked;
+    if (!(await appConfirm(blocking
+      ? ("'" + (u.name || u.email) + "' — BLOCK karein?\n\nWo dobara login nahi kar sakega (un ka data mehfooz rahega).")
+      : ("'" + (u.name || u.email) + "' — UNBLOCK karein?")))) return;
+    sb("rpc/admin_set_user_blocked", { method: "POST", body: { p_target: u.id, p_blocked: blocking } })
+      .then(function (res) {
+        if (!res.ok) { setAdminMsg("Block update nahi hua — dobara try karein.", false); return; }
+        u.blocked = blocking;
+        renderAdminUserList();
+        if (adminCurrentUser && adminCurrentUser.id === id) {
+          adminCurrentUser.blocked = blocking;
+          $("adminBlockBtn").textContent = blocking ? "Unblock" : "Block";
+          $("adminUserBadges").innerHTML = (id === myId() ? '<span class="badge-admin">Admin (you)</span> ' : '') +
+            (blocking ? '<span class="badge-blocked">Blocked</span>' : '<span class="badge-admin">Active</span>');
+        }
+        setAdminMsg(blocking ? "User block ho gaya — ab login nahi kar sakega." : "User unblock ho gaya.", true);
+      }).catch(function () { setAdminMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
 
   function setAdminSetMsg(text, ok) {
@@ -6452,6 +6479,8 @@
   $("adminCommunityEditSave").addEventListener("click",saveAdminCommunity);
 
   $("adminUserList").addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-admin-block]") : null;
+    if (b) { blockUserById(b.getAttribute("data-admin-block")); return; } // v93: list se Block/Unblock
     var d = e.target.closest ? e.target.closest("[data-admin-del]") : null;
     if (d) { deleteUser(d.getAttribute("data-admin-del")); return; }
     var o = e.target.closest ? e.target.closest("[data-admin-open]") : null;

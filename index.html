@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=67">
+<link rel="stylesheet" href="styles.css?v=68">
 </head>
 <body>
 
@@ -640,10 +640,11 @@ window.addEventListener("error", function (e) {
     </section>
 
 <section id="adminUserView" hidden>
-      <div class="card">
-        <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
-        <h2 id="adminUserTitle" style="margin-top:10px"></h2>
-        <p id="adminUserBadges"></p>
+      <div class="card admin-user-page">
+        <div class="admin-user-head">
+          <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+          <div class="admin-user-head-text"><h2 id="adminUserTitle"></h2><p id="adminUserBadges"></p></div>
+        </div>
         <dl class="kv">
           <dt>Email</dt><dd id="adminUserEmail"></dd>
           <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
@@ -799,6 +800,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=98"></script>
+<script src="app.js?v=99"></script>
 </body>
 </html>
