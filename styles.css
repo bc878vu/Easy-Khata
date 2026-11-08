@@ -658,6 +658,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .admin-user-grid .empty{grid-column:1/-1}
 /* v93: Show more buttons span the full grid width (pehle 2-col grid mein aadhi cell mein phans jate thay) */
 #adminUserMoreBtn,#adminCommunityMoreBtn,#adminCommunityMemberMoreBtn{grid-column:1/-1;width:100%}
+/* v94: admin lists scroll INSIDE their box (history .scroll-box + friend-list .people pattern) —
+   lambi user/community/member list se poora admin page lamba nahi banta. Box 420px tak
+   dikhata hai (~2 rows desktop, ~2.5 cards phone), baaki andar scroll hota hai.
+   overscroll-behavior:auto (v21.1 lesson) — box ke end par page scroll chain karta hai. */
+#adminUserList,#adminCommunityList,#adminCommunityMemberList{max-height:420px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:auto;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--bg);scrollbar-width:thin;scrollbar-color:var(--muted) transparent;-webkit-overflow-scrolling:touch}
+#adminUserList::-webkit-scrollbar,#adminCommunityList::-webkit-scrollbar,#adminCommunityMemberList::-webkit-scrollbar{width:6px}
+#adminUserList::-webkit-scrollbar-thumb,#adminCommunityList::-webkit-scrollbar-thumb,#adminCommunityMemberList::-webkit-scrollbar-thumb{background:var(--muted);border-radius:3px}
+#adminUserList::-webkit-scrollbar-track,#adminCommunityList::-webkit-scrollbar-track,#adminCommunityMemberList::-webkit-scrollbar-track{background:transparent}
 /* v93: admin user detail — compact header (v92 recurring pattern: back + title aik row mein) */
 .admin-user-page{padding-top:14px}
 .admin-user-head{display:flex;gap:10px;align-items:flex-start}
