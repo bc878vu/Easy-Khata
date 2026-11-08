@@ -389,8 +389,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 #ledgerCard .toolbar .btn{padding:7px 10px;min-height:36px;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ledgerCard .date-cell span{font-size:.68rem}
 #ledgerCard .toolbar .cd-btn{min-height:36px;padding:7px 10px;font-size:.86rem}
-@media(max-width:360px){
+@media(max-width:480px){
+  /* v104: phone par search ko poori width — warna placeholder kat-ta hai
+     ("Search name, food or ar..."). Person filter neeche full-width. */
   #ledgerCard .tb-search-row{grid-template-columns:1fr}
+}
+@media(max-width:360px){
   #ledgerCard .tb-actions-row{grid-template-columns:1fr}
 }
 /* Scrollable history box (v21, fixed v21.1): Poora hisaab + LEN-DEN sirf ~5-7 rows
