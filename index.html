@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=74">
+<link rel="stylesheet" href="styles.css?v=75">
 </head>
 <body>
 
@@ -302,7 +302,7 @@ window.addEventListener("error", function (e) {
             </div>
           </div>
           <div class="field">
-            <label class="check"><input id="txnSplit" type="checkbox"> Aik khana, kai dost — barabar baant lein</label>
+            <label class="check"><input id="txnSplit" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text">Aik khana, kai dost — barabar baant lein</span><span class="check-chev" aria-hidden="true">⌄</span></label>
           </div>
           <div id="splitBox" class="field" hidden>
             <label>Dost chunein (baantne ke liye)</label>
@@ -323,7 +323,7 @@ window.addEventListener("error", function (e) {
             <input id="txnDate" type="date" required>
           </div>
           <div class="field" id="txnRepeatRow">
-            <label class="check"><input id="txnRepeat" type="checkbox"> 🔁 Har dafa repeat karein <span class="optional-label">Recurring</span></label>
+            <label class="check"><input id="txnRepeat" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text">🔁 Har dafa repeat karein</span> <span class="optional-label">Recurring</span><span class="check-chev" aria-hidden="true">⌄</span></label>
           </div>
           <div id="repeatBox" class="field" hidden>
             <label for="txnRepeatFreq">Kab repeat ho?</label>
@@ -802,6 +802,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=104"></script>
+<script src="app.js?v=105"></script>
 </body>
 </html>
