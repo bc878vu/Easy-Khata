@@ -1383,10 +1383,10 @@ input,select,textarea,button{max-width:100%}
 .cm-actions .cd-wrap{flex:1;min-width:140px} /* v86: custom dropdown wrap member card mein bhi poori chaudi */
 .cm-actions .btn{flex:1;min-height:34px;font-size:12px}
 @media(max-width:520px){
- .cm-actions{flex-wrap:wrap}
- .cm-actions .member-role-select{flex:1 1 110px;min-width:110px}
- .cm-actions .cd-wrap{flex:1 1 110px;min-width:110px} /* v95: phone par select + Save + Remove aik row mein (pehle select poori chauraai le kar card lamba karta tha) */
- .cm-actions .btn{flex:0 0 auto;padding:8px 10px;font-size:11px;min-height:32px}
+ .cm-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+ .cm-actions .member-role-select{min-width:0}
+ .cm-actions .cd-wrap{grid-column:1/-1;min-width:0} /* v97: phone par select poori chauraai (row 1), 3 buttons barabar (row 2) — v96 ka akela Suspend dosri row mein latka hua lagta tha (user screenshot) */
+ .cm-actions .btn{flex:none;padding:8px 6px;font-size:11px;min-height:32px}
  .community-list{max-height:320px}
 }
 
