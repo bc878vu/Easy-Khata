@@ -167,7 +167,11 @@
         body: opts.body ? JSON.stringify(opts.body) : undefined
       }, navigator.onLine ? 12000 : 6000).then(function (r) {
         lastNetworkResponseAt = Date.now();
-        if(r.ok) offlineMode = false;
+        // v68: server ne jawab de diya = internet maujood hai. Agar badge
+        // laga hua tha to abhi hatao (pehle sirf online event ya agle
+        // loadAll par hat-ta tha — slow connection par atak jata tha).
+        if (r.ok && offlineMode) { offlineMode = false; stopOfflineRecheck(); renderOffline(); }
+        else if (r.ok) offlineMode = false;
         return r.text().then(function (t) {
           var j = null;
           try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
@@ -1553,6 +1557,7 @@
       var c = loadCache(currentWorkspaceId);
       if (c) {
         offlineMode = true;
+        startOfflineRecheck(); // v68: 15s probe — theek hote hi badge khud hat jaye
         dbReady = true;
         profiles = c.profiles || [];
         workspaces = Array.isArray(c.workspaces) ? c.workspaces : workspaces;
@@ -2006,8 +2011,8 @@
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) {
-        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Internet nahi hai. Dost ka naam phone mein save ho gaya; internet aate hi update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
-        setContactMsg("Dost save nahi hua ("+res.status+") — dobara try karein.", false); return;
+        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Dost ka naam phone mein save ho gaya; thodi der mein khud update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
+        setContactMsg("Dost save nahi hua ("+res.status+")" + saveErrDetail(res) + " — dobara try karein.", false); return;
       }
       var created = res.body && res.body[0];
       if (created) { created.manual = true; myContacts.push(created); }
@@ -3064,8 +3069,19 @@
   function isTransientResponse(res) {
     return !!res && (res.status === 408 || res.status === 429 || res.status >= 500);
   }
+  function saveErrDetail(res) {
+    // Server ne save kyun mana kiya — asal wajah dikhao, sirf
+    // "dobara try karein" nahi (v68: Personal save ka 403 isi liye
+    // ghanton chhupa raha).
+    var m = res && res.body && (res.body.message || res.body.error);
+    m = m ? String(m).slice(0, 120) : "";
+    return m ? ": " + m : "";
+  }
   function markConnectionIssue() {
-    offlineMode = true;
+    // v68: server ne jawab de diya (408/429/5xx) = internet maujood hai,
+    // is liye offlineMode NAHI lagate — pehle yehi ghalat badge
+    // "Internet nahi hai" lagata tha. Sirf pending count update karo;
+    // record waise bhi outbox mein queue ho jata hai.
     renderOffline();
   }
   // v24.11: network throw par aik dafa retry (upload + PATCH dono idempotent
@@ -3406,8 +3422,8 @@
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Internet nahi hai. Hisaab phone mein save ho gaya; internet aate hi update ho jayega.",true);return;}
-          setPeopleMsg("Hisaab barabar nahi ho saka. Dobara try karein.", false); return;
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega.",true);return;}
+          setPeopleMsg("Hisaab barabar nahi ho saka" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
@@ -4688,10 +4704,12 @@
     function next() {
       if (i >= ids.length) {
         btn.disabled = false;
+        // v68: loadAll() pehle — woh shuru mein txnMsg saaf karta hai,
+        // is liye confirmation message us ke BAAD lagao, warna foran mit jata hai.
+        loadAll();
         if (failed) setTxnMsg(done + " records save ho gaye, " + failed + " fail — dobara check karein.", false);
         else if (offlineSaved) { setTxnMsg(ids.length + " records phone mein save ho gaye. Internet aate hi update ho jayenge!", true); resetTxnForm(); }
         else { setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); }
-        loadAll();
         return;
       }
       var id = ids[i++];
@@ -4781,12 +4799,12 @@
         .then(function (res) {
           btn.disabled = false;
           if (!res.ok) {
-            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Internet nahi hai. Tabdeeli phone mein save ho gayi; internet aate hi update ho jayegi.",true);btn.disabled=false;return;}
-            setTxnMsg("Tabdeeli save nahi hui. Dobara try karein.", false); return;
+            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Tabdeeli phone mein save ho gayi; thodi der mein khud update ho jayegi.",true);btn.disabled=false;return;}
+            setTxnMsg("Tabdeeli save nahi hui" + saveErrDetail(res) + " — dobara try karein.", false); return;
           }
           resetTxnForm();
+          loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
           setTxnMsg("Record update ho gaya!", true);
-          loadAll();
         }).catch(function () {
           btn.disabled = false;
           offlineTxnUpdate(editId, body);
@@ -4799,15 +4817,15 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Internet nahi hai. Record phone mein save ho gaya; internet aate hi update ho jayega.",true);btn.disabled=false;return;}
-          setTxnMsg("Record save nahi hua. Dobara try karein.", false); return;
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
+          setTxnMsg("Record save nahi hua" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person)); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
+        loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
         setTxnMsg("Record save ho gaya!", true);
-        loadAll();
       }).catch(function () {
         btn.disabled = false;
         offlineTxnInsert(Object.assign({ id: recId }, body));
@@ -4825,8 +4843,8 @@
     return sb("khata_txn_hidden", { method: "POST", prefer: "return=minimal", body: { txn_id: id, user_id: myId() } })
       .then(function (res) {
         if (!res.ok && res.status !== 409) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnHide(id);setTxnMsg("Internet nahi hai. Record hide kar diya gaya; internet aate hi update ho jayega.",true);return true;}
-          setTxnMsg("Record hataya nahi gaya — dobara try karein.", false); return false;
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnHide(id);setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record hide kar diya gaya; thodi der mein khud update ho jayega.",true);return true;}
+          setTxnMsg("Record hataya nahi gaya" + saveErrDetail(res) + " — dobara try karein.", false); return false;
         }
         hiddenTxnIds[id] = true;
         saveCache();
@@ -5180,6 +5198,37 @@
   }
 
   /* ---------- PWA: offline ---------- */
+  // v68: badge sirf ASAL offline par dikhta hai. Pehle offlineMode aik
+  // sticky latch tha — aik dafa load timeout ya server 5xx par lag jata
+  // tha aur phir khud kabhi nahi hat-ta tha (slow connection par bhi),
+  // jab ke internet maujood tha. Ab: (1) server ka jawab (5xx bhi) =
+  // internet maujood, offlineMode nahi lagta; (2) load fail par halka
+  // probe har 15s mein dobara check karta hai aur theek hote hi badge
+  // hata deta hai; (3) har kamyab jawab par bhi badge foran update hota hai.
+  var offlineRecheckTimer = null;
+  function probeReachability() {
+    // Chhota sa Supabase probe: koi bhi HTTP jawab (200 ho ya 401) =
+    // internet maujood hai; sirf network error/timeout = asal offline.
+    return fetchWithTimeout(API + "/rest/v1/khata_profiles?select=id&limit=1", {
+      method: "GET",
+      headers: { "apikey": ANON, "Authorization": "Bearer " + authToken() }
+    }, 8000).then(function () { return true; }).catch(function () { return false; });
+  }
+  function stopOfflineRecheck() {
+    if (offlineRecheckTimer) { clearInterval(offlineRecheckTimer); offlineRecheckTimer = null; }
+  }
+  function startOfflineRecheck() {
+    if (offlineRecheckTimer) return;
+    offlineRecheckTimer = setInterval(function () {
+      if (!offlineMode) { stopOfflineRecheck(); return; }
+      if (guestMode) return;
+      if (!navigator.onLine) { renderOffline(); return; }
+      probeReachability().then(function (ok) {
+        if (ok) { offlineMode = false; stopOfflineRecheck(); renderOffline(); flushOutbox(); }
+        else renderOffline();
+      });
+    }, 15000);
+  }
   function renderOffline() {
     var b = $("offlineBadge");
     if (!b) return;
@@ -5187,7 +5236,7 @@
       // v24: guest mode mein koi "Sync pending" nahi hota — sirf asli
       // offline honay par badge dikhe (sab kuch local hai).
       b.hidden = navigator.onLine;
-      b.textContent = "Internet nahi hai";
+      b.textContent = "Offline";
       return;
     }
     var pending = loadOutbox().length;
@@ -5198,7 +5247,7 @@
       // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
       // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
       b.hidden = false;
-      b.textContent = pending > 0 ? "Internet nahi hai · "+pending+" changes baqi" : "Internet nahi hai";
+      b.textContent = pending > 0 ? "Offline · "+pending+" changes baqi" : "Offline";
     } else if (pending > 0) {
       b.hidden = false;
       b.textContent = pending+" changes baqi hain";
@@ -5206,7 +5255,14 @@
       b.hidden = true;
     }
   }
-  window.addEventListener("online", function () { renderOffline(); flushOutbox(); });
+  window.addEventListener("online", function () {
+    // Browser kehta hai internet wapas aaya — probe se tasdeeq karo
+    // (kabhi kabhi "online" event par bhi server nahi milta).
+    probeReachability().then(function (ok) {
+      if (ok && offlineMode) { offlineMode = false; stopOfflineRecheck(); }
+      renderOffline(); flushOutbox();
+    });
+  });
   window.addEventListener("offline", renderOffline);
   var offlineBadgeEl = $("offlineBadge");
   if (offlineBadgeEl) offlineBadgeEl.addEventListener("click", function () { flushOutbox(); });
