@@ -1272,3 +1272,111 @@ input,select,textarea,button{max-width:100%}
 .community-invite-row .btn{font-size:11px;padding:8px}
 .member-role-select{flex:1}
 @media(max-width:520px){.community-invite-row{grid-template-columns:minmax(0,1fr) 105px}.community-invite-row .btn{grid-column:1/-1;width:100%}}
+
+
+/* Platform admin: community + member management */
+.admin-community-card,.admin-community-member-card{display:flex;flex-direction:column;gap:10px}
+.admin-community-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.admin-community-head>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.admin-community-head strong{font-size:15px;overflow-wrap:anywhere}
+.admin-community-head small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.admin-community-add-member{display:grid;grid-template-columns:minmax(0,1fr) 112px auto;gap:7px;padding-top:10px;border-top:1px solid var(--line)}
+.admin-community-add-member input,.admin-community-add-member select,.admin-community-member-controls select{min-width:0;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);padding:9px;font:inherit;font-size:12px}
+.admin-community-member-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:7px}
+.admin-community-member-controls .btn{white-space:nowrap}
+#adminCommunityEditOverlay{position:fixed;inset:0;z-index:1000;background:rgba(10,18,32,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+#adminCommunityEditOverlay[hidden]{display:none}
+#adminCommunityEditOverlay .community-modal{width:min(560px,100%);max-height:90dvh;overflow:auto;padding:20px}
+.admin-community-card .admin-user-meta{flex-wrap:wrap}
+@media(max-width:600px){
+ .admin-community-add-member{grid-template-columns:minmax(0,1fr) 105px}
+ .admin-community-add-member .btn{grid-column:1/-1;width:100%}
+ .admin-community-member-controls{grid-template-columns:1fr 1fr}
+ .admin-community-member-controls .btn{width:100%}
+}
+
+
+/* Signup community onboarding — compact, responsive and accessible */
+.auth{width:min(100%,440px);min-width:0}
+.auth .field{margin-bottom:9px}
+.auth .field input{min-height:44px}
+.community-onboarding{
+  margin:10px 0 12px;padding:12px;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--tab-bg);min-width:0;
+}
+.community-onboarding h3{font-size:.92rem;margin:0 0 3px;line-height:1.35}
+.community-onboarding>p.muted{font-size:.78rem;line-height:1.4;margin:0 0 9px}
+.community-onboarding-actions{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+}
+.community-onboarding-actions .btn{
+  min-width:0;min-height:38px;padding:8px 9px;
+  font-size:.78rem;line-height:1.25;white-space:normal;
+}
+#signupJoinCommunityPanel{margin-top:9px;min-width:0}
+#signupJoinCommunityPanel .field{margin-bottom:7px}
+#signupJoinCommunityPanel .field label{font-size:.76rem;margin-bottom:3px}
+#signupJoinCommunityPanel input{min-height:40px;padding:8px 10px;font-size:.9rem}
+#signupCommunityDirectory{
+  display:grid;gap:7px;max-height:180px;overflow:auto;
+  margin:7px 0 0;overscroll-behavior:contain;
+}
+#signupCommunityDirectory:empty{display:none}
+#signupCommunityDirectory .community-card{
+  grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;
+  padding:9px 10px;border-radius:11px;background:var(--card);
+}
+#signupCommunityDirectory .community-card strong{font-size:.82rem}
+#signupCommunityDirectory .community-card small{font-size:.7rem;line-height:1.3}
+#signupCommunityDirectory .community-join-pick{
+  grid-column:2;grid-row:1 / span 3;padding:7px 9px;
+  font-size:.7rem;min-height:32px;
+}
+#signupCommunityDirectory .community-empty{
+  padding:10px;font-size:.76rem;line-height:1.4;border-radius:10px;
+}
+#signupCommunityChoice{font-size:.76rem;line-height:1.4;margin:7px 0 0}
+#signupCommunityCreateHint{
+  margin:8px 0 0;padding:9px 10px;border-radius:10px;
+  background:var(--card);font-size:.76rem;line-height:1.4;
+}
+@media(max-width:520px){
+  .wrap{padding:10px 12px 18px}
+  .auth-brand{margin:12px auto 4px}
+  .auth-brand h1{font-size:1.42rem;margin:7px 0 3px}
+  .auth-brand p{font-size:.86rem;margin-bottom:8px}
+  .auth-logo{width:54px;height:54px}
+  .auth-chips{gap:5px}
+  .auth-chips span{font-size:.7rem;padding:4px 8px}
+  .auth{margin:8px auto;padding:13px}
+  .auth .tabs{margin-bottom:8px}
+  .auth .field{margin-bottom:8px}
+  .auth .field label{font-size:.8rem}
+  .auth .field input{min-height:41px;padding:9px 10px;font-size:.92rem}
+  .community-onboarding{padding:10px;margin:8px 0 10px}
+  .community-onboarding-actions{gap:7px}
+  .community-onboarding-actions .btn{min-height:36px;font-size:.74rem}
+  #signupCommunityDirectory{max-height:150px}
+}
+@media(max-width:350px){
+  .community-onboarding-actions{grid-template-columns:1fr}
+  .auth-chips span{font-size:.66rem}
+}
+
+
+/* Admin community management v2: live overview, dense filters, touch-safe responsive controls. */
+.admin-community-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0 14px}
+.admin-community-stat{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--tab-bg)}
+.admin-community-stat span{font-size:.72rem;color:var(--muted);font-weight:650}
+.admin-community-stat strong{font-size:1.25rem;line-height:1.2;overflow-wrap:anywhere}
+.admin-community-toolbar{grid-template-columns:minmax(180px,1fr) 170px}
+.admin-community-member-card{min-width:0}
+.admin-community-member-controls select,.admin-community-add-member input,.admin-community-add-member select{min-height:42px;font-size:.82rem}
+.admin-community-member-controls .btn,.admin-community-add-member .btn{min-height:42px}
+.admin-community-card .admin-user-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.admin-community-card .admin-user-actions .btn{min-width:0;white-space:normal}
+#adminCommunityEditOverlay .community-modal{box-sizing:border-box;padding:clamp(16px,3vw,24px)}
+@media(max-width:700px){.admin-community-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-community-toolbar{grid-template-columns:minmax(0,1fr) 140px}}
+@media(max-width:520px){.admin-community-toolbar{grid-template-columns:1fr}.admin-community-card .admin-user-actions{grid-template-columns:1fr 1fr}.admin-community-card .admin-user-actions .btn:last-child{grid-column:1/-1}.admin-community-member-controls{grid-template-columns:1fr 1fr}.admin-community-member-controls select{min-height:44px}.admin-community-add-member{grid-template-columns:minmax(0,1fr) 1fr}.admin-community-add-member .btn{grid-column:1/-1;width:100%}}
+@media(max-width:360px){.admin-community-summary{gap:6px}.admin-community-stat{padding:10px}.admin-community-stat strong{font-size:1.1rem}}
