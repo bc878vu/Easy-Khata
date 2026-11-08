@@ -447,7 +447,7 @@
     return name ? esc(name) : '<button class="btn-danger" type="button" data-missing-name="' + esc(id) + '">Naam set karein</button>';
   }
   async function saveMissingPartyName(id) {
-    if (!id || !myId())) return;
+    if (!id || !myId()) return;
     var name = await appPrompt("Is record mein is shakhs ka asal naam likhein:", "", {title:"Contact name"});
     if (name === null) return;
     name = name.trim();
@@ -546,7 +546,7 @@
     // pair dated on/before it is locked history. Settlement rows are always locked.
     var latestByPair = {};
     txns.forEach(function (t) {
-      if (!isSettlementNote(t.note))) return;
+      if (!isSettlementNote(t.note)) return;
       var d = String(t.txn_date || "");
       var k = pairKey(t.payer_id, t.receiver_id);
       if (d && (!latestByPair[k] || d > latestByPair[k])) latestByPair[k] = d;
@@ -683,7 +683,7 @@
     showView("khata");
   }
   function showAdminView() {
-    if (!isAdmin())) return;
+    if (!isAdmin()) return;
     showView("admin");
     renderAdmin();
   }
@@ -1589,7 +1589,7 @@
   var guestMigrationOffered = false;
   function maybeOfferGuestMigration() {
     if (guestMigrationOffered || guestMode) return;
-    if (!guestHasData())) return;
+    if (!guestHasData()) return;
     guestMigrationOffered = true;
     var g = loadGuestStore();
     var n = (g.txns || []).length, c = (g.contacts || []).length;
@@ -1847,7 +1847,7 @@
   }
   function syncAppBadge() {
     try {
-      if (typeof navigator === "undefined" || !("setAppBadge" in navigator))) return;
+      if (typeof navigator === "undefined" || !("setAppBadge" in navigator)) return;
       if (!$("notifView").hidden) return; // Yaad Dehani khuli hai — user dekh raha hai
       var n = unreadNotifCount();
       if (n === appBadgeCount) return; // pehle se wahi hai — dobara set nahi
@@ -2477,7 +2477,7 @@
     }).join('');
   }
   function exportAdminUsers() {
-    if(!isAdmin())) return;
+    if(!isAdmin()) return;
     var rows=[["Name","Email","Phone","Status","Records","Joined"]];
     (adminUsers||[]).forEach(function(u){rows.push([u.name||"",u.email||"",u.phone||"",u.blocked?"Blocked":"Active",Number(u.records)||0,u.created_at||""]);});
     var csv=rows.map(function(row){return row.map(function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
@@ -2645,7 +2645,7 @@
     var p = null;
     adminUsers.forEach(function (x) { if (x.id === id) p = x; });
     if (!p) p = findPerson(id);
-    if (!p || id === myId())) return;
+    if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
     if (!(await appConfirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur community ka access ruk jayega. Purane hisaab mehfooz rahenge."))) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
@@ -2668,7 +2668,7 @@
   // admin_create_user RPC auth user + profile banata hai; naya user
   // foran login kar sakta hai. Admin ka kaam online-only hai.
   function createAdminUser() {
-    if (!isAdmin())) return;
+    if (!isAdmin()) return;
     var name = $("adminAddName").value.trim();
     var email = $("adminAddEmail").value.trim();
     var phone = $("adminAddPhone").value.trim();
@@ -2730,7 +2730,7 @@
     $("adminUserTxns").innerHTML = html;
   }
   async function adminEditTxn(id) {
-    if (!isAdmin())) return;
+    if (!isAdmin()) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
     var amount = await appPrompt("Nayi raqam (Rs):", String(t.amount), {title:"Edit transaction",inputType:"number"}); if (amount === null) return;
@@ -2745,7 +2745,7 @@
     }).catch(function (e) { setAdminUserMsg("Record update nahi ho saka. Dobara try karein.", false); });
   }
   async function adminDeleteTxn(id) {
-    if (!isAdmin())) return;
+    if (!isAdmin()) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
     if (!(await appConfirm("Ye record dono users ki history se hamesha ke liye delete ho jayega. Isay wapas nahi la sakenge. Kya aap jari rakhna chahte hain?"))) return;
@@ -2757,7 +2757,7 @@
     }).catch(function (e) { setAdminUserMsg("Record delete nahi ho saka. Dobara try karein.", false); });
   }
   function openAdminUser(id) {
-    if (!isAdmin())) return;
+    if (!isAdmin()) return;
     var u = null;
     adminUsers.forEach(function (x) { if (x.id === id) u = x; });
     if (!u) return;
@@ -2904,7 +2904,7 @@
     var givenMinor = 0, takenMinor = 0, count = 0;
     visibleTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
-      if (t.payer_id !== myId() && t.receiver_id !== myId())) return;
+      if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
       var a = moneyToMinor(t.amount);
       count++;
       if (t.payer_id === myId()) givenMinor += a;
@@ -3487,7 +3487,7 @@
     renderWorkspaceBar();
   }
   function openPersonDetail(id) {
-    if (!findPerson(id))) return;
+    if (!findPerson(id)) return;
     detailPersonId = id;
     renderPersonDetail();
     showView("detail");
@@ -4511,7 +4511,7 @@
   function startEditTxn(id) {
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
-    if (!t || t.created_by !== myId())) return;
+    if (!t || t.created_by !== myId()) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     showView("khata");
     setSplitMode(false);
@@ -4759,7 +4759,7 @@
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
-    if (t.payer_id !== myId() && t.receiver_id !== myId())) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
+    if (t.payer_id !== myId() && t.receiver_id !== myId()) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
     askConfirm("Record history se hatayein?", "Ye record sirf history se hide hoga. Aapka total balance aur dost ki list ka balance bilkul change nahi hoga. Doosre dost ko bhi koi fark nahi parega.", "History se hatayein", function () {
     if (guestMode) {
       // Guest history hide only: preserve the underlying transaction for balances.
@@ -5073,12 +5073,12 @@
     }).catch(function () { return false; });
   }
   function wireAppUpdate() {
-    if (!("serviceWorker" in navigator))) return;
+    if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
       // No reload on first install — only when moving from an old version to a new one.
       if (!hadControllerAtLoad) return;
       if (updateReloaded) return;
-      if (isFormDirty())) return; // if the form is filled, the new version comes on the next open
+      if (isFormDirty()) return; // if the form is filled, the new version comes on the next open
       updateReloaded = true;
       window.location.reload();
     });

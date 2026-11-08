@@ -37,7 +37,16 @@
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('hide');},6000);</script>
 
 <script>
-window.addEventListener("error", function () {
+window.addEventListener("error", function (e) {
+  // v62: asli error ko chhupao nahi — console + localStorage mein save karo
+  // taake agla boot error foran pehchana ja sake (visible text wahi rehta hai).
+  try {
+    console.error("[EasyKhata boot error]", e && e.message, e && e.filename, e && e.lineno);
+    window.localStorage.setItem("easykhata_last_boot_error", JSON.stringify({
+      message: e && e.message, filename: e && e.filename, lineno: e && e.lineno,
+      at: new Date().toISOString()
+    }));
+  } catch (err) {}
   var splash = document.getElementById("splash");
   if (splash) splash.classList.add("hide");
   var wrap = document.getElementById("authWrap");
@@ -741,6 +750,6 @@ window.addEventListener("error", function () {
     </div>
   </div>
 
-<script src="app.js?v=71"></script>
+<script src="app.js?v=72"></script>
 </body>
 </html>
