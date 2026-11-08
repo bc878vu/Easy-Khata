@@ -1073,8 +1073,9 @@
     var bar=$("workspaceBar"); if(!bar)return;
     bar.hidden=guestMode||!session; if(bar.hidden)return;
     var sel=$("workspaceSelect"), active=null; sel.innerHTML="";
-    workspaces.forEach(function(w){var o=document.createElement("option");o.value=w.id;o.textContent=(w.type==="personal"?"Personal · ":"Business · ")+w.name;sel.appendChild(o);if(w.id===currentWorkspaceId)active=w;});
+    workspaces.forEach(function(w){var o=document.createElement("option");o.value=w.id;o.textContent=(w.type==="personal"?"Personal · ":"Business · ")+w.name;o.setAttribute("data-ic",w.type==="business"?"🏢":"👤");sel.appendChild(o);if(w.id===currentWorkspaceId)active=w;});
     sel.value=currentWorkspaceId;
+    cdSync(sel); // v73: custom dropdown ka label + menu fresh karo
     // v70: bar icon follows the active workspace — business 🏢, personal 👤.
     var ic=$("workspaceIcon"); if(ic)ic.textContent=active&&active.type==="business"?"🏢":"👤";
     closeWorkspaceMenu();
@@ -1089,6 +1090,103 @@
   function openWorkspaceMenu(){var m=$("workspaceMenu");if(!m)return;m.hidden=false;$("workspaceMenuBtn").setAttribute("aria-expanded","true");}
   function closeWorkspaceMenu(){var m=$("workspaceMenu");if(!m||m.hidden)return;m.hidden=true;$("workspaceMenuBtn").setAttribute("aria-expanded","false");}
   function toggleWorkspaceMenu(){$("workspaceMenu").hidden?openWorkspaceMenu():closeWorkspaceMenu();}
+  /* ---------- Custom dropdowns (v73) ----------
+     Native <select> ka popup OS ka hota hai — dark, app design se bilkul
+     alag (screenshot mein workspace switcher aisa hi dikh raha tha). Is liye
+     har select ke saath aik custom button + menu lagta hai; asli select
+     chhupa rehta hai aur STATE STORE ka kaam karta hai — us ki value aur
+     change handlers sab waisay hi chalte hain, is liye purani logic mein
+     koi tabdeeli nahi. Menu share-sheet wale radio style mein hai. */
+  function cdItemHtml(opt, currentValue) {
+    var active = opt.value === currentValue;
+    var ic = opt.getAttribute("data-ic") || "";
+    return '<button type="button" class="cd-item' + (active ? " is-active" : "") + '" role="option" aria-selected="' + active + '" data-value="' + esc(opt.value) + '">' +
+      (ic ? '<span class="cd-item-ic" aria-hidden="true">' + esc(ic) + '</span>' : "") +
+      '<span class="cd-item-label">' + esc(opt.textContent) + '</span>' +
+      '<span class="cd-radio" aria-hidden="true"></span></button>';
+  }
+  function cdSync(sel) {
+    if (!sel) return;
+    var wrap = sel.parentElement;
+    if (!wrap || !wrap.classList.contains("cd-wrap")) return;
+    var btn = wrap.querySelector(".cd-btn"), menu = wrap.querySelector(".cd-menu");
+    if (!btn || !menu) return;
+    btn.disabled = !!sel.disabled;
+    var label = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : "";
+    btn.querySelector(".cd-btn-label").textContent = label || "";
+    var html = "";
+    Array.prototype.forEach.call(sel.childNodes, function (node) {
+      if (node.tagName === "OPTGROUP") {
+        html += '<div class="cd-group">' + esc(node.label || "") + '</div>';
+        Array.prototype.forEach.call(node.childNodes, function (o) { if (o.tagName === "OPTION") html += cdItemHtml(o, sel.value); });
+      } else if (node.tagName === "OPTION") {
+        html += cdItemHtml(node, sel.value);
+      }
+    });
+    menu.innerHTML = html || '<div class="cd-empty">Koi option nahi</div>';
+  }
+  function cdCloseAll() {
+    document.querySelectorAll(".cd-menu").forEach(function (m) { m.hidden = true; });
+    document.querySelectorAll(".cd-btn").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+  }
+  function cdToggle(sel) {
+    if (!sel) return;
+    var wrap = sel.parentElement;
+    if (!wrap || !wrap.classList.contains("cd-wrap")) return;
+    var menu = wrap.querySelector(".cd-menu"), btn = wrap.querySelector(".cd-btn");
+    if (!menu || !btn || sel.disabled) return;
+    var willOpen = menu.hidden;
+    cdCloseAll();
+    closeWorkspaceMenu();
+    if (willOpen) { cdSync(sel); menu.hidden = false; btn.setAttribute("aria-expanded", "true"); }
+  }
+  function cdPick(sel, value) {
+    if (!sel) return;
+    sel.value = value;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    cdSync(sel);
+    cdCloseAll();
+  }
+  function cdAttach(sel) {
+    if (!sel || sel.dataset.cdAttached) return;
+    sel.dataset.cdAttached = "1";
+    sel.classList.add("cd-native");
+    var wrap = document.createElement("div");
+    wrap.className = "cd-wrap";
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cd-btn";
+    btn.setAttribute("aria-haspopup", "listbox");
+    btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = '<span class="cd-btn-label"></span><span class="cd-chevron" aria-hidden="true">⌄</span>';
+    var menu = document.createElement("div");
+    menu.className = "cd-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "listbox");
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    // Label (agar select se jura ho) ab button ki taraf ishara kare.
+    try { var lab = document.querySelector('label[for="' + sel.id + '"]'); if (lab && sel.id) { btn.id = "cdBtn-" + sel.id; lab.htmlFor = btn.id; } } catch (e) {}
+    btn.addEventListener("click", function (e) { e.stopPropagation(); cdToggle(sel); });
+    menu.addEventListener("click", function (e) {
+      var item = e.target.closest ? e.target.closest(".cd-item") : null;
+      if (!item) return;
+      cdPick(sel, item.getAttribute("data-value"));
+    });
+    cdSync(sel);
+  }
+  function cdAttachStatic() {
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole"].forEach(function (id) {
+      var sel = $(id);
+      if (sel) cdAttach(sel);
+    });
+  }
+  function cdAttachIn(container) {
+    if (!container) return;
+    container.querySelectorAll("select").forEach(function (sel) { cdAttach(sel); });
+  }
   function loadWorkspaces(){
     return sb("khata_workspaces?select=id,name,type,created_by,status,community_username,community_listed&status=eq.active&order=created_at.asc").then(function(res){
       if(!res.ok)throw new Error("workspaces load failed");
@@ -1113,6 +1211,7 @@
     });
     if(pinned)saveOutbox(pendingOps);
     $("workspaceSelect").disabled=true;
+    cdSync($("workspaceSelect")); // v73: custom button bhi disabled dikhe
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       $("workspaceSelect").disabled=false;
       if(!res.ok){setTxnMsg("Community change nahi ho saki. Dobara koshish karein.",false);renderWorkspaceBar();return;}
@@ -1247,7 +1346,8 @@
           saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
           var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
           remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-          actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
+          actions.appendChild(roleSelect);cdAttach(roleSelect); // v73: role picker bhi custom dropdown
+          actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
         }
         box.appendChild(card);
       });
@@ -2042,6 +2142,7 @@
       renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       $("txnPerson").value = guestRec.id;
+      cdSync($("txnPerson")); // v73: custom dropdown label bhi naye dost par le jao
       return;
     }
     var btn = $("saveContactBtn");
@@ -2050,7 +2151,7 @@
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) {
-        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Dost ka naam phone mein save ho gaya; thodi der mein khud update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;return;}
+        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Dost ka naam phone mein save ho gaya; thodi der mein khud update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;cdSync($("txnPerson"));return;}
         setContactMsg("Dost save nahi hua ("+res.status+")" + saveErrDetail(res) + " — dobara try karein.", false); return;
       }
       var created = res.body && res.body[0];
@@ -2060,7 +2161,7 @@
       setContactMsg("Dost add ho gaya!", true);
       renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
-      if (created) $("txnPerson").value = created.id;
+      if (created) { $("txnPerson").value = created.id; cdSync($("txnPerson")); } // v73: label sync
     }).catch(function () {
       btn.disabled = false;
       var createdOffline = offlineContactInsert(contactBody);
@@ -2070,6 +2171,7 @@
       renderSummary();
       renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
       $("txnPerson").value = createdOffline.id;
+      cdSync($("txnPerson")); // v73: label sync
     });
   }
   function deleteContact(id) {
@@ -2556,7 +2658,7 @@
       adminWorkspaces=Array.isArray(results[0].body)?results[0].body:[];
       adminWorkspaceMembers=Array.isArray(results[1].body)?results[1].body:[];
       var memberFilter=$("adminMemberCommunityFilter"),previousCommunity=memberFilter?memberFilter.value:"";
-      if(memberFilter){memberFilter.innerHTML='<option value="">All communities</option>'+adminWorkspaces.filter(function(w){return w.type==="business";}).map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>';}).join("");if(adminWorkspaces.some(function(w){return w.id===previousCommunity;}))memberFilter.value=previousCommunity;}
+      if(memberFilter){memberFilter.innerHTML='<option value="">All communities</option>'+adminWorkspaces.filter(function(w){return w.type==="business";}).map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>';}).join("");if(adminWorkspaces.some(function(w){return w.id===previousCommunity;}))memberFilter.value=previousCommunity;cdSync(memberFilter);}
       renderAdminCommunities();renderAdminCommunityMembers();
       return true;
     }).catch(function(){
@@ -2590,6 +2692,7 @@
         '<select data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
         '<button class="btn btn-primary btn-mini" data-admin-add-member="'+esc(w.id)+'" type="button">Add member</button></div></article>';
     }).join("");
+    cdAttachIn(box); // v73: per-row role picker bhi custom dropdown
   }
   function renderAdminCommunityMembers() {
     var box=$("adminCommunityMemberList");if(!box)return;
@@ -2611,6 +2714,7 @@
         (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
         '</div></article>';
     }).join("");
+    cdAttachIn(box); // v73: per-row role/status picker bhi custom dropdown
   }
   function editAdminCommunity(id) {
     var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
@@ -3812,6 +3916,7 @@
     if (manual) html += '<optgroup label="Mere contacts (manual)">' + manual + '</optgroup>';
     sel.innerHTML = html || '<option value="">(koi dost nahi)</option>';
     if (prev) sel.value = prev;
+    cdSync(sel); // v73: custom dropdown ka label + menu fresh karo
   }
 
   function renderTxnFilterOptions() {
@@ -3826,6 +3931,7 @@
     });
     sel.innerHTML = html;
     if (prev) sel.value = prev;
+    cdSync(sel); // v73: custom dropdown ka label + menu fresh karo
   }
 
   function filteredTxns() {
@@ -4723,6 +4829,7 @@
     var dir = t.payer_id === me ? "given" : "taken";
     editingId = id;
     $("txnPerson").value = other;
+    cdSync($("txnPerson")); // v73: edit karte waqt dropdown label bhi us dost par le jao
     var radio = document.querySelector('input[name="txnDir"][value="' + dir + '"]');
     if (radio) radio.checked = true;
     $("txnAmount").value = t.amount;
@@ -5134,6 +5241,7 @@
   $("clearFilterBtn").addEventListener("click", function () {
     txnSearchText = ""; txnFilterPerson = ""; txnFromDate = ""; txnToDate = "";
     $("txnSearch").value = ""; $("txnFilterPerson").value = ""; $("txnFrom").value = ""; $("txnTo").value = "";
+    cdSync($("txnFilterPerson")); // v73: filter saaf karte waqt dropdown label bhi "Sab" par le jao
     renderTxns();
   });
   $("exportCsvBtn").addEventListener("click", exportFilteredLedgerPdf);
@@ -5213,8 +5321,12 @@
   $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
   $("saveContactBtn").addEventListener("click", addContact);
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
-  $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();toggleWorkspaceMenu();});
+  $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});
   $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  // v73: sab static selects ko custom dropdown banao; bahar click / Escape se band karo.
+  cdAttachStatic();
+  document.addEventListener("click", function(e){ if(!e.target.closest || !e.target.closest(".cd-wrap")) cdCloseAll(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ cdCloseAll(); closeWorkspaceMenu(); } });
   document.addEventListener("click", function(e){var bar=$("workspaceBar");if(bar&&!bar.contains(e.target))closeWorkspaceMenu();});
   document.addEventListener("keydown", function(e){if(e.key==="Escape")closeWorkspaceMenu();});
   $("workspaceCreateBtn").addEventListener("click", createBusinessWorkspace);

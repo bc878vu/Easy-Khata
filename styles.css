@@ -17,6 +17,7 @@
   --red-dark:#b91c1c;
   --red-soft:#fee2e2;
   --accent:#1d4ed8;
+  --primary:#2563eb;
   --accent-soft:#dbeafe;
   /* developer-credit gradient (light theme: blue -> violet -> pink) */
   --credit-1:#2563eb;
@@ -49,6 +50,7 @@
   --red-dark:#fca5a5;
   --red-soft:#450a0a;
   --accent:#60a5fa;
+  --primary:#60a5fa;
   --accent-soft:#1e3a5f;
   /* developer-credit gradient (dark theme: light blue -> light violet -> light pink) */
   --credit-1:#60a5fa;
@@ -702,6 +704,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   --input-border:#bdc9d8;
   --tab-bg:#edf2f8;
   --accent:#1d4ed8;
+  --primary:#2563eb;
   --accent-soft:#e4efff;
   --accent-btn:#1d4ed8;
   --green:#167443;
@@ -730,6 +733,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   --input-border:#536985;
   --tab-bg:#24364e;
   --accent:#8abaff;
+  --primary:#8abaff;
   --accent-soft:#203e65;
   --accent-btn:#2459c7;
   --green:#70e0a0;
@@ -1229,8 +1233,40 @@ input,select,textarea,button{max-width:100%}
 .workspace-bar{position:relative;display:flex;align-items:center;gap:10px;max-width:1180px;width:calc(100% - 24px);margin:10px auto 0;padding:8px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 8px rgba(20,30,50,.04)}
 .workspace-bar[hidden]{display:none}
 .ws-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,var(--bg));font-size:18px;line-height:1}
-.workspace-bar select{flex:1;min-width:0;height:36px;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:14px;font-weight:700;text-overflow:ellipsis;cursor:pointer}
-.workspace-bar select:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.workspace-bar .cd-wrap{flex:1;min-width:0}
+.workspace-bar .cd-btn{border:0;background:transparent;min-height:36px;padding:0 4px;font-weight:700}
+.workspace-bar .cd-btn:hover{background:var(--bg)}
+.workspace-bar .cd-btn:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,transparent)}
+
+/* v73: Custom dropdowns — native <select> ka popup OS ka hota hai (dark,
+   app design se alag), is liye sab selects button + menu ban gaye. Asli
+   select chhupa rehta hai (state store). Style share-sheet jaisa: tinted
+   selected item + radio circle + ✓, dark mode var() based. */
+.cd-native{display:none!important}
+.cd-wrap{position:relative;min-width:0}
+.cd-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--input-border);border-radius:12px;background:var(--input-bg);color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}
+.cd-btn:hover{border-color:var(--primary)}
+.cd-btn:focus-visible{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,transparent)}
+.cd-btn:disabled{opacity:.55;cursor:default}
+.cd-btn-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.cd-chevron{flex:none;font-size:16px;color:var(--muted);transition:transform .15s ease}
+.cd-btn[aria-expanded="true"] .cd-chevron{transform:rotate(180deg)}
+.cd-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:80;max-height:264px;overflow:auto;padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 14px 34px rgba(10,20,40,.2)}
+.cd-menu[hidden]{display:none}
+.cd-item{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.cd-item:hover{background:var(--bg)}
+.cd-item.is-active{background:color-mix(in srgb,var(--primary) 9%,var(--bg))}
+.cd-item-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cd-item-ic{flex:none;font-size:16px}
+.cd-radio{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--input-border);display:grid;place-items:center;color:#fff;font-size:12px;line-height:1}
+.cd-item.is-active .cd-radio{background:var(--primary);border-color:var(--primary)}
+.cd-item.is-active .cd-radio::after{content:"✓";font-weight:700}
+.cd-group{padding:10px 12px 4px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.cd-empty{padding:12px;font-size:13px;color:var(--muted)}
+#txnForm .cd-btn{min-height:52px;padding:12px 14px;border-radius:13px}
+.community-invite-row .cd-wrap{flex:1;min-width:0}
+.community-request-actions .cd-wrap{flex:1;min-width:0}
+.admin-community-member-controls .cd-wrap,.admin-community-add-member .cd-wrap{flex:1;min-width:0}
 .ws-menu-btn{flex:0 0 auto;width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:20px;line-height:1;letter-spacing:1px;cursor:pointer}
 .ws-menu-btn:hover{border-color:var(--primary)}
 .ws-menu-btn[aria-expanded="true"]{background:color-mix(in srgb,var(--primary) 12%,var(--bg));border-color:var(--primary)}
@@ -1239,7 +1275,7 @@ input,select,textarea,button{max-width:100%}
 .ws-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
 .ws-menu-item:hover{background:var(--bg)}
 .ws-menu-item[hidden]{display:none}
-@media(max-width:520px){.workspace-bar{gap:8px;padding:7px 10px}.ws-icon{width:30px;height:30px;font-size:16px}.workspace-bar select{font-size:13px}.ws-menu-btn{width:34px;height:34px}}
+@media(max-width:520px){.workspace-bar{gap:8px;padding:7px 10px}.ws-icon{width:30px;height:30px;font-size:16px}.workspace-bar .cd-btn{font-size:13px}.ws-menu-btn{width:34px;height:34px}}
 
 
 /* Public community flow — compact responsive cards and native-feeling dialogs */
@@ -1406,9 +1442,21 @@ input,select,textarea,button{max-width:100%}
 .rate-feedback{display:block;width:100%;min-height:84px;margin-top:14px;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit;font-size:15px;line-height:1.5;outline:none;resize:vertical}
 .rate-feedback:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 16%,transparent)}
 /* v69: Share sheet — "Apna balance share karein" options + live preview. */
-.share-sheet-options{display:flex;flex-direction:column;gap:10px;margin-top:16px}
-.share-sheet-opt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:14px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer}
-.share-sheet-opt strong{font-size:15px}
-.share-sheet-opt span{font-size:12.5px;color:var(--muted);line-height:1.5}
-.share-sheet-opt.is-active{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--bg));box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}
-.share-sheet-preview{margin:16px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
+/* v72: Share sheet style refresh — modern option cards + visible selected state. */
+.share-sheet-options{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.share-sheet-opt{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:16px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease,transform .12s ease}
+.share-sheet-opt:hover{border-color:color-mix(in srgb,var(--primary) 45%,var(--line))}
+.share-sheet-opt:active{transform:scale(.985)}
+.share-opt-ic{flex:none;width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:var(--accent-soft);font-size:20px}
+.share-sheet-opt[data-share-kind="balance"] .share-opt-ic{background:var(--green-soft)}
+.share-sheet-opt[data-share-kind="month"] .share-opt-ic{background:color-mix(in srgb,#f59e0b 16%,var(--bg))}
+.share-opt-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.share-opt-tx strong{font-size:15px}
+.share-opt-tx span{font-size:12.5px;color:var(--muted);line-height:1.5}
+.share-opt-radio{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--input-border);display:grid;place-items:center;color:#fff;font-size:13px;line-height:1;transition:background .15s ease,border-color .15s ease}
+.share-sheet-opt.is-active{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 9%,var(--bg));box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 15%,transparent),0 6px 16px rgba(16,24,40,.07)}
+.share-sheet-opt.is-active .share-opt-radio{background:var(--primary);border-color:var(--primary)}
+.share-sheet-opt.is-active .share-opt-radio::after{content:"✓";font-weight:700}
+.share-sheet-preview-label{margin:18px 0 8px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.share-sheet-preview{margin:0;padding:13px 14px;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;background:color-mix(in srgb,var(--primary) 5%,var(--bg));color:var(--text);font:inherit;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
+#shareSheetOverlay .app-dialog-mark{background:linear-gradient(135deg,var(--accent-btn),var(--credit-2));color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.35)}
