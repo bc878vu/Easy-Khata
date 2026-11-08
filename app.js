@@ -3393,26 +3393,13 @@
     });
   }
   function shareAll() {
-    var givenMinor = 0, takenMinor = 0;
-    balanceTxns().forEach(function (t) {
-      var a = moneyToMinor(t.amount);
-      if (t.payer_id === myId()) givenMinor += a;
-      if (t.receiver_id === myId()) takenMinor += a;
-    });
-    var given = moneyFromMinor(givenMinor), taken = moneyFromMinor(takenMinor);
-    var net = moneyFromMinor(givenMinor - takenMinor); // +: I am owed, -: I owe
-    var netLine = net > 0 ? "Net: " + fmtRs(net) + " — I will receive."
-      : net < 0 ? "Net: " + fmtRs(-net) + " — I have to pay." : "Net: settled up — no balance.";
-    var latest = latestLine(latestTxn());
-    var text = "Easy Khata — My Food Balance\n" +
-      myName() + "\n\n" +
-      "Debit (I gave): " + fmtRs(given) + "\n" +
-      "Credit (I took): " + fmtRs(taken) + "\n\n" +
-      netLine + "\n" +
-      (latest ? "\n" + latest + "\n" : "") +
-      "\nEasy Khata: " + APP_SHORT_URL;
+    // v62.1 (user order 2026-11-08): "Share Easy Khata" mein SIRF link + chhota
+    // message jaye — poora balance (Debit/Credit/Net/Latest) kabhi share na ho.
+    // Per-person Share (personShareText) aur WhatsApp Remind (personShortText)
+    // waisi hi hain — dost se hisaab barabar karne ke liye un mein rakam zaroori hai.
+    var text = "Easy Khata — apna rozmarra ka hisaab aasani se rakhein!\n\nEasy Khata: " + APP_SHORT_URL;
     if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
-    copyText(text).then(function () { setTxnMsg("Balance copy ho gaya — kisi bhi app mein paste karein.", true); });
+    copyText(text).then(function () { setTxnMsg("Link copy ho gaya — kisi bhi app mein paste karein.", true); });
   }
 
   function renderPeople() {
