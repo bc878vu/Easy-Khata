@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.easykhata.app",
+      "package_name": "com.amantech.easykhata",
       "sha256_cert_fingerprints": ["7A:C3:D2:3D:FD:8D:CD:50:7C:FD:F6:DB:44:E0:4A:4E:19:E3:3D:33:E0:CD:09:11:50:1C:B7:A9:1E:73:CD:12"]
     }
   }

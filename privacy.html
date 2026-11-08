@@ -49,14 +49,19 @@
 
   <div class="card">
     <h2>📋 1. Hum aap ka kya data rakhte hain</h2>
+    <p>App use karne ke liye aap se sirf wohi maloomat li jati hai jo hisaab ke liye zaroori hai:</p>
     <ul>
       <li><strong>Account:</strong> aap ka naam, email aur phone number (jo aap khud dein), aur profile photo (jo aap khud lagayein).</li>
       <li><strong>Hisaab:</strong> aap ke dost, un ke saath transactions — kis ne kitne diye, kis se kitne lene hain — settlements aur community memberships.</li>
-      <li><strong>Notifications:</strong> aap ki notification settings aur push token, taake har transaction ki khabar waqt par aap tak pahunche.</li>
+      <li><strong>Notifications:</strong> aap ki notification settings, taake har transaction ki khabar waqt par aap tak pahunche.</li>
       <li><strong>Bina login ke (Guest mode):</strong> aap ka hisaab sirf aap ke apne phone ya browser par save hota hai — humare servers tak kuch nahi jata.</li>
     </ul>
+    <p><strong>Hum aap se ye cheezein kabhi nahi mangte:</strong> aap ke contacts, aap ki location, SMS, ya CNIC — app ye permissions leti hi nahi.</p>
 
-    <h2>🎯 2. Ye data kis kaam aata hai</h2>
+    <h2>🔍 2. App khud kya maloomat leti hai</h2>
+    <p>App aap ki location, contacts, SMS ya aap ke phone ki dosri apps ki maloomat nahi leti. Service chalane ke liye sirf zaroori basic technical maloomat — jaise internet connection ki details — servers tak ja sakti hain. App mein koi ads nahi hain, is liye aap ka data ads ke liye track bhi nahi hota.</p>
+
+    <h2>🎯 3. Ye data kis kaam aata hai</h2>
     <ul>
       <li>Aap ka hisaab saaf dikhane ke liye — kis ne kitne diye, kis se kitne lene hain, balance kya bacha.</li>
       <li>Taake aap apna hisaab apne doosre devices par bhi dekh sakein (jab aap account banayein).</li>
@@ -64,32 +69,43 @@
       <li>Community ka hisaab sirf us community ke members dekh sakte hain — bahar koi nahi.</li>
     </ul>
 
-    <h2>🚫 3. Hum kya kabhi nahi karte</h2>
+    <h2>🚫 4. Hum kya kabhi nahi karte</h2>
     <ul>
       <li>Aap ka data <strong>kabhi nahi bechte</strong> — na aaj, na kabhi.</li>
       <li>App mein <strong>koi ads nahi</strong> hain, aur aap ka data ads ke liye use nahi hota.</li>
-      <li>Aap ka data kisi teesri party ko nahi dete. Sirf neeche likhe service providers data ko service chalane ke liye use karte hain.</li>
+      <li>Aap ka data kisi teesri party ko nahi dete. Sirf wohi services data ko haath lagati hain jo app chalane ke liye zaroori hain — jaise database, login, notifications aur hosting — aur wo bhi sirf service dene ke liye.</li>
     </ul>
 
-    <h2>🗄️ 4. Aap ka data kahan mehfooz rehta hai</h2>
-    <p>Account ka data mehfooz tareeqe se <strong>Supabase</strong> (database aur login) aur <strong>Firebase</strong> (push notifications) par save hota hai. App <strong>Vercel</strong> par hosted hai. Ye providers data ko sirf service dene ke liye use karte hain, apni privacy policies ke mutabiq.</p>
+    <h2>🗄️ 5. Aap ka data kahan rehta hai</h2>
+    <p>Account banane par aap ka hisaab mehfooz cloud servers par rehta hai — phone badal jaye ya kho jaye to dobara login kar ke wapas mil jata hai. Guest mode mein data sirf aap ke apne phone par rehta hai, is liye phone badalne par wapas nahi milta.</p>
     <p class="note">Ye servers Pakistan se bahar bhi ho sakte hain — ye normal hai. Aap ka data hamesha mehfooz (encrypted) connection se jata hai.</p>
 
-    <h2>✅ 5. Aap ke rights — aap ke haath mein</h2>
+    <h2>🔒 6. Aap ka data kaise mehfooz rehta hai</h2>
+    <p>Aap ka hisaab sirf aap dekh sakte hain — aur jin doston ya community members ko aap khud dikhayein. App mein PIN lock bhi hai — chahein to apne hisaab par chaar-hindson wala lock laga sakte hain. Phir bhi, imandari se: internet par koi cheez 100% mehfooz hone ki guarantee nahi de sakta.</p>
+
+    <h2>✅ 7. Aap ke rights — aap ke haath mein</h2>
     <ul>
       <li>Profile details (naam, phone, photo) aap khud kabhi bhi badal sakte hain.</li>
       <li>Record delete karne par wo sirf <strong>aap ki</strong> history se hat-ta hai — doosre dost ke hisaab par koi fark nahi parta. Settled hisaab hamesha locked rehta hai, taake purana hisaab dobara na badla ja sake.</li>
-      <li>Account band karwana ho to WhatsApp helpline par rabta karein — confirm karne ke baad aap ka account data delete kar diya jayega.</li>
-      <li>Notifications aap Account menu se ya phone ki settings se kabhi bhi band kar sakte hain.</li>
+      <li>Notifications aap Account menu se ya phone ki settings se kabhi bhi band kar sakte hain — band karne par yaad-dahani aur notifications ruk jayengi.</li>
     </ul>
 
-    <h2>👶 6. Bachche</h2>
+    <h2>🗑️ 8. Account delete karwana</h2>
+    <p>Account band karwana ho to WhatsApp helpline par rabta karein. Confirm karne ke baad aap ka account data delete kar diya jayega. Jo hisaab settle ho chuka hai (dono taraf confirm), wo financial record ke tor par mehfooz rehta hai — taake purana hisaab dobara na badla ja sake. Delete confirm hone se pehle aap helpline par bata kar apni request wapas bhi le sakte hain.</p>
+
+    <h2>👶 9. Bachche</h2>
     <p>Ye app aam users ke liye hai — 13 saal se kam umar ke bachon ke liye nahi. Hum jaan-boojh kar 13 saal se kam umar ke bachon ka data collect nahi karte.</p>
 
-    <h2>🔄 7. Is policy mein tabdeeli</h2>
-    <p>Agar policy mein kuch badla, to nayi version isi page par lag jayegi aur upar ki date bhi badal jayegi.</p>
+    <h2>🔗 10. Teesri party ke links</h2>
+    <p>App mein WhatsApp helpline ka link hai. Us par jaane ke baad aap WhatsApp par hote hain, aur wahan WhatsApp ki apni policy lagoo hoti hai — humari nahi.</p>
 
-    <h2>📞 8. Rabta karein</h2>
+    <h2>⚖️ 11. Qanoon</h2>
+    <p>Agar qanoon ya koi court maloomat mange, to humein qanoon ke mutabiq maloomat deni par sakti hain. Aisa sirf usi soorat mein hoga.</p>
+
+    <h2>🔄 12. Is policy mein tabdeeli</h2>
+    <p>Agar policy mein kuch badla, to nayi version isi page par lag jayegi aur upar ki date bhi badal jayegi. App use karte rehne ka matlab hai ke aap nayi policy se mutafiq hain.</p>
+
+    <h2>📞 13. Rabta karein</h2>
     <p>Privacy ke baare mein koi bhi sawal ho — ya aap ko lage ke kuch theek nahi — to WhatsApp par rabta karein: <a href="https://wa.me/923098851445">+92 309 8851445</a> — ya app kholein: <a href="https://easy-khata-asad2327s-projects.vercel.app/">Easy Khata</a>.</p>
   </div>
   <footer>Developed by Asad &middot; Easy Khata — Food Money Ledger<span class="thanks">Shukriya — aap ke bharose ke liye. 🙏</span></footer>
