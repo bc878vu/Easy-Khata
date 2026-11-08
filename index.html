@@ -549,8 +549,9 @@ window.addEventListener("error", function () {
             <div><h2>Community management</h2><p>All business communities · edit, suspend, restore and safe delete</p></div>
             <button id="adminCreateCommunityBtn" class="btn btn-primary" type="button">＋ Create community</button>
           </div>
-          <div class="admin-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search community name or username…"></div>
+          <div id="adminCommunitySummary" class="admin-community-summary" aria-live="polite"></div>
+          <div class="admin-toolbar admin-community-toolbar">
+            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search community name or username…" aria-label="Search communities"></div>
             <select id="adminCommunityStatus"><option value="all">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option></select>
           </div>
           <div id="adminCommunityList" class="admin-user-grid"></div>
@@ -558,7 +559,8 @@ window.addEventListener("error", function () {
         <article class="admin-panel admin-users-panel">
           <div class="admin-panel-head"><div><h2>All community members</h2><p>Manage roles, access and community ownership. Ledger history remains intact.</p></div></div>
           <div class="admin-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or community…"></div>
+            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or community…" aria-label="Search community members"></div>
+            <select id="adminMemberCommunityFilter" aria-label="Filter members by community"><option value="">All communities</option></select>
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
         </article>
