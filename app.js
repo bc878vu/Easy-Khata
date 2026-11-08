@@ -4815,15 +4815,16 @@
   });
   // v75: report libs LAZY load — jsPDF (~364KB) + xlsx-js-style (~425KB)
   // pehli visit par download NAHI hote; sirf jab export button dabao.
-  // SRI hash wahi jo index.html ke (hataye gaye) tags par tha. SW CDN_LIBS
-  // inhein pehli use ke baad offline ke liye cache karta hai. Load fail ho
-  // to promise null deta hai aur agli koshish dobara try karti hai.
-  // v90: URL par ?ekv=1 — SW cache-first handler kisi purani/kharab cached
-  // copy (opaque ya truncated bytes) ko SRI fail karwa kar export rok deta
-  // tha; naya URL purani entries ko bypass karta hai (bytes + SRI wahi).
+  // SRI hash wahi jo index.html ke (hataye gaye) tags par tha. SW inhein
+  // pehli use ke baad offline ke liye cache karta hai. Load fail ho to
+  // promise null deta hai aur agli koshish dobara try karti hai.
+  // v91: SELF-HOSTED (vendor/) — CDN load leased-browser profile mein bar
+  // bar fail hota tha (network/CSP/SRI/CORS sab theek thay, phir bhi script
+  // load nahi hoti thi); same-origin load ko koi bahari rok nahi sakti.
+  // Bytes + SRI hash CDN wali files jese hi hain (curl se verify kiye).
   var REPORT_LIBS = {
-    jspdf: { url: "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js?ekv=1", integrity: "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk", global: function () { return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null; } },
-    xlsx: { url: "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js?ekv=1", integrity: "sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb", global: function () { return window.XLSX || null; } }
+    jspdf: { url: "vendor/jspdf.umd.min.js", integrity: "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk", global: function () { return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null; } },
+    xlsx: { url: "vendor/xlsx.bundle.js", integrity: "sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb", global: function () { return window.XLSX || null; } }
   };
   var reportLibLoading = {};
   function ensureReportLib(kind) {

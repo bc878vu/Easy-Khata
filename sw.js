@@ -3,16 +3,20 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v90-0";
+var CACHE = "easy-khata-v91-0";
 var SHELL = [
   "./",
   "index.html",
   "styles.css?v=66",
   "config.js?v=4",
-  "app.js?v=96",
+  "app.js?v=97",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
-  "icons/icon.svg"
+  "icons/icon.svg",
+  // v91: report libs self-hosted — install par cache ho jayein, offline
+  // export pehli visit se hi chale (pehle CDN se pehli use par aati thiin).
+  "vendor/jspdf.umd.min.js",
+  "vendor/xlsx.bundle.js"
 ];
 // v24.8: boot + PDF ke liye zaroori CDN libs (index.html mein pinned versions).
 // Ye cross-origin hain — pehle SW inhein bilkul intercept nahi karta tha,
@@ -22,10 +26,11 @@ var SHELL = [
 var CDN_LIBS = [
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
-  "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js?ekv=1",
-  "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js?ekv=1"
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"
 ];
+// v91: jsPDF + xlsx ab CDN_LIBS mein nahi — self-hosted (vendor/) hain, is
+// liye woh same-origin SHELL/cache-first path se aate hain, CDN handler se
+// nahi. Boot libs (Supabase/Firebase) ab bhi CDN se hain.
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
 
 self.addEventListener("install", function (e) {
