@@ -25,6 +25,49 @@
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
+  function dateToISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function parseISODate(iso) {
+    var p = String(iso || "").split("-");
+    if (p.length !== 3) return null;
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // v87: recurring — agla occurrence STRICTLY after fromISO (aaj ki date
+  // bhi agle period mein jati hai, taake aaj ka record dobara na bane).
+  // monthly: day_value 1-28 (mahine ki tareekh); weekly: ISO weekday 1 Mon..7 Sun.
+  function nextRecurringDate(freq, day, fromISO) {
+    var from = parseISODate(fromISO) || new Date();
+    if (freq === "weekly") {
+      var iso = from.getDay() === 0 ? 7 : from.getDay();
+      var diff = (day - iso + 7) % 7;
+      if (diff === 0) diff = 7;
+      return dateToISO(new Date(from.getFullYear(), from.getMonth(), from.getDate() + diff));
+    }
+    var cand = new Date(from.getFullYear(), from.getMonth(), day);
+    if (cand <= from) cand = new Date(from.getFullYear(), from.getMonth() + 1, day);
+    return dateToISO(cand);
+  }
+  // v87: deterministic txn id (rule + due date) — due check dobara chale ya
+  // response kho jaye to bhi wahi id banti hai; POST 409 = pehle hi bana hua.
+  function hash32(str, seed) {
+    var h1 = seed >>> 0, h2 = 0x41c6ce57;
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    var s1 = (h2 >>> 0).toString(16), s2 = (h1 >>> 0).toString(16);
+    while (s1.length < 8) s1 = "0" + s1;
+    while (s2.length < 8) s2 = "0" + s2;
+    return s1 + s2;
+  }
+  function recurringDueId(ruleId, dueISO) {
+    var a = hash32(ruleId + "|" + dueISO, 0xdeadbeef);
+    var b = hash32(dueISO + "|" + ruleId, 0x9e3779b9);
+    return a.slice(0, 8) + "-" + a.slice(8, 12) + "-5" + a.slice(13, 16) + "-8" + b.slice(0, 3) + "-" + b.slice(3, 15);
+  }
   function moneyToMinor(value) {
     var n = Number(value);
     if (!Number.isFinite(n)) return 0;
@@ -217,6 +260,8 @@
   var workspaceInviteBusy = false;
   var txns = [];       // {id, payer_id, receiver_id, amount, note, txn_date, created_by, created_at}
   var txnFullSyncAt = 0; // v86: aakhri FULL txn sync (ms) — delta sync ka 24h bound
+  var recurringRules = []; // v87: is workspace ke recurring rules (khata_recurring)
+  var recurringDueRunning = false; // v87: due check aik waqt mein aik dafa
   // v24.11: per-user hidden records — Delete kabhi real DELETE nahi karta.
   // Har user ke apne hidden ids (khata_txn_hidden table) — sirf us ki apni
   // history se record hat-ta hai, doosre dost ko koi fark nahi parta.
@@ -318,7 +363,8 @@
     try {
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
-        contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now()
+        contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now(),
+        recurring: recurringRules
       }));
     } catch (e) {}
   }
@@ -354,6 +400,9 @@
       .filter(function (c) { return !droppedIds[c.id] || keptPartyIds[c.id]; });
     hiddenTxnIds = {};
     (g && Array.isArray(g.hidden) ? g.hidden : []).forEach(function (id) { if (keptTxns.some(function (t) { return t.id === id; })) hiddenTxnIds[id] = true; });
+    // v87: guest recurring rules — sirf woh jin mein guest shamil ho
+    // (dono taraf se bahar wala rule purani leak hai, txns ki tarah hatao).
+    recurringRules = ((g && g.recurring) || []).filter(function (r) { return r.payer_id === guestMeId || r.receiver_id === guestMeId; });
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -373,6 +422,7 @@
     saveGuestStore(); // pehli dafa: guest id persist ho jaye taake reload par wahi rahe
     showApp();
     renderAll();
+    runRecurringDue(); // v87: guest boot par bhi due rules ke local record banein
     maybeShowPinLock(); // v78: PIN set ho to boot par lock screen
   }
   // v24.1: reload par bhi seedha guest mode (saved hisaab ho ya naya) —
@@ -421,7 +471,8 @@
       if (!fullAt) { var prev = loadCache(currentWorkspaceId); if (prev && prev.txnFullSyncAt) fullAt = prev.txnFullSyncAt; }
       var payload = {
         profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
-        workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now(), txnFullSyncAt: fullAt || 0
+        workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now(), txnFullSyncAt: fullAt || 0,
+        recurring: recurringRules
       };
       window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
       window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
@@ -741,8 +792,9 @@
     $("adminUserView").hidden = name !== "adminUser";
     if ($("hiddenView")) $("hiddenView").hidden = name !== "hidden";
     if ($("backupView")) $("backupView").hidden = name !== "backup";
+    if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
-    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
     // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
@@ -1254,7 +1306,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole"].forEach(function (id) {
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay"].forEach(function (id) {
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -1810,6 +1862,7 @@
       // server ko koi call nahi jati.
       loadGuestIntoState();
       renderAll();
+      runRecurringDue(); // v87: guest rules bhi due hon to local record bane
       setTxnMsg("", true);
       return;
     }
@@ -1852,6 +1905,7 @@
         setupRealtime();
         loadNotifs();
         loadContacts();
+        loadRecurringRules().then(function () { runRecurringDue(); }); // v87: due rules ke record banein
         saveCache();
         flushOutbox();
       });
@@ -1871,11 +1925,13 @@
         (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
         myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
         notifs = c.notifs || [];
+        recurringRules = c.recurring || []; // v87: offline bhi rules cache se
         renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
         setTxnMsg("Connection nahi mil raha. Filhal aapko is community ka aakhri saved hisaab dikhaya ja raha hai.", false);
         renderOffline();
+        runRecurringDue(); // v87: offline bhi due record queue ho jaye
         return;
       }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
@@ -1908,9 +1964,9 @@
     if (guestMode) return;
     if (!guestHasData()) return;
     var g = loadGuestStore();
-    var n = (g.txns || []).length, c = (g.contacts || []).length;
+    var n = (g.txns || []).length, c = (g.contacts || []).length, rr = (g.recurring || []).length;
     askConfirm("Guest hisaab save karein?",
-      "Aap ke guest mode ke " + n + " records aur " + c + " dost is account mein save ho jayenge — phir ye cloud par mehfooz rahenge.",
+      "Aap ke guest mode ke " + n + " records aur " + c + " dost is account mein save ho jayenge — phir ye cloud par mehfooz rahenge." + (rr ? " " + rr + " recurring rules bhi saath aayenge." : ""),
       "Save karein", function () {
         askConfirm("Pakka save karein?",
           "Ye " + n + " records aur " + c + " dost aap ke account mein save ho jayenge, aur guest mode se hat jayenge. Ye wapas nahi hoga.",
@@ -1938,8 +1994,23 @@
         } });
       });
       return Promise.all(txnJobs);
-    }).then(function (results) {
-      var failed = results.filter(function (r) { return !r.ok; }).length;
+    }).then(function (txnResults) {
+      var txnFailed = txnResults.filter(function (r) { return !r.ok; }).length;
+      // v87: guest recurring rules bhi migrate hon (ids wahi, guestMe -> me).
+      var ruleJobs = (g.recurring || []).map(function (r) {
+        return sb("khata_recurring", { method: "POST", prefer: "return=representation", body: {
+          id: r.id, owner_id: me, workspace_id: currentWorkspaceId,
+          payer_id: r.payer_id === guestMe ? me : r.payer_id,
+          receiver_id: r.receiver_id === guestMe ? me : r.receiver_id,
+          amount: r.amount, note: r.note || "", frequency: r.frequency, day_value: r.day_value,
+          next_due: r.next_due, is_active: r.is_active !== false,
+          created_at: r.created_at || new Date().toISOString()
+        } });
+      });
+      return Promise.all(ruleJobs).then(function (ruleResults) {
+        return txnFailed + ruleResults.filter(function (r) { return !r.ok; }).length;
+      });
+    }).then(function (failed) {
       if (failed) {
         setTxnMsg(failed + " records migrate nahi hue — guest hisaab mehfooz hai, agle login par phir poocha jayega.", false);
         return;
@@ -1964,6 +2035,7 @@
     fillMyPhone();
     renderAccount();
     renderAdmin();
+    renderRecurringList(); // v87: recurring page ki list taaza (chhoti list, sasti)
   }
 
   /* ---------- notifications ---------- */
@@ -1986,7 +2058,7 @@
     var ind = $("liveUpdating");
     var slowTimer = setTimeout(function () { if (ind) ind.hidden = false; }, 800);
     var done = function () { clearTimeout(slowTimer); if (ind) ind.hidden = true; rtLastFetch = Date.now(); };
-    refreshTxns().then(function () { loadNotifs(); loadContacts(); done(); }).catch(function () { done(); });
+    refreshTxns().then(function () { loadNotifs(); loadContacts(); loadRecurringRules(); done(); }).catch(function () { done(); });
   }
   function scheduleLiveReload() {
     if (guestMode) return; // v71: guest mode mein live reload kabhi nahi
@@ -2011,6 +2083,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_transactions", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, scheduleLiveReload)
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_recurring", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, scheduleLiveReload);
       rtChannel = channel;
       channel.subscribe(function(status) {
@@ -2374,6 +2447,153 @@
         txns = rows;
         return loadHiddenIds().then(function () { renderAll(); });
       }).catch(function () {});
+  }
+
+  /* ---------- recurring records (v87) ----------
+     Rule = aik record jo har mahina / har hafta khud ban jata hai.
+     - Table khata_recurring (owner-only RLS); guest rules local store mein.
+     - Due check loadAll par chalta hai: next_due <= aaj wale active rules
+       ke liye txn banta hai (txn_date = due date, imandari se), phir
+       next_due aik period aage. Aik run mein zyada se zyada 3 chhoote hue
+       (lambi chhutti ke baad sailaab na aaye — baaki agle run mein).
+     - Txn id deterministic hai (rule + due date) — dobara run ya khoi hui
+       response par bhi duplicate nahi banta (POST 409 = pehle hi bana hua). */
+  var WEEKDAYS_UR = ["Peer", "Mangal", "Budh", "Jumeraat", "Jumma", "Hafta", "Itwaar"];
+  function loadRecurringRules() {
+    if (guestMode) return Promise.resolve(recurringRules);
+    if (!currentWorkspaceId) return Promise.resolve(recurringRules);
+    return sb("khata_recurring?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&order=next_due.asc")
+      .then(function (res) {
+        if (res.ok) recurringRules = Array.isArray(res.body) ? res.body : [];
+        return recurringRules;
+      }).catch(function () { return recurringRules; });
+  }
+  function saveRecurringRule(rule) {
+    if (guestMode) { saveGuestStore(); saveCache(); return Promise.resolve(true); }
+    return sb("khata_recurring?id=eq." + encodeURIComponent(rule.id), { method: "PATCH", prefer: "return=minimal", body: { next_due: rule.next_due, last_run_at: rule.last_run_at, is_active: rule.is_active, updated_at: new Date().toISOString() } })
+      .then(function (res) {
+        if (res.ok) { saveCache(); return true; }
+        if (isTransientResponse(res)) { queueOp({ key: newUuid(), op: "update", table: "khata_recurring", id: rule.id, body: { next_due: rule.next_due, last_run_at: rule.last_run_at, is_active: rule.is_active }, ts: Date.now() }); saveCache(); return true; }
+        return false;
+      }).catch(function () {
+        queueOp({ key: newUuid(), op: "update", table: "khata_recurring", id: rule.id, body: { next_due: rule.next_due, last_run_at: rule.last_run_at, is_active: rule.is_active }, ts: Date.now() });
+        saveCache();
+        return true;
+      });
+  }
+  function createRecurringTxn(rule, dueDate) {
+    var id = recurringDueId(rule.id, dueDate);
+    var exists = null;
+    txns.forEach(function (t) { if (t.id === id) exists = t; });
+    if (exists) return Promise.resolve(0);
+    var body = { payer_id: rule.payer_id, receiver_id: rule.receiver_id, amount: rule.amount, note: rule.note, txn_date: dueDate, created_by: rule.owner_id, workspace_id: rule.workspace_id };
+    if (guestMode) {
+      txns.unshift(Object.assign({ id: id, created_at: new Date().toISOString() }, body));
+      saveGuestStore();
+      return Promise.resolve(1);
+    }
+    return sb("khata_transactions", { method: "POST", prefer: "return=representation", body: Object.assign({ id: id }, body) })
+      .then(function (res) {
+        if (res.ok) {
+          var created = res.body && res.body[0];
+          if (created) {
+            txns.unshift(created);
+            var other = rule.payer_id === myId() ? rule.receiver_id : rule.payer_id;
+            if (other && other !== myId()) { sendNotif(other, "record", created); triggerPush(other, myName() + " ne record add kiya", notifBodyFor(created, other), created.id); }
+          }
+          return 1;
+        }
+        if (res.status === 409) return 0;
+        if (isTransientResponse(res)) { offlineTxnInsert(Object.assign({ id: id }, body)); return 1; }
+        return 0;
+      }).catch(function () { offlineTxnInsert(Object.assign({ id: id }, body)); return 1; });
+  }
+  function runRecurringDue() {
+    if (recurringDueRunning) return Promise.resolve(0);
+    if (!guestMode && !currentWorkspaceId) return Promise.resolve(0);
+    recurringDueRunning = true;
+    var today = todayLocal();
+    var due = recurringRules.filter(function (r) { return r.is_active && r.next_due && r.next_due <= today; });
+    if (!due.length) { recurringDueRunning = false; return Promise.resolve(0); }
+    var created = 0;
+    var jobs = due.map(function (rule) {
+      var dates = [];
+      var d = rule.next_due;
+      while (d <= today && dates.length < 3) { dates.push(d); d = nextRecurringDate(rule.frequency, rule.day_value, d); }
+      var chain = Promise.resolve();
+      dates.forEach(function (dueDate) { chain = chain.then(function () { return createRecurringTxn(rule, dueDate); }); });
+      return chain.then(function (n) {
+        created += n;
+        rule.next_due = d;
+        rule.last_run_at = new Date().toISOString();
+        return saveRecurringRule(rule);
+      });
+    });
+    return Promise.all(jobs).then(function () {
+      recurringDueRunning = false;
+      if (created) { saveCache(); renderAll(); }
+      return created;
+    }).catch(function () { recurringDueRunning = false; return created; });
+  }
+  function renderRecurringList() {
+    var box = $("recurringList");
+    if (!box) return;
+    var list = recurringRules.slice().sort(function (a, b) { return (a.next_due || "") < (b.next_due || "") ? -1 : 1; });
+    if (!list.length) {
+      box.innerHTML = '<p class="empty">Abhi koi recurring record nahi — naya record save karte waqt "Har dafa repeat karein" tick karein.</p>';
+      return;
+    }
+    var html = "";
+    list.forEach(function (r) {
+      var other = r.payer_id === myId() ? r.receiver_id : r.payer_id;
+      var name = profileName(other) || "—";
+      var dir = r.payer_id === myId() ? "Diye" : "Liye";
+      var freqTxt = r.frequency === "weekly"
+        ? ("Har hafta · " + WEEKDAYS_UR[(r.day_value || 1) - 1])
+        : ("Har mahina · " + r.day_value + " tareekh");
+      html += '<div class="rec-rule"><div class="rec-rule-main"><strong>' + esc(name) + " — " + esc(fmtRs(r.amount)) + " (" + dir + ")</strong>"
+        + '<span class="muted">' + esc(freqTxt) + " · Agla: " + esc(r.next_due || "—") + (r.is_active ? "" : " · ⏸ Paused") + "</span>"
+        + (r.note ? '<span class="muted">' + esc(r.note) + "</span>" : "")
+        + '</div><div class="rec-actions"><button class="btn btn-soft" type="button" data-rec-toggle="' + r.id + '">' + (r.is_active ? "Pause" : "Resume") + '</button>'
+        + '<button class="btn btn-ghost" type="button" data-rec-del="' + r.id + '">Delete</button></div></div>';
+    });
+    box.innerHTML = html;
+  }
+  function toggleRecurringRule(id) {
+    var rule = null;
+    recurringRules.forEach(function (r) { if (r.id === id) rule = r; });
+    if (!rule) return;
+    rule.is_active = !rule.is_active;
+    renderRecurringList();
+    saveRecurringRule(rule);
+    setRecurringMsg(rule.is_active ? "Recurring dobara on ho gaya." : "Recurring pause ho gaya — agla record nahi banega.", true);
+  }
+  function deleteRecurringRule(id) {
+    var rule = null;
+    recurringRules.forEach(function (r) { if (r.id === id) rule = r; });
+    if (!rule) return;
+    var other = rule.payer_id === myId() ? rule.receiver_id : rule.payer_id;
+    askConfirm("Recurring hatayein?", "Ye repeat band ho jayega — " + (profileName(other) || "dost") + " ke saath " + fmtRs(rule.amount) + " ka record ab khud nahi banega. Pehle se bane hue records nahi hatenge.", "Hata dein", function () {
+      recurringRules = recurringRules.filter(function (r) { return r.id !== id; });
+      renderRecurringList();
+      if (guestMode) { saveGuestStore(); setRecurringMsg("Recurring hata diya gaya.", true); return; }
+      sb("khata_recurring?id=eq." + encodeURIComponent(id), { method: "DELETE" })
+        .then(function (res) {
+          if (res.ok) { saveCache(); setRecurringMsg("Recurring hata diya gaya.", true); return; }
+          if (isTransientResponse(res)) { queueOp({ key: newUuid(), op: "delete", table: "khata_recurring", id: id, ts: Date.now() }); saveCache(); setRecurringMsg("Recurring hata diya gaya. Internet aate hi update ho jayega.", true); return; }
+          setRecurringMsg("Recurring hataya nahi gaya — dobara try karein.", false);
+        }).catch(function () {
+          queueOp({ key: newUuid(), op: "delete", table: "khata_recurring", id: id, ts: Date.now() });
+          saveCache();
+          setRecurringMsg("Recurring hata diya gaya. Internet aate hi update ho jayega.", true);
+        });
+    });
+  }
+  function setRecurringMsg(text, ok) {
+    var el = $("recurringMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
   function setContactMsg(text, ok) {
     var el = $("contactMsg");
@@ -5437,6 +5657,8 @@
     $("txnAmount").value = "";
     $("txnNote").value = "";
     $("txnDate").value = todayLocal();
+    clearRepeatBox(); // v87: agle record par repeat dobara tick karna parega
+    $("txnRepeatRow").hidden = false;
     setTxnMsg("");
   }
   function startEditTxn(id) {
@@ -5446,6 +5668,8 @@
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     showView("khata");
     setSplitMode(false);
+    clearRepeatBox(); // v87: edit par repeat nahi — rule form se nahi badalta
+    $("txnRepeatRow").hidden = true;
     var me = myId();
     var other = t.payer_id === me ? t.receiver_id : t.payer_id;
     var dir = t.payer_id === me ? "given" : "taken";
@@ -5500,6 +5724,10 @@
     $("txnPersonRow").hidden = on;
     $("txnDirRow").hidden = on;
     $("splitBox").hidden = !on;
+    // v87: split (kai dost) + repeat (aik dost) aik saath nahi — split on
+    // ho to repeat hat jaye.
+    if (on) { clearRepeatBox(); $("txnRepeatRow").hidden = true; }
+    else { $("txnRepeatRow").hidden = false; }
     if (on) renderSplitList();
   }
   // v24: guest split — wahi barabar baant, sirf local store mein.
@@ -5566,6 +5794,85 @@
     next();
   }
 
+  // v87: repeat form — frequency badle to din ki options dobara banao.
+  // Default din txn ki tareekh se (monthly: usi tareekh, weekly: usi din).
+  function fillRepeatDayOptions() {
+    var freq = $("txnRepeatFreq").value;
+    var sel = $("txnRepeatDay");
+    var prev = sel.value;
+    sel.innerHTML = "";
+    if (freq === "weekly") {
+      for (var i = 1; i <= 7; i++) {
+        var o = document.createElement("option");
+        o.value = String(i);
+        o.textContent = WEEKDAYS_UR[i - 1];
+        sel.appendChild(o);
+      }
+    } else {
+      for (var d = 1; d <= 28; d++) {
+        var o2 = document.createElement("option");
+        o2.value = String(d);
+        o2.textContent = "Mahine ki " + d + " tareekh";
+        sel.appendChild(o2);
+      }
+    }
+    var dd = parseISODate($("txnDate").value || todayLocal());
+    var defVal = freq === "weekly"
+      ? String(dd ? (dd.getDay() === 0 ? 7 : dd.getDay()) : 1)
+      : String(dd ? Math.min(28, dd.getDate()) : 1);
+    // NOTE: options bharte hi select pehli option (1) auto-select kar leta
+    // hai — is liye value hamesha set karo, sirf khaali hone par nahi.
+    sel.value = prev || defVal;
+    if (!sel.value) sel.value = defVal; // prev is frequency mein maujood nahi (misal: 28 weekly)
+    cdSync(sel); // v73: options badle to button label/menu dobara banao
+    updateRepeatHint();
+  }
+  function updateRepeatHint() {
+    var el = $("repeatHint");
+    if (!el) return;
+    var date = $("txnDate").value || todayLocal();
+    var freq = $("txnRepeatFreq").value;
+    var day = parseInt($("txnRepeatDay").value || "1", 10);
+    var next = nextRecurringDate(freq, day, date);
+    el.textContent = "Pehla repeat: " + next + " — us ke baad " + (freq === "weekly" ? "har hafta usi din" : "har mahine ki " + day + " tareekh") + ".";
+  }
+  function clearRepeatBox() {
+    var rep = $("txnRepeat");
+    if (rep) rep.checked = false;
+    var box = $("repeatBox");
+    if (box) box.hidden = true;
+  }
+  // v87: form se rule banao — txn save hone ke BAAD hi (txn fail ho to rule nahi).
+  function maybeCreateRecurringRule(body) {
+    var rep = $("txnRepeat");
+    if (!rep || !rep.checked || editingId) return;
+    var freq = $("txnRepeatFreq").value || "monthly";
+    var day = parseInt($("txnRepeatDay").value || "1", 10) || 1;
+    var rule = {
+      id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId,
+      payer_id: body.payer_id, receiver_id: body.receiver_id,
+      amount: body.amount, note: body.note || "",
+      frequency: freq, day_value: day,
+      next_due: nextRecurringDate(freq, day, body.txn_date),
+      is_active: true, created_at: new Date().toISOString()
+    };
+    recurringRules.push(rule);
+    renderRecurringList();
+    if (guestMode) { saveGuestStore(); return; }
+    sb("khata_recurring", { method: "POST", prefer: "return=representation", body: rule })
+      .then(function (res) {
+        if (res.ok) { saveCache(); return; }
+        if (isTransientResponse(res) || res.status === 409) {
+          if (res.status !== 409) queueOp({ key: newUuid(), op: "insert", table: "khata_recurring", id: rule.id, body: rule, ts: Date.now() });
+          saveCache();
+          return;
+        }
+        setTxnMsg("Record save ho gaya, lekin recurring rule save nahi hua — dobara try karein.", false);
+      }).catch(function () {
+        queueOp({ key: newUuid(), op: "insert", table: "khata_recurring", id: rule.id, body: rule, ts: Date.now() });
+        saveCache();
+      });
+  }
   function addTxn(e) {
     e.preventDefault();
     if (!dbReady) { setTxnMsg("App abhi tayyar nahi. Barah-e-karam support se rabta karein.", false); return; }
@@ -5620,6 +5927,8 @@
       txns.unshift(Object.assign({ id: recId, created_at: new Date().toISOString() }, body));
       saveGuestStore();
       renderAll();
+      maybeCreateRecurringRule(body); // v87: repeat tick ho to rule bane
+      clearRepeatBox();
       $("txnAmount").value = "";
       $("txnNote").value = "";
       setTxnMsg("Record save ho gaya!", true);
@@ -5650,18 +5959,22 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));maybeCreateRecurringRule(body);clearRepeatBox();$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
           setTxnMsg("Record save nahi hua" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person), created.id); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
+        maybeCreateRecurringRule(body); // v87: repeat tick ho to rule bane
+        clearRepeatBox();
         loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
         setTxnMsg("Record save ho gaya!", true);
       }).catch(function () {
         btn.disabled = false;
         offlineTxnInsert(Object.assign({ id: recId }, body));
+        maybeCreateRecurringRule(body); // v87: offline bhi rule queue ho
+        clearRepeatBox();
         $("txnAmount").value = "";
         $("txnNote").value = "";
         setTxnMsg("Record save ho gaya. Internet aate hi update ho jayega.", true);
@@ -5830,6 +6143,15 @@
   $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
   $("savePassBtn").addEventListener("click", doChangePass);
   $("txnForm").addEventListener("submit", addTxn);
+  // v87: repeat form — tick karte hi din ki options + hint banein.
+  $("txnRepeat").addEventListener("change", function () {
+    var on = $("txnRepeat").checked;
+    $("repeatBox").hidden = !on;
+    if (on) fillRepeatDayOptions();
+  });
+  $("txnRepeatFreq").addEventListener("change", fillRepeatDayOptions);
+  $("txnRepeatDay").addEventListener("change", updateRepeatHint);
+  $("txnDate").addEventListener("change", function () { if (!$("repeatBox").hidden) updateRepeatHint(); });
   $("cancelEditBtn").addEventListener("click", resetTxnForm);
   $("refreshBtn").addEventListener("click", loadAll);
   $("shareAllBtn").addEventListener("click", openShareSheet); // v69: sheet khole, seedha link na bheje
@@ -6005,6 +6327,15 @@
   });
   $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
   $("acctBackupMenuBtn").addEventListener("click", function () { showView("backup"); });
+  // v87: recurring page — list + wapas + pause/delete (delegation, aik listener).
+  $("acctRecurringBtn").addEventListener("click", function () { renderRecurringList(); showView("recurring"); });
+  $("recurringBackBtn").addEventListener("click", function () { showView("account"); });
+  $("recurringList").addEventListener("click", function (e) {
+    var t = e.target.closest("[data-rec-toggle]");
+    if (t) { toggleRecurringRule(t.getAttribute("data-rec-toggle")); return; }
+    var d = e.target.closest("[data-rec-del]");
+    if (d) deleteRecurringRule(d.getAttribute("data-rec-del"));
+  });
   $("backupBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);

@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=64">
+<link rel="stylesheet" href="styles.css?v=65">
 </head>
 <body>
 
@@ -314,6 +314,16 @@ window.addEventListener("error", function (e) {
             <label for="txnDate">Tareekh</label>
             <input id="txnDate" type="date" required>
           </div>
+          <div class="field" id="txnRepeatRow">
+            <label class="check"><input id="txnRepeat" type="checkbox"> 🔁 Har dafa repeat karein <span class="optional-label">Recurring</span></label>
+          </div>
+          <div id="repeatBox" class="field" hidden>
+            <label for="txnRepeatFreq">Kab repeat ho?</label>
+            <select id="txnRepeatFreq"><option value="monthly">Har mahina</option><option value="weekly">Har hafta</option></select>
+            <label for="txnRepeatDay" style="margin-top:10px">Kis din?</label>
+            <select id="txnRepeatDay"></select>
+            <p id="repeatHint" class="muted"></p>
+          </div>
           <p id="txnMsg" class="msg" role="status"></p>
           <button class="btn btn-primary btn-block" type="submit">Save karein</button>
           <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Cancel karein</button>
@@ -476,6 +486,7 @@ window.addEventListener("error", function (e) {
         <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup</span><span class="menu-right">›</span></button>
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
         <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
+        <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span>Recurring records</span><span class="menu-right">›</span></button>
         <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
         <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
         <p id="acctBackupMsg" class="msg" role="status"></p>
@@ -513,6 +524,7 @@ window.addEventListener("error", function (e) {
         <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
         <p id="acctJsonMsg" class="msg" role="status"></p>
     </div></div></section>
+    <section id="recurringView" hidden><div class="card"><button id="recurringBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Recurring records</h2><p class="muted">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p><div id="recurringList" class="txns"></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
@@ -777,6 +789,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=92"></script>
+<script src="app.js?v=93"></script>
 </body>
 </html>

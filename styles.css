@@ -1519,3 +1519,10 @@ input,select,textarea,button{max-width:100%}
 .share-sheet-preview-label{margin:18px 0 8px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .share-sheet-preview{margin:0;padding:13px 14px;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;background:color-mix(in srgb,var(--primary) 5%,var(--bg));color:var(--text);font:inherit;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
 #shareSheetOverlay .app-dialog-mark{background:linear-gradient(135deg,var(--accent-btn),var(--credit-2));color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.35)}
+
+/* v87: recurring rules list — compact card rows, chhoti screen par stack */
+.rec-rule{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rec-rule:last-child{border-bottom:0}
+.rec-rule-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rec-actions{display:flex;gap:8px;flex-shrink:0}
+@media(max-width:520px){.rec-rule{flex-direction:column}.rec-actions{width:100%}.rec-actions .btn{flex:1}}
