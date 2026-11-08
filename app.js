@@ -3381,6 +3381,7 @@
     try { window.localStorage.setItem(BALANCE_HIDE_KEY, balanceHidden() ? "0" : "1"); } catch (e) {}
     renderBalanceEye();
     renderSummary();
+    renderPeople(); // v76: eye DOST list ki raqam bhi chhupata/dikhata hai
   }
 
   function renderSummary() {
@@ -3751,11 +3752,13 @@
       return;
     }
     var html = "";
+    var hideAmounts = balanceHidden(); // v76: eye on ho to DOST list ki raqam bhi chhupi
     ids.forEach(function (id) {
       var p = map[id];
       var net = p.net; // +: they owe me, -: I owe them
       var cls = net > 0 ? "pos" : net < 0 ? "neg" : "zero";
       var netText = net > 0 ? "+ " + fmtRs(net) : net < 0 ? "− " + fmtRs(-net) : "Settled";
+      if (hideAmounts && net !== 0) netText = "Rs ••••••";
       var last = p.last ? "Aakhri len-den: " + fmtDateLong(p.last) : "Abhi koi len-den nahi";
       html += '<button class="person" type="button" data-person="' + esc(id) + '">' +
         '<span class="p-avatar">' + avatarHtml(p.avatar_url, initials(p.name)) + '</span>' +
