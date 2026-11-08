@@ -4719,15 +4719,35 @@
       return appPrompt(msg, "", o);
     }
     if (pinIsSet()) {
+      // v89: maujooda PIN — lock screen jaisa hi 5-ghalat rule (pehle
+      // change flow mein infinite retry thi, brute-force ka rasta khula tha).
       var curMsg = "Maujooda PIN likhein:";
+      var curFails = 0;
       while (true) {
         var cur = await pinStep(curMsg, "Continue");
         if (cur === null) return;
         if (pinCheck((cur || "").trim())) break;
+        curFails++;
+        if (curFails >= 5) {
+          await appDialog("5 dafa ghalat PIN — PIN change band ho gaya. Dobara Account se try karein.", { mode: "notice", title: "PIN Lock" });
+          return;
+        }
         shakeAppDialog();
         curMsg = "Ghalat PIN hai — dobara try karein:";
       }
-      var nextMsg = "Naya 4-digit PIN likhein (PIN band karne ke liye khali chhorein):";
+      // v89: PIN band karna ab saaf choice hai — khaali field + Continue ka
+      // chhupa hua tareeqa nahi (phone par samajh nahi aata tha). Choice aur
+      // off-confirm dono stayOpen — overlay beech mein band nahi hota.
+      var choice = await appConfirm("PIN Lock band karein ya naya PIN set karein?", { title: "PIN Lock", okText: "PIN band karein", cancelText: "Naya PIN set karein", stayOpen: true });
+      if (choice) {
+        var off = await appConfirm("PIN Lock band kar dein? Is ke baad app khulte hi PIN nahi poochha jayega.", { title: "PIN Lock", okText: "Band karein", cancelText: "Wapas", stayOpen: true });
+        if (!off) return;
+        pinClear();
+        renderPinLockMenu();
+        await appDialog("PIN Lock band ho gaya.", { mode: "notice", title: "PIN Lock" });
+        return;
+      }
+      var nextMsg = "Naya 4-digit PIN likhein:";
       var next = "";
       while (true) {
         next = await pinStep(nextMsg, "Continue");
@@ -4738,8 +4758,9 @@
         nextMsg = "PIN sirf 4 digits ka hota hai (jaise 1234):";
       }
       if (next === "") {
-        var off = await appConfirm("PIN Lock band kar dein? Is ke baad app khulte hi PIN nahi poochha jayega.", { title: "PIN Lock", okText: "Band karein", cancelText: "Wapas" });
-        if (!off) return;
+        // Fallback: khaali naya PIN ab bhi band karta hai (purana tareeqa).
+        var off2 = await appConfirm("PIN Lock band kar dein? Is ke baad app khulte hi PIN nahi poochha jayega.", { title: "PIN Lock", okText: "Band karein", cancelText: "Wapas", stayOpen: true });
+        if (!off2) return;
         pinClear();
         renderPinLockMenu();
         await appDialog("PIN Lock band ho gaya.", { mode: "notice", title: "PIN Lock" });
