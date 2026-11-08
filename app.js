@@ -727,7 +727,7 @@
     if (/email not confirmed/i.test(m)) return "Email confirm nahi hui — inbox mein confirmation link check karein, phir login karein.";
     if (/only request this after|too many requests|rate limit/i.test(m) || res.status === 429) return "Thori der ruk kar dobara try karein.";
     if (/sending.*(mail|email)|confirmation.*(mail|email)|smtp/i.test(m)) return "Confirmation email bhejne mein masla hua — thori der baad dobara try karein.";
-    if (/password/i.test(m) && /short|least|6/i.test(m)) return "Password kam se kam 6 harf ka ho.";
+    if (/password/i.test(m) && /short|least|8/i.test(m)) return "Password kam se kam 8 harf ka ho.";
     if (/email/i.test(m) && /invalid/i.test(m)) return "Sahi email likhein.";
     if (!m) { try { console.warn("EasyKhata auth error", res.status, res.body); } catch (e) {} }
     return m || "Kuch ghalat ho gaya — dobara try karein.";
@@ -858,7 +858,11 @@
     if (!email || !password) { setAuthMsg("Email aur password zaroori hain.", false); return; }
     if (authMode === "signup" && !name) { setAuthMsg("Apna naam likhein.", false); return; }
     if (authMode === "signup" && phone && !normPhone(phone)) { setAuthMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
-    if (password.length < 6) { setAuthMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    // v79 (#7): server (Supabase Auth) ab kam se kam 8 harf mangta hai.
+    // Sirf SIGNUP par 8 check karo — login par nahi, warna purane 6-7 harf
+    // wale password se login band ho jayega (server login par length nahi
+    // check karta, sirf signup/change par).
+    if (authMode === "signup" && password.length < 8) { setAuthMsg("Password kam se kam 8 harf ka ho.", false); return; }
     var btn = $("authSubmitBtn");
     var isSignup = authMode === "signup";
     if(isSignup){try{if(signupCommunityIntentMemory)window.localStorage.setItem(signupCommunityIntentKey(email),JSON.stringify(signupCommunityIntentMemory));var pendingIntent=window.localStorage.getItem(signupCommunityIntentKey(email));if(!pendingIntent)saveSignupCommunityIntent("join","");}catch(e){}}
@@ -950,7 +954,7 @@
   function doChangePass() {
     var p1 = $("newPass1").value;
     var p2 = $("newPass2").value;
-    if (!p1 || p1.length < 6) { setPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (!p1 || p1.length < 8) { setPassMsg("Password kam se kam 8 harf ka ho.", false); return; }
     if (p1 !== p2) { setPassMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("savePassBtn");
     btn.disabled = true;
@@ -968,7 +972,7 @@
   function doReset() {
     var p1 = $("resetPassword").value;
     var p2 = $("resetPassword2").value;
-    if (!p1 || p1.length < 6) { setResetMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (!p1 || p1.length < 8) { setResetMsg("Password kam se kam 8 harf ka ho.", false); return; }
     if (p1 !== p2) { setResetMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("resetBtn");
     btn.disabled = true;
@@ -2013,17 +2017,71 @@
       else if ("clearAppBadge" in navigator) { var c2 = navigator.clearAppBadge(); if (c2 && c2.catch) c2.catch(function () {}); }
     } catch (e) {}
   }
+  // v79: Yaad Dehani redesign — kind icon, relative time, tappable links,
+  // 3-line clamp + tap to expand, filter chips (Sab/Naye/Parhe hue) + counts.
+  var notifFilter = "all";
+  var expandedNotifIds = {};
+  function fmtRelTime(ts) {
+    try {
+      var d = new Date(ts).getTime();
+      if (!d) return fmtDate(ts);
+      var s = Math.max(0, Math.floor((Date.now() - d) / 1000));
+      if (s < 60) return "Abhi";
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + " minute pehle";
+      var h = Math.floor(m / 60);
+      if (h < 24) return h + (h === 1 ? " ghanta pehle" : " ghante pehle");
+      var days = Math.floor(h / 24);
+      if (days === 1) return "Kal";
+      if (days < 7) return days + " din pehle";
+      return fmtDate(ts);
+    } catch (e) { return fmtDate(ts); }
+  }
+  function notifKindMeta(kind) {
+    if (kind === "remind") return { ic: "🔔", cls: "kind-remind" };
+    if (kind === "settle") return { ic: "✅", cls: "kind-settle" };
+    if (kind === "admin") return { ic: "🛡️", cls: "kind-admin" };
+    if (kind === "record") return { ic: "➕", cls: "kind-record" };
+    return { ic: "💬", cls: "kind-other" };
+  }
+  function linkifyNotifBody(text) {
+    // Pehle escape (XSS safe), phir http(s) links ko tappable banao.
+    var safe = esc(text || "");
+    return safe.replace(/https?:\/\/[^\s<]+/g, function (url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener">' + url + "</a>";
+    });
+  }
   function renderNotifList() {
-    if (!notifs.length) {
-      $("notifList").innerHTML = '<p class="empty">Abhi koi notification nahi.</p>';
+    var unread = unreadNotifCount();
+    var badge = $("notifCountBadge");
+    if (badge) { badge.hidden = unread === 0; badge.textContent = unread + " nayi"; }
+    var markAll = $("markAllReadBtn");
+    if (markAll) markAll.hidden = unread === 0;
+    document.querySelectorAll("[data-notif-filter]").forEach(function (b) {
+      var f = b.getAttribute("data-notif-filter");
+      var n = f === "unread" ? unread : f === "read" ? (notifs.length - unread) : notifs.length;
+      b.textContent = (f === "all" ? "Sab" : f === "unread" ? "Naye" : "Parhe hue") + " (" + n + ")";
+      b.classList.toggle("is-active", f === notifFilter);
+    });
+    var list = notifs.filter(function (x) {
+      return notifFilter === "unread" ? !x.is_read : notifFilter === "read" ? x.is_read : true;
+    });
+    if (!list.length) {
+      $("notifList").innerHTML = '<p class="empty">' +
+        (notifFilter === "unread" ? "Koi nayi yaad dehani nahi — sab parha hua hai. ✓"
+          : notifFilter === "read" ? "Abhi koi parhi hui notification nahi."
+          : "Abhi koi notification nahi.") + "</p>";
       return;
     }
     var html = "";
-    notifs.forEach(function (x) {
-      html += '<div class="notif' + (x.is_read ? "" : " unread") + '" data-notif="' + esc(x.id) + '">' +
-        '<div class="notif-title">' + esc(x.title || "") + '</div>' +
-        '<div class="notif-body">' + esc(x.body || "") + '</div>' +
-        '<div class="notif-time">' + esc(fmtNotifTime(x.created_at)) + '</div></div>';
+    list.forEach(function (x) {
+      var meta = notifKindMeta(x.kind);
+      var expanded = !!expandedNotifIds[x.id];
+      html += '<div class="notif' + (x.is_read ? "" : " unread") + (expanded ? " expanded" : "") + '" data-notif="' + esc(x.id) + '">' +
+        '<span class="notif-ic ' + meta.cls + '" aria-hidden="true">' + meta.ic + "</span>" +
+        '<span class="notif-main"><span class="notif-title">' + esc(x.title || "") + (x.is_read ? "" : '<span class="notif-dot" aria-hidden="true"></span>') + "</span>" +
+        '<span class="notif-body">' + linkifyNotifBody(x.body || "") + "</span>" +
+        '<span class="notif-time">' + esc(fmtRelTime(x.created_at)) + " · " + esc(fmtNotifTime(x.created_at)) + "</span></span></div>";
     });
     $("notifList").innerHTML = html;
   }
@@ -2837,7 +2895,7 @@
     var pass = $("adminAddPass").value;
     if (!name) { setAdminAddMsg("Naam likhein.", false); return; }
     if (email.indexOf("@") === -1 || email.indexOf(".") === -1) { setAdminAddMsg("Sahi email likhein.", false); return; }
-    if (!pass || pass.length < 6) { setAdminAddMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (!pass || pass.length < 8) { setAdminAddMsg("Password kam se kam 8 harf ka ho.", false); return; }
     var btn = $("adminAddSaveBtn");
     btn.disabled = true;
     sb("rpc/admin_create_user", { method: "POST", body: { p_name: name, p_email: email, p_phone: phone, p_password: pass } })
@@ -2847,7 +2905,7 @@
           var msg = (res.body && res.body.message) || "";
           if (msg.indexOf("email already registered") !== -1) setAdminAddMsg("Ye email pehle se registered hai.", false);
           else if (msg.indexOf("not admin") !== -1) setAdminAddMsg("Sirf admin user bana sakta hai.", false);
-          else if (msg.indexOf("password too short") !== -1) setAdminAddMsg("Password kam se kam 6 harf ka ho.", false);
+          else if (msg.indexOf("password too short") !== -1) setAdminAddMsg("Password kam se kam 8 harf ka ho.", false);
           else if (msg.indexOf("valid email") !== -1) setAdminAddMsg("Sahi email likhein.", false);
           else if (msg.indexOf("name required") !== -1) setAdminAddMsg("Naam likhein.", false);
           else setAdminAddMsg("User nahi bana — dobara try karein.", false);
@@ -2988,7 +3046,7 @@
     if (!isAdmin() || !adminCurrentUser) return;
     var p1 = $("adminNewPass1").value;
     var p2 = $("adminNewPass2").value;
-    if (!p1 || p1.length < 6) { setAdminPassMsg("Password kam se kam 6 harf ka ho.", false); return; }
+    if (!p1 || p1.length < 8) { setAdminPassMsg("Password kam se kam 8 harf ka ho.", false); return; }
     if (p1 !== p2) { setAdminPassMsg("Dono password aik jaise hon.", false); return; }
     var btn = $("adminPassSaveBtn");
     btn.disabled = true;
@@ -5691,8 +5749,21 @@
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
   $("notifList").addEventListener("click", function (e) {
+    // Link par tap — link khule, na read ho na expand.
+    if (e.target.closest && e.target.closest("a")) return;
     var row = e.target.closest ? e.target.closest("[data-notif]") : null;
-    if (row) markNotifRead(row.getAttribute("data-notif"));
+    if (!row) return;
+    var id = row.getAttribute("data-notif");
+    expandedNotifIds[id] = !expandedNotifIds[id]; // tap = poora text kholo/band karo
+    if (row.classList.contains("unread")) markNotifRead(id); // reload par expand state rehti hai
+    else renderNotifList();
+  });
+  // v79: filter chips — Sab / Naye / Parhe hue.
+  document.querySelectorAll("[data-notif-filter]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      notifFilter = b.getAttribute("data-notif-filter");
+      renderNotifList();
+    });
   });
   $("fabAdd").addEventListener("click", function () {
     showView("khata");

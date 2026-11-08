@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=60">
+<link rel="stylesheet" href="styles.css?v=61">
 </head>
 <body>
 
@@ -513,10 +513,20 @@ window.addEventListener("error", function (e) {
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
-        <h2 style="margin-top:10px">Yaad Dehani</h2>
+        <div class="notif-head">
+          <h2 style="margin-top:10px">Yaad Dehani</h2>
+          <span id="notifCountBadge" class="notif-count" hidden></span>
+        </div>
         <p class="muted">Jab koi aap ke saath record save kare, to yahan message aayega.</p>
-        <button id="markAllReadBtn" class="btn btn-soft" type="button">Sab parha hua karein</button>
-        <div id="notifList" class="notifs" style="margin-top:12px"></div>
+        <div class="notif-tools">
+          <div class="notif-filters" role="tablist" aria-label="Notifications filter">
+            <button type="button" class="notif-filter is-active" data-notif-filter="all">Sab (0)</button>
+            <button type="button" class="notif-filter" data-notif-filter="unread">Naye (0)</button>
+            <button type="button" class="notif-filter" data-notif-filter="read">Parhe hue (0)</button>
+          </div>
+          <button id="markAllReadBtn" class="btn btn-soft notif-markall" type="button">Sab parha hua karein</button>
+        </div>
+        <div id="notifList" class="notifs"></div>
       </div>
     </section>
 
@@ -773,6 +783,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=85"></script>
+<script src="app.js?v=86"></script>
 </body>
 </html>

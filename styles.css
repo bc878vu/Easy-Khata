@@ -526,13 +526,32 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 
 /* ---------- notifications / admin ---------- */
-.notifs{display:grid;gap:8px}
-.notif{background:var(--tab-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer}
-.notif.unread{border-left:3px solid var(--accent)}
-.notif-title{font-weight:700;font-size:.9rem}
-.notif-body{font-size:.85rem;color:var(--muted)}
-.notif-time{font-size:.72rem;color:var(--muted)}
+/* v79: Yaad Dehani redesign — icon chip per kind, unread tint + dot,
+   3-line clamp + tap to expand, filter pills + count badge. */
+.notif-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.notif-count{flex:none;margin-top:14px;padding:3px 10px;border-radius:999px;background:var(--primary);color:#fff;font-size:.75rem;font-weight:700}
+.notif-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.notif-filters{display:flex;gap:6px;flex-wrap:wrap}
+.notif-filter{border:1px solid var(--line);background:var(--tab-bg);color:var(--text);border-radius:999px;padding:6px 12px;font:inherit;font-size:.82rem;cursor:pointer}
+.notif-filter.is-active{background:var(--primary);border-color:var(--primary);color:#fff}
+.notif-markall{padding:7px 12px;min-height:36px;font-size:.85rem}
+.notifs{display:grid;gap:8px;margin-top:12px}
+.notif{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer}
+.notif.unread{background:color-mix(in srgb,var(--primary) 7%,var(--card));border-left:3px solid var(--primary)}
+.notif-ic{flex:none;width:36px;height:36px;display:grid;place-items:center;border-radius:12px;font-size:18px;background:var(--tab-bg)}
+.notif-ic.kind-record{background:color-mix(in srgb,var(--green) 16%,transparent)}
+.notif-ic.kind-remind{background:color-mix(in srgb,#f59e0b 16%,transparent)}
+.notif-ic.kind-settle{background:color-mix(in srgb,var(--green) 16%,transparent)}
+.notif-ic.kind-admin{background:color-mix(in srgb,var(--primary) 14%,transparent)}
+.notif-main{flex:1;min-width:0}
+.notif-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92rem}
+.notif-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.notif-body{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:.85rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:anywhere}
+.notif.expanded .notif-body{display:block;-webkit-line-clamp:unset}
+.notif-body a{color:var(--primary)}
+.notif-time{display:block;font-size:.72rem;color:var(--muted);margin-top:6px}
 .notif-read{margin-top:8px}
+@media(max-width:359px){.notif{padding:10px;gap:8px}.notif-ic{width:32px;height:32px;font-size:16px}.notif-filter{padding:5px 10px;font-size:.78rem}}
 .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:.9rem}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0;overflow-wrap:anywhere}
