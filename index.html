@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=69">
+<link rel="stylesheet" href="styles.css?v=70">
 </head>
 <body>
 
@@ -795,11 +795,11 @@ window.addEventListener("error", function (e) {
       <h3>Pending join requests <span id="communityRequestsCount" class="cm-count"></span></h3>
       <div id="communityRequestsList" class="community-list"></div>
       <h3 class="members-section-title">Active members <span id="workspaceMemberCount" class="cm-count"></span></h3>
-      <div class="cm-search"><input id="workspaceMemberSearch" type="search" placeholder="Member search karein — naam ya email…" aria-label="Search members"></div>
+      <div class="cm-search"><input id="workspaceMemberSearch" type="search" placeholder="Member search karein — naam ya email…" aria-label="Search members"><select id="workspaceMemberRoleFilter" aria-label="Filter members by role"><option value="">All roles</option><option value="owner">Owner</option><option value="admin">Admin</option><option value="accountant">Accountant</option><option value="staff">Staff</option><option value="viewer">Viewer</option></select></div>
       <div id="workspaceMemberCards" class="community-list"></div>
     </section>
   </div>
 
-<script src="app.js?v=99"></script>
+<script src="app.js?v=100"></script>
 </body>
 </html>

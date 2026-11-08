@@ -275,6 +275,7 @@
   var adminWorkspaceMembers = [];
   var lastMemberRows = []; // v80: members modal ki aakhri fetch (search local filter ke liye)
   var memberSearchQ = "";
+  var memberRoleFilter = ""; // v95: members modal role filter (all/owner/admin/accountant/staff/viewer)
   var adminCommunityMemberShown = 20; // v80: admin member list — pehle 20, phir Show more
   var adminUserShown = 20; // v81: admin user list — pehle 20, phir Show more
   var adminCommunityShown = 20; // v81: admin community list — pehle 20, phir Show more
@@ -1435,6 +1436,7 @@
   function manageWorkspaceMembers(){
     if(!currentWorkspaceId)return;
     memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
+    memberRoleFilter="";var rf=$("workspaceMemberRoleFilter");if(rf)rf.value=""; // v95: filter reset
     var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
     var sub=$("membersModalSub");if(sub)sub.textContent=active?(active.name||"Community"):"";
     $("membersOverlay").hidden=false;
@@ -1489,6 +1491,7 @@
     var box=$("workspaceMemberCards");if(!box)return;box.innerHTML="";
     var q=memberSearchQ.trim().toLowerCase();
     var shown=rows.filter(function(m){
+      if(memberRoleFilter&&String(m.role||"").toLowerCase()!==memberRoleFilter)return false; // v95: role filter
       if(!q)return true;
       var p=profiles.filter(function(x){return x.id===m.user_id;})[0]||{};
       return [p.name,p.email,m.role].join(" ").toLowerCase().indexOf(q)!==-1;
@@ -1535,6 +1538,7 @@
   }
   function inviteWorkspaceMember(){
     memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
+    memberRoleFilter="";var rf=$("workspaceMemberRoleFilter");if(rf)rf.value=""; // v95: filter reset
     $("membersOverlay").hidden=false;
     loadCommunityJoinRequests();loadWorkspaceMemberCards();
     $("workspaceInviteEmail").focus();
@@ -6464,6 +6468,7 @@
   $("adminMemberSearch").addEventListener("input",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
   $("adminMemberCommunityFilter").addEventListener("change",function(){adminCommunityMemberShown=20;renderAdminCommunityMembers();});
   $("workspaceMemberSearch").addEventListener("input",function(){memberSearchQ=this.value;renderWorkspaceMemberCards(lastMemberRows);});
+  $("workspaceMemberRoleFilter").addEventListener("change",function(){memberRoleFilter=this.value;renderWorkspaceMemberCards(lastMemberRows);}); // v95
   $("adminCommunityList").addEventListener("click",function(e){
     var edit=e.target.closest("[data-admin-community-edit]");if(edit){editAdminCommunity(edit.getAttribute("data-admin-community-edit"));return;}
     var status=e.target.closest("[data-admin-community-status]");if(status){setAdminCommunityStatus(status.getAttribute("data-admin-community-status"),status.getAttribute("data-next-status"));return;}
