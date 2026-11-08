@@ -3988,6 +3988,132 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
+  // v77: JSON backup/restore — poora hisaab (dost + len-den + hidden flags) aik
+  // file mein. Backup kabhi delete NAHI karta; restore sirf UPSERT karta hai
+  // (PostgREST on_conflict=id + resolution=merge-duplicates), is liye dobara
+  // restore karna bhi safe hai — duplicate nahi bante. Guest mode mein sab
+  // kuch local hai (ZERO network): export guest store, import usi mein merge.
+  var BACKUP_MARKER = "easy-khata-backup";
+  function setAcctJsonMsg(text, ok) {
+    var el = $("acctJsonMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function buildBackupJson() {
+    var data = {
+      app: BACKUP_MARKER, version: 1,
+      exported_at: new Date().toISOString(),
+      user_id: guestMode ? guestMeId : myId(),
+      contacts: (myContacts || []).map(function (c) {
+        return { id: c.id, name: c.name, phone: c.phone || null, workspace_id: c.workspace_id || currentWorkspaceId };
+      }),
+      txns: (txns || []).map(function (t) {
+        return { id: t.id, payer_id: t.payer_id, receiver_id: t.receiver_id, amount: t.amount, note: t.note || "", txn_date: t.txn_date, created_by: t.created_by, workspace_id: t.workspace_id, created_at: t.created_at };
+      }),
+      hidden: Object.keys(hiddenTxnIds)
+    };
+    return JSON.stringify(data);
+  }
+  function exportJsonBackup() {
+    var blob = new Blob([buildBackupJson()], { type: "application/json;charset=utf-8" });
+    downloadBlob(blob, "easy-khata-backup-" + todayLocal() + ".json");
+    setAcctJsonMsg("JSON backup download ho gaya (" + (txns || []).length + " records, " + (myContacts || []).length + " dost).", true);
+  }
+  function parseBackupJson(text) {
+    var d;
+    try { d = JSON.parse(text); } catch (e) { return { error: "Ye file Easy Khata ka backup nahi lagti — JSON nahi hai." }; }
+    if (!d || d.app !== BACKUP_MARKER || d.version !== 1 || !Array.isArray(d.contacts) || !Array.isArray(d.txns)) {
+      return { error: "Ye file Easy Khata ka backup nahi hai." };
+    }
+    if (d.contacts.length > 5000 || d.txns.length > 10000) return { error: "Backup file bohot bari hai — ye Easy Khata ka backup nahi lagti." };
+    var contacts = [], txns = [], hidden = [];
+    d.contacts.forEach(function (c) {
+      if (c && typeof c.id === "string" && c.id && typeof c.name === "string" && c.name.trim()) {
+        contacts.push({ id: c.id, name: String(c.name).slice(0, 200), phone: typeof c.phone === "string" ? c.phone.slice(0, 30) : null, workspace_id: typeof c.workspace_id === "string" ? c.workspace_id : null });
+      }
+    });
+    d.txns.forEach(function (t) {
+      if (t && typeof t.id === "string" && t.id && typeof t.payer_id === "string" && t.payer_id
+        && typeof t.receiver_id === "string" && t.receiver_id && typeof t.amount === "number"
+        && t.amount > 0 && t.amount <= 10000000 && typeof t.txn_date === "string" && /^\d{4}-\d{2}-\d{2}/.test(t.txn_date)) {
+        txns.push({ id: t.id, payer_id: t.payer_id, receiver_id: t.receiver_id, amount: t.amount, note: typeof t.note === "string" ? t.note.slice(0, 500) : "", txn_date: t.txn_date.slice(0, 10), created_by: typeof t.created_by === "string" ? t.created_by : null, workspace_id: typeof t.workspace_id === "string" ? t.workspace_id : null, created_at: typeof t.created_at === "string" ? t.created_at : null });
+      }
+    });
+    if (Array.isArray(d.hidden)) d.hidden.forEach(function (id) { if (typeof id === "string" && id) hidden.push(id); });
+    return { data: { contacts: contacts, txns: txns, hidden: hidden, meId: typeof d.user_id === "string" ? d.user_id : "" } };
+  }
+  function restoreBackupOnline(data) {
+    var me = myId();
+    var cJobs = data.contacts.map(function (c) {
+      return sb("khata_contacts?on_conflict=id", { method: "POST", prefer: "return=minimal,resolution=merge-duplicates", body: { id: c.id, owner_id: me, workspace_id: c.workspace_id || currentWorkspaceId, name: c.name, phone: c.phone || null } });
+    });
+    return Promise.all(cJobs).then(function (cRes) {
+      var cOk = cRes.filter(function (r) { return r.ok; }).length;
+      var tJobs = data.txns.map(function (t) {
+        // created_by hamesha me: RLS insert mein created_by = auth.uid() chahiye;
+        // payer/receiver/amount/date waisay hi rehte hain — hisaab same hai.
+        return sb("khata_transactions?on_conflict=id", { method: "POST", prefer: "return=minimal,resolution=merge-duplicates", body: { id: t.id, payer_id: t.payer_id, receiver_id: t.receiver_id, amount: t.amount, note: t.note || "", txn_date: t.txn_date, created_by: me, workspace_id: t.workspace_id || currentWorkspaceId, created_at: t.created_at || new Date().toISOString() } });
+      });
+      return Promise.all(tJobs).then(function (tRes) {
+        var tOk = tRes.filter(function (r) { return r.ok; }).length;
+        var hJobs = (data.hidden || []).map(function (id) {
+          return sb("khata_txn_hidden?on_conflict=txn_id,user_id", { method: "POST", prefer: "return=minimal,resolution=merge-duplicates", body: { txn_id: id, user_id: me } });
+        });
+        return Promise.all(hJobs).then(function (hRes) {
+          var hOk = hRes.filter(function (r) { return r.ok; }).length;
+          var failed = (data.contacts.length - cOk) + (data.txns.length - tOk) + ((data.hidden || []).length - hOk);
+          loadAll();
+          setAcctJsonMsg("Restore ho gaya: " + cOk + "/" + data.contacts.length + " dost, " + tOk + "/" + data.txns.length + " records, " + hOk + " hidden." + (failed ? " " + failed + " fail hue (shayad doosre account ka data ho)." : ""), (cOk + tOk) > 0);
+        });
+      });
+    }).catch(function () {
+      setAcctJsonMsg("Restore nahi ho saka — internet check karke dobara koshish karein.", false);
+    });
+  }
+  function restoreBackupGuest(data) {
+    // Guest store (local) mein merge — id se dedupe, kuch delete nahi hota.
+    // Doosre device ke guest backup ka me.id is device ke guestMeId se map hota
+    // hai (wahi pattern jo doGuestMigration mein hai).
+    var fileMe = data.meId || "";
+    var mapId = function (id) { return id === fileMe ? guestMeId : id; };
+    var cSeen = {}, tSeen = {}, hSet = {};
+    (myContacts || []).forEach(function (c) { cSeen[c.id] = true; });
+    (txns || []).forEach(function (t) { tSeen[t.id] = true; });
+    Object.keys(hiddenTxnIds).forEach(function (id) { hSet[id] = true; });
+    var cNew = 0, tNew = 0;
+    data.contacts.forEach(function (c) {
+      if (cSeen[c.id]) return;
+      myContacts.push({ id: c.id, name: c.name, phone: c.phone || null });
+      cSeen[c.id] = true; cNew++;
+    });
+    data.txns.forEach(function (t) {
+      if (tSeen[t.id]) return;
+      txns.push({ id: t.id, payer_id: mapId(t.payer_id), receiver_id: mapId(t.receiver_id), amount: t.amount, note: t.note || "", txn_date: t.txn_date, created_by: mapId(t.created_by || ""), created_at: t.created_at || new Date().toISOString() });
+      tSeen[t.id] = true; tNew++;
+    });
+    (data.hidden || []).forEach(function (id) { hSet[id] = true; });
+    hiddenTxnIds = hSet;
+    saveGuestStore();
+    renderAll();
+    setAcctJsonMsg("Restore ho gaya: " + cNew + " naye dost, " + tNew + " naye records. Pehle wala hisaab waisa hi hai.", true);
+  }
+  function onJsonRestoreFile(ev) {
+    var input = ev.target;
+    var file = input && input.files && input.files[0];
+    if (input) input.value = ""; // dobara wohi file chuni ja sake
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setAcctJsonMsg("File bohot bari hai (5 MB se zyada) — backup file chhoti hoti hai.", false); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parsed = parseBackupJson(String(reader.result || ""));
+      if (parsed.error) { setAcctJsonMsg(parsed.error, false); return; }
+      if (guestMode) restoreBackupGuest(parsed.data);
+      else restoreBackupOnline(parsed.data);
+    };
+    reader.onerror = function () { setAcctJsonMsg("File parhi nahi gayi — dobara koshish karein.", false); };
+    reader.readAsText(file);
+  }
   // v75: report libs LAZY load — jsPDF (~364KB) + xlsx-js-style (~425KB)
   // pehli visit par download NAHI hote; sirf jab export button dabao.
   // SRI hash wahi jo index.html ke (hataye gaye) tags par tha. SW CDN_LIBS
@@ -5228,6 +5354,9 @@
     if (card) setTimeout(function () { card.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
   });
   $("acctBackupBtn").addEventListener("click", exportCsv);
+  $("acctJsonBackupBtn").addEventListener("click", exportJsonBackup); // v77: JSON backup
+  $("acctJsonRestoreBtn").addEventListener("click", function () { $("acctJsonRestoreInput").click(); });
+  $("acctJsonRestoreInput").addEventListener("change", onJsonRestoreFile);
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
