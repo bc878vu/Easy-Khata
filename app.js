@@ -4921,7 +4921,7 @@
   // member's personal ledger just because the community ledger is shared.
   async function exportFilteredLedgerPdf() {
     var PdfCtor = await ensureReportLib("jspdf");
-    if (!PdfCtor) { setTxnMsg("PDF tayyar nahi ho saki. Internet check karke dobara try karein.", false); return; }
+    if (!PdfCtor) { setTxnMsg("Could not prepare the PDF. Check your connection and try again.", false); return; }
     try {
       var me = myId();
       var list = filteredTxns().filter(function (t) {
@@ -4930,7 +4930,7 @@
         var d = String(b.txn_date || "").localeCompare(String(a.txn_date || ""));
         return d || String(b.created_at || "").localeCompare(String(a.created_at || ""));
       });
-      if (!list.length) { setTxnMsg("Is filter mein aap ka koi record nahi mila.", false); return; }
+      if (!list.length) { setTxnMsg("No records match the current filters.", false); return; }
 
       var givenMinor = 0, takenMinor = 0, people = {};
       list.forEach(function (t) {
@@ -4963,33 +4963,33 @@
       var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
       var doc = base.doc, M = base.M, R = base.R, C = base.C;
       var rangeText = txnFromDate || txnToDate
-        ? "Muddat: " + (txnFromDate ? fmtDate(txnFromDate) : "Shuru se") + " se " + (txnToDate ? fmtDate(txnToDate) : "Aaj tak")
-        : "Muddat: Tamam tareekhein";
+        ? "Date range: " + (txnFromDate ? fmtDate(txnFromDate) : "Beginning") + " to " + (txnToDate ? fmtDate(txnToDate) : "Today")
+        : "Date range: All dates";
       var extraFilters = [];
-      if (txnFilterPerson) extraFilters.push("Dost: " + profileName(txnFilterPerson));
+      if (txnFilterPerson) extraFilters.push("Person: " + profileName(txnFilterPerson));
       if (txnSearchText.trim()) extraFilters.push("Search: " + txnSearchText.trim());
 
-      base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
-      base.metaLine("Naam: " + myName() + "  |  Community: " + spaceName);
-      base.metaLine(rangeText + (extraFilters.length ? "  |  " + extraFilters.join("  |  ") : "") + "  |  Aap ke records: " + list.length);
+      base.headerBand("Account Statement", fmtDateLong(todayLocal()));
+      base.metaLine("Name: " + myName() + "  |  Workspace: " + spaceName);
+      base.metaLine(rangeText + (extraFilters.length ? "  |  " + extraFilters.join("  |  ") : "") + "  |  Records: " + list.length);
       base.summaryCards([
-        { label: "Aap ne diye", value: fmtRs(given), color: C.red },
-        { label: "Aap ko mile", value: fmtRs(taken), color: C.green },
+        { label: "You paid", value: fmtRs(given), color: C.red },
+        { label: "You received", value: fmtRs(taken), color: C.green },
         { label: "Net balance", value: netSignedTxt(net), color: C.blue }
       ]);
 
-      base.section("Doston ka hisaab");
-      base.metaLine("(+ ka matlab dost aap ko denge, - ka matlab aap dost ko denge)");
+      base.section("People summary");
+      base.metaLine("(+ means the person owes you; − means you owe the person.)");
       function peopleHead() {
         base.tableHead([
-          { t: "Dost", x: M, maxW: 190 },
-          { t: "Aap ne diye", x: 310, align: "right", maxW: 76 },
-          { t: "Aap ko mile", x: 400, align: "right", maxW: 76 },
+          { t: "Person", x: M, maxW: 190 },
+          { t: "You paid", x: 310, align: "right", maxW: 76 },
+          { t: "You received", x: 400, align: "right", maxW: 76 },
           { t: "Balance", x: R, align: "right", maxW: 110 }
         ]);
       }
       peopleHead();
-      if (!peopleList.length) base.emptyBox("Abhi koi dost ya record nahi.");
+      if (!peopleList.length) base.emptyBox("No people or records to display.");
       peopleList.forEach(function (p, i) {
         if (base.needPage(14)) peopleHead();
         base.tableRow([
@@ -5006,13 +5006,13 @@
         { t: netSignedTxt(net), x: R, align: "right", maxW: 110 }
       ]);
 
-      base.section("Len-den ki tafseel (" + list.length + " records)");
+      base.section("Transaction details (" + list.length + " records)");
       function historyHead() {
         base.tableHead([
-          { t: "Tareekh", x: M, maxW: 54 },
-          { t: "Dene wala", x: 100, maxW: 105 },
-          { t: "Lene wala", x: 214, maxW: 105 },
-          { t: "Raqam", x: 420, align: "right", maxW: 72 },
+          { t: "Date", x: M, maxW: 54 },
+          { t: "Paid by", x: 100, maxW: 105 },
+          { t: "Received by", x: 214, maxW: 105 },
+          { t: "Amount", x: 420, align: "right", maxW: 72 },
           { t: "Note", x: 430, maxW: 125 }
         ]);
       }
@@ -5046,9 +5046,9 @@
       document.body.appendChild(link);
       link.click();
       setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 500);
-      setTxnMsg("Aap ki PDF report download ho gayi (" + list.length + " records).", true);
+      setTxnMsg("PDF report downloaded (" + list.length + " records).", true);
     } catch (e) {
-      setTxnMsg("PDF report nahi ban saki. Dobara koshish karein.", false);
+      setTxnMsg("Could not create the PDF report. Please try again.", false);
     }
   }
 
@@ -5868,15 +5868,15 @@
     if (fc) {
       var anyFilter = !!(txnSearchText || txnFilterPerson || txnFromDate || txnToDate);
       fc.hidden = !anyFilter;
-      if (anyFilter) fc.textContent = list.length + " records shown";
+      if (anyFilter) fc.textContent = list.length + (list.length === 1 ? " record shown" : " records shown");
     }
     if (!visibleTxns().length) {
-      $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
+      $("txnList").innerHTML = '<p class="empty">No records yet. Add your first transaction above.</p>';
       refreshScrollHints();
       return;
     }
     if (!list.length) {
-      $("txnList").innerHTML = '<p class="empty">Is search/filter se koi record nahi mila.</p>';
+      $("txnList").innerHTML = '<p class="empty">No records match your search or filters.</p>';
       refreshScrollHints();
       return;
     }
