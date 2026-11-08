@@ -1438,9 +1438,18 @@
     memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
     memberRoleFilter="";var rf=$("workspaceMemberRoleFilter");if(rf)rf.value=""; // v95: filter reset
     var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
+    // v96: community admin (owner/admin) hi users manage karta hai — baqi
+    // members ko sirf read-only member list dikhti hai; invite + requests
+    // un ke liye chhupte hain (warna submit par server error aata).
+    var myRole=active?active.current_role:"";
+    var canManage=["owner","admin"].indexOf(myRole)>=0;
+    var inviteBox=$("communityInviteBox");if(inviteBox)inviteBox.hidden=!canManage;
+    var reqTitle=$("communityRequestsTitle");if(reqTitle)reqTitle.hidden=!canManage;
+    var reqList=$("communityRequestsList");if(reqList)reqList.hidden=!canManage;
+    var title=$("membersModalTitle");if(title)title.textContent=canManage?"Members & requests":"Members";
     var sub=$("membersModalSub");if(sub)sub.textContent=active?(active.name||"Community"):"";
     $("membersOverlay").hidden=false;
-    loadCommunityJoinRequests();
+    if(canManage)loadCommunityJoinRequests();
     loadWorkspaceMemberCards();
   }
   function cmAvatar(name){
@@ -1481,7 +1490,7 @@
   }
   function loadWorkspaceMemberCards(){
     var box=$("workspaceMemberCards");box.innerHTML='<p class="muted">Members load ho rahe hain…</p>';
-    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=eq.active&order=joined_at.asc").then(function(res){
+    sb("khata_workspace_members?select=user_id,role,status,joined_at&workspace_id=eq."+encodeURIComponent(currentWorkspaceId)+"&status=in.(active,suspended)&order=joined_at.asc").then(function(res){
       if(!res.ok)throw new Error("members");
       lastMemberRows=Array.isArray(res.body)?res.body:[];
       renderWorkspaceMemberCards(lastMemberRows);
@@ -1501,7 +1510,7 @@
     if(sub){var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];if(active)sub.textContent=active.name+" · "+rows.length+" members";}
     if(!shown.length){
       var p=document.createElement("p");p.className="community-empty";
-      p.textContent=q?"Koi member nahi mila — search badal kar dekhein.":"Abhi koi active member nahi.";
+      p.textContent=q?"Koi member nahi mila — search badal kar dekhein.":"Abhi koi member nahi.";
       box.appendChild(p);return;
     }
     var myRole=(workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0]||{}).current_role;
@@ -1518,6 +1527,8 @@
       var meta=document.createElement("small");meta.textContent=(p.email||"")+(m.joined_at?" · Joined "+fmtDate(m.joined_at):"");
       main.appendChild(name);main.appendChild(meta);top.appendChild(main);
       top.appendChild(cmRoleChip(m.role));
+      // v96: suspended member dikhta hai (pill) taake admin use restore kar sake.
+      if(String(m.status||"").toLowerCase()==="suspended"){var st=document.createElement("span");st.className="cm-status-chip";st.textContent="⏸ Suspended";top.appendChild(st);}
       card.appendChild(top);
       // v80: owner ka role/remove UI mein nahi — owner ko sirf owner badal sakta hai (server rule).
       // Apna card bhi action-free. Role picker CUSTOM hai (v86) — fixed-position
@@ -1531,7 +1542,17 @@
         saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
         var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
         remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-        actions.appendChild(roleSelect);cdAttach(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
+        // v96: Suspend/Restore — community admin (owner/admin) ke liye;
+        // server: khata_set_workspace_member_status (admin owner/admin ko
+        // chhu nahi sakta; last owner + platform-blocked mehfooz hain).
+        var suspended=String(m.status||"").toLowerCase()==="suspended";
+        var suspBtn=document.createElement("button");suspBtn.type="button";suspBtn.className="btn btn-neutral";suspBtn.textContent=suspended?"Restore":"Suspend";
+        suspBtn.addEventListener("click",async function(){
+          if(!suspended&&!(await appConfirm("Is member ko temporarily suspend karein? Un ka community access ruk jayega, purana hisaab mehfooz rahega.")))return;
+          suspBtn.disabled=true;
+          sb("rpc/khata_set_workspace_member_status",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_status:suspended?"active":"suspended"}}).then(function(out){suspBtn.disabled=false;if(out.ok){setTxnMsg(suspended?"Member restore ho gaya.":"Member suspend ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Member update nahi hua — owner/admin permission check karein.",false);});
+        });
+        actions.appendChild(roleSelect);cdAttach(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);actions.appendChild(suspBtn);card.appendChild(actions);
       }
       box.appendChild(card);
     });
@@ -3198,6 +3219,7 @@
         '<div class="admin-user-meta"><span>'+Number(w.member_count||0)+' members</span><span>'+Number(w.transaction_count||0)+' records</span><span>'+esc(fmtRs(w.transaction_volume||0))+'</span></div>'+
         '<div class="admin-user-meta"><span>'+(w.password_configured?'Password protected':'Password missing')+'</span><span>'+(w.community_listed?'Directory listed':'Unlisted')+'</span><span>'+Number(w.contact_count||0)+' contacts</span></div>'+
         '<div class="admin-user-actions"><button class="btn btn-soft btn-mini" data-admin-community-edit="'+esc(w.id)+'" type="button">Edit</button>'+
+        '<button class="btn btn-soft btn-mini" data-admin-community-members="'+esc(w.id)+'" type="button">👥 Members</button>'+
         '<button class="btn btn-soft btn-mini" data-admin-community-status="'+esc(w.id)+'" data-next-status="'+(suspended?'active':'suspended')+'" type="button">'+(suspended?'Restore':'Suspend')+'</button>'+
         '<button class="btn btn-danger btn-mini" data-admin-community-delete="'+esc(w.id)+'" type="button">Delete if empty</button></div>'+
         '<div class="admin-community-add-member"><input type="email" data-admin-add-email="'+esc(w.id)+'" placeholder="Existing user email">'+
@@ -3281,6 +3303,15 @@
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community delete nahi hui. Data wali community ko suspend karein.",false);return;}
       setAdminMsg("Empty community delete ho gayi.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — community delete nahi hui.",false);});
+  }
+  // v96: community card se seedha us community ke members — filter set +
+  // list render + member panel tak scroll (admin panel se user manage).
+  function adminShowCommunityMembers(id) {
+    var f=$("adminMemberCommunityFilter");if(!f)return;
+    f.value=id;cdSync(f);
+    adminCommunityMemberShown=20;renderAdminCommunityMembers();
+    var panel=$("adminCommunityMemberList");
+    if(panel){var top=panel.getBoundingClientRect().top+(window.scrollY||0)-8;window.scrollTo({top:top,behavior:"smooth"});}
   }
   function adminAddCommunityMember(id) {
     var email=$("adminCommunityList").querySelector('[data-admin-add-email="'+id+'"]').value.trim();
@@ -6470,6 +6501,7 @@
   $("workspaceMemberSearch").addEventListener("input",function(){memberSearchQ=this.value;renderWorkspaceMemberCards(lastMemberRows);});
   $("workspaceMemberRoleFilter").addEventListener("change",function(){memberRoleFilter=this.value;renderWorkspaceMemberCards(lastMemberRows);}); // v95
   $("adminCommunityList").addEventListener("click",function(e){
+    var members=e.target.closest("[data-admin-community-members]");if(members){adminShowCommunityMembers(members.getAttribute("data-admin-community-members"));return;}
     var edit=e.target.closest("[data-admin-community-edit]");if(edit){editAdminCommunity(edit.getAttribute("data-admin-community-edit"));return;}
     var status=e.target.closest("[data-admin-community-status]");if(status){setAdminCommunityStatus(status.getAttribute("data-admin-community-status"),status.getAttribute("data-next-status"));return;}
     var del=e.target.closest("[data-admin-community-delete]");if(del){deleteAdminCommunity(del.getAttribute("data-admin-community-delete"));return;}
