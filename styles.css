@@ -1641,3 +1641,29 @@ input,select,textarea,button{max-width:100%}
 .monthly-banner-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .monthly-banner-actions .btn{min-height:38px}
 @media(max-width:520px){.monthly-banner{flex-direction:column;align-items:stretch}.monthly-banner-actions{width:100%}.monthly-banner-actions .btn-primary{flex:1}}
+
+
+/* All Records — compact, accessible responsive polish */
+#ledgerCard{min-width:0;overflow:hidden}
+#ledgerCard>.muted{margin:4px 0 8px;font-size:.82rem}
+#ledgerCard .toolbar{padding:0}
+#ledgerCard .toolbar input,#ledgerCard .toolbar select{min-height:38px;border-radius:10px}
+#ledgerCard .toolbar input:focus-visible,#ledgerCard .toolbar select:focus-visible,
+#ledgerCard .toolbar .btn:focus-visible,#ledgerCard #refreshBtn:focus-visible{
+  outline:3px solid color-mix(in srgb,var(--accent) 28%,transparent);outline-offset:2px
+}
+#ledgerCard .tb-actions-row .btn{min-width:0}
+#ledgerCard #exportCsvBtn{background:var(--accent-soft,var(--tab-bg));color:var(--accent);border:1px solid var(--accent-soft,var(--line))}
+#ledgerCard #filterCount{padding:3px 2px;font-weight:600}
+@media(min-width:700px){
+  #ledgerCard .toolbar{grid-template-columns:minmax(0,1.35fr) minmax(220px,.9fr) auto;align-items:end;column-gap:10px}
+  #ledgerCard .tb-search-row,#ledgerCard .tb-dates-row,#ledgerCard .tb-actions-row{grid-column:auto}
+  #ledgerCard .tb-dates-row{grid-template-columns:1fr 1fr}
+  #ledgerCard .tb-actions-row{grid-template-columns:1fr 1.2fr}
+}
+@media(max-width:380px){
+  #ledgerCard{padding:12px}
+  #ledgerCard .list-head h2{font-size:1rem}
+  #ledgerCard .toolbar input,#ledgerCard .toolbar select{font-size:.82rem;padding-inline:8px}
+  #ledgerCard .toolbar .btn{font-size:.78rem;padding-inline:7px}
+}
