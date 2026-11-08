@@ -3402,6 +3402,76 @@
     copyText(text).then(function () { setTxnMsg("Link copy ho gaya — kisi bhi app mein paste karein.", true); });
   }
 
+  /* ---------- Rate Easy Khata (v64) ---------- */
+  // "Rate Easy Khata" pehle sirf promo text share karta tha — ab asal star
+  // rating hai: 5 sitare + optional rai. Save: hamesha localStorage (guest
+  // bhi); logged-in ho to Supabase khata_ratings mein upsert bhi (best effort,
+  // fail ho to bhi rating local mehfooz rehti hai). Guest mode mein ZERO network.
+  var RATING_KEY = "easykhata_my_rating";
+  function myRating() {
+    try {
+      var r = JSON.parse(window.localStorage.getItem(RATING_KEY) || "null");
+      return r && r.stars >= 1 && r.stars <= 5 ? r : null;
+    } catch (e) { return null; }
+  }
+  function renderRateState() {
+    var btn = $("acctRateBtn");
+    if (!btn) return;
+    var label = btn.querySelectorAll("span")[1];
+    if (!label) return;
+    var r = myRating();
+    label.textContent = r ? "Rate Easy Khata " + "★".repeat(r.stars) + "☆".repeat(5 - r.stars) : "Rate Easy Khata";
+  }
+  var ratePicked = 0;
+  function paintRateStars() {
+    var stars = document.querySelectorAll("#rateStars .rate-star");
+    stars.forEach(function (b) {
+      var n = Number(b.getAttribute("data-stars"));
+      b.textContent = n <= ratePicked ? "★" : "☆";
+      b.classList.toggle("lit", n <= ratePicked);
+      b.setAttribute("aria-checked", n === ratePicked ? "true" : "false");
+    });
+    var submit = $("rateSubmitBtn");
+    if (submit) submit.disabled = !ratePicked;
+  }
+  function openRateDialog() {
+    var overlay = $("rateOverlay");
+    if (!overlay) return;
+    var saved = myRating();
+    ratePicked = saved ? saved.stars : 0;
+    var fb = $("rateFeedback");
+    if (fb) fb.value = saved && saved.feedback ? saved.feedback : "";
+    var msg = $("rateMsg");
+    if (msg) msg.textContent = "";
+    paintRateStars();
+    overlay.hidden = false;
+    document.body.classList.add("dialog-open");
+  }
+  function closeRateDialog() {
+    var o = $("rateOverlay");
+    if (o) o.hidden = true;
+    document.body.classList.remove("dialog-open");
+  }
+  function submitRating() {
+    if (!ratePicked) return;
+    var feedback = (($("rateFeedback") && $("rateFeedback").value) || "").trim().slice(0, 500);
+    var rec = { stars: ratePicked, feedback: feedback, at: new Date().toISOString() };
+    try { window.localStorage.setItem(RATING_KEY, JSON.stringify(rec)); } catch (e) {}
+    renderRateState();
+    closeRateDialog();
+    if (!guestMode && session && session.user) {
+      sb("khata_ratings?on_conflict=user_id", {
+        method: "POST", prefer: "resolution=merge-duplicates",
+        body: { user_id: session.user.id, stars: ratePicked, feedback: feedback || null, updated_at: new Date().toISOString() }
+      }).catch(function () {});
+    }
+    if (ratePicked === 5) {
+      appConfirm("Shukriya! ★★★★★\n\nAap ko Easy Khata pasand aaya — kya aap ise doston ke saath share karna chahenge?", { title: "Shukriya!", okText: "Share karein", cancelText: "Abhi nahi" }).then(function (ok) { if (ok) shareAll(); });
+    } else {
+      appDialog("Shukriya! Aap ki rating save ho gayi — aap ki rai se Easy Khata behtar hoga.", { mode: "notice", title: "Shukriya!" });
+    }
+  }
+
   function renderPeople() {
     var map = peopleMap();
     var total = Object.keys(map).length;
@@ -3471,6 +3541,7 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
+    renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
     renderWorkspaceBar();
   }
   function openPersonDetail(id) {
@@ -4856,9 +4927,13 @@
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
-  $("acctRateBtn").addEventListener("click", function () {
-    shareText("Easy Khata — doston ke saath khane ka hisaab, aasan tareeqe se.\n\nEasy Khata: " + APP_SHORT_URL);
+  $("acctRateBtn").addEventListener("click", openRateDialog);
+  document.querySelectorAll("#rateStars .rate-star").forEach(function (b) {
+    b.addEventListener("click", function () { ratePicked = Number(b.getAttribute("data-stars")); paintRateStars(); });
   });
+  $("rateCancelBtn").addEventListener("click", closeRateDialog);
+  $("rateSubmitBtn").addEventListener("click", submitRating);
+  $("rateOverlay").addEventListener("click", function (e) { if (e.target === $("rateOverlay")) closeRateDialog(); });
   $("acctWaBtn").addEventListener("click", function () {
     // WhatsApp helpline — Asad ka apna number (03098851445). v24.5 mein
     // verify kiya: live code mein number pehle se yahi tha, is liye number
