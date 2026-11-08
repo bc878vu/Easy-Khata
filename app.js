@@ -2549,9 +2549,22 @@
   function renderRecurringList() {
     var box = $("recurringList");
     if (!box) return;
+    // v92: live stats — active/paused ginti + agla record (khud update hota hai).
+    var stats = $("recurringStats");
+    if (stats) {
+      var active = 0, paused = 0, nextDue = null;
+      recurringRules.forEach(function (r) {
+        if (r.is_active) { active++; if (r.next_due && (!nextDue || r.next_due < nextDue)) nextDue = r.next_due; }
+        else paused++;
+      });
+      stats.innerHTML = '<div class="rec-stat"><strong>' + active + '</strong><span>Active</span></div>'
+        + '<div class="rec-stat"><strong>' + paused + '</strong><span>Paused</span></div>'
+        + '<div class="rec-stat"><strong>' + esc(nextDue ? fmtDate(nextDue) : "—") + '</strong><span>Agla record</span></div>';
+    }
     var list = recurringRules.slice().sort(function (a, b) { return (a.next_due || "") < (b.next_due || "") ? -1 : 1; });
     if (!list.length) {
-      box.innerHTML = '<p class="empty">Abhi koi recurring record nahi — naya record save karte waqt "Har dafa repeat karein" tick karein.</p>';
+      // v92: rich empty state — icon + wazeh text + seedha Khata form par le jane wala button.
+      box.innerHTML = '<div class="rec-empty"><div class="rec-empty-ico">🔁</div><strong>Abhi koi recurring record nahi</strong><p class="muted">Naya record save karte waqt “Har dafa repeat karein” tick karein — phir har mahina ya har hafta record khud ban jayega.</p><button class="btn btn-primary" type="button" data-rec-new>➕ Naya record banayein</button></div>';
       return;
     }
     var html = "";
@@ -2562,7 +2575,7 @@
       var freqTxt = r.frequency === "weekly"
         ? ("Har hafta · " + WEEKDAYS_UR[(r.day_value || 1) - 1])
         : ("Har mahina · " + r.day_value + " tareekh");
-      html += '<div class="rec-rule"><div class="rec-rule-main"><strong>' + esc(name) + " — " + esc(fmtRs(r.amount)) + " (" + dir + ")</strong>"
+      html += '<div class="rec-rule"><span class="rec-dot ' + (r.is_active ? "on" : "off") + '" aria-hidden="true"></span><div class="rec-rule-main"><strong>' + esc(name) + " — " + esc(fmtRs(r.amount)) + " (" + dir + ")</strong>"
         + '<span class="muted">' + esc(freqTxt) + " · Agla: " + esc(r.next_due || "—") + (r.is_active ? "" : " · ⏸ Paused") + "</span>"
         + (r.note ? '<span class="muted">' + esc(r.note) + "</span>" : "")
         + '</div><div class="rec-actions"><button class="btn btn-soft" type="button" data-rec-toggle="' + r.id + '">' + (r.is_active ? "Pause" : "Resume") + '</button>'
@@ -6516,6 +6529,8 @@
   $("acctRecurringBtn").addEventListener("click", function () { renderRecurringList(); showView("recurring"); });
   $("recurringBackBtn").addEventListener("click", function () { showView("account"); });
   $("recurringList").addEventListener("click", function (e) {
+    var nw = e.target.closest("[data-rec-new]");
+    if (nw) { showView("khata"); return; } // v92: empty-state CTA — Khata form par le jao
     var t = e.target.closest("[data-rec-toggle]");
     if (t) { toggleRecurringRule(t.getAttribute("data-rec-toggle")); return; }
     var d = e.target.closest("[data-rec-del]");

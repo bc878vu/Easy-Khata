@@ -1527,6 +1527,30 @@ input,select,textarea,button{max-width:100%}
 .rec-actions{display:flex;gap:8px;flex-shrink:0}
 @media(max-width:520px){.rec-rule{flex-direction:column}.rec-actions{width:100%}.rec-actions .btn{flex:1}}
 
+/* v92: recurring page — compact header, live stats, rich empty state, how-it-works */
+.rec-page{padding-top:14px}
+.rec-head{display:flex;gap:10px;align-items:flex-start}
+.rec-back{flex-shrink:0;margin-top:1px}
+.rec-head-text{min-width:0}
+.rec-head-text h2{margin:0;font-size:19px;line-height:1.3}
+.rec-head-text .muted{margin:3px 0 0;font-size:13px;line-height:1.5}
+.rec-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 4px}
+.rec-stat{border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center;background:color-mix(in srgb,var(--primary) 5%,var(--card))}
+.rec-stat strong{display:block;font-size:16px;line-height:1.25;overflow-wrap:anywhere}
+.rec-stat span{display:block;margin-top:2px;font-size:11.5px;color:var(--muted)}
+.rec-empty{text-align:center;padding:20px 8px 10px}
+.rec-empty-ico{font-size:34px;line-height:1}
+.rec-empty strong{display:block;margin:8px 0 4px;font-size:15.5px}
+.rec-empty p{margin:0 auto 14px;max-width:340px;font-size:13px;line-height:1.6}
+.rec-how{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.rec-how-step{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;line-height:1.45;color:var(--muted);text-align:center}
+.rec-how-num{width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center;flex-shrink:0}
+.rec-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.rec-dot.on{background:#16a34a}
+.rec-dot.off{background:#9ca3af}
+.rec-actions .btn{min-height:34px;padding:6px 12px;font-size:13px}
+@media(max-width:380px){.rec-stats{gap:6px}.rec-stat strong{font-size:14px}.rec-how{grid-template-columns:1fr;gap:6px}.rec-how-step{flex-direction:row;align-items:center;text-align:left}}
+
 /* v88: monthly report banner — khata view ke upar, compact + responsive */
 .monthly-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:14px;background:color-mix(in srgb,var(--primary) 6%,var(--card));color:var(--text);font-size:13.5px;line-height:1.5}
 .monthly-banner[hidden]{display:none}

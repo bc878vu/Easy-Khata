@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=66">
+<link rel="stylesheet" href="styles.css?v=67">
 </head>
 <body>
 
@@ -533,7 +533,7 @@ window.addEventListener("error", function (e) {
         <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
         <p id="acctJsonMsg" class="msg" role="status"></p>
     </div></div></section>
-    <section id="recurringView" hidden><div class="card"><button id="recurringBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Recurring records</h2><p class="muted">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p><div id="recurringList" class="txns"></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
+    <section id="recurringView" hidden><div class="card rec-page"><div class="rec-head"><button id="recurringBackBtn" class="btn btn-ghost rec-back" type="button">← Wapas</button><div class="rec-head-text"><h2>🔁 Recurring records</h2><p class="muted">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p></div></div><div id="recurringStats" class="rec-stats" aria-live="polite"></div><div id="recurringList" class="txns"></div><div class="rec-how"><div class="rec-how-step"><span class="rec-how-num">1</span><span>Record banayein</span></div><div class="rec-how-step"><span class="rec-how-num">2</span><span>“Har dafa repeat karein” tick karein</span></div><div class="rec-how-step"><span class="rec-how-num">3</span><span>Agli tareekh par record khud ban jayega</span></div></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
     <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Monthly report</h2><p class="muted">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
     <section id="notifView" hidden>
       <div class="card">
@@ -799,6 +799,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=97"></script>
+<script src="app.js?v=98"></script>
 </body>
 </html>
