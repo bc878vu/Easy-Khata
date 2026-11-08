@@ -220,7 +220,6 @@
   // Har user ke apne hidden ids (khata_txn_hidden table) — sirf us ki apni
   // history se record hat-ta hai, doosre dost ko koi fark nahi parta.
   var hiddenTxnIds = {}; // {txnId: true}
-  function isTxnHidden(id) { return !!hiddenTxnIds[id]; }
   function visibleTxns() { return txns.filter(function (t) { return !hiddenTxnIds[t.id]; }); }
   // Balance ledger is independent from history visibility: hiding a row only
   // removes it from the history UI, never from balances or friend totals.
@@ -382,7 +381,6 @@
       return v.toString(16);
     });
   }
-  function isOffline() { return !navigator.onLine; }
   function loadOutbox() {
     try {
       var raw = window.localStorage.getItem(OUTBOX_KEY);
@@ -418,8 +416,9 @@
       };
       window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
       window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
-      // Keep the legacy single-workspace cache as a one-time migration fallback.
-      window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      // v75: legacy CACHE_KEY par dobara NAHI likhte — sirf parhte hain
+      // (loadCache fallback, one-time migration). Har save par poora payload
+      // 3 dafa stringify karna bekaar tha; ab 1 dafa.
     } catch (e) {
       try { console.warn("Easy Khata: workspace cache could not be saved", e); } catch (e2) {}
     }
@@ -1463,7 +1462,7 @@
               if (other && other !== myId()) {
                 var isSettle = String(op.body.note || "").indexOf("Settled up") === 0;
                 sendNotif(other, isSettle ? "settle" : "record", op.body);
-                triggerPush(other, isSettle ? "Hisaab barabar ho gaya" : myName() + " ne record add kiya", notifBodyFor(op.body, other));
+                triggerPush(other, isSettle ? "Hisaab barabar ho gaya" : myName() + " ne record add kiya", notifBodyFor(op.body, other), op.body.id);
               }
             } catch (e) {}
           }
@@ -2535,7 +2534,7 @@
       } else setPushMsg(pushReasonText(r.reason, r.detail), false);
     });
   }
-  function triggerPush(recipientId, title, text) {
+  function triggerPush(recipientId, title, text, txnId) {
     // Fire-and-forget: the server function sends the push to the recipient.
     // The save flow never waits on this.
     if (!recipientId || recipientId === myId() || !session || !session.access_token) return;
@@ -2545,7 +2544,7 @@
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-      body: JSON.stringify({ recipientId: recipientId, title: title, body: text })
+      body: JSON.stringify({ recipientId: recipientId, title: title, body: text, txnId: txnId || null })
     }).catch(function () {});
   }
 
@@ -2896,7 +2895,7 @@
     var amount = await appPrompt("Nayi raqam (Rs):", String(t.amount), {title:"Edit transaction",inputType:"number"}); if (amount === null) return;
     var note = await appPrompt("Note:", t.note || "Food", {title:"Transaction note"}); if (note === null) return;
     var date = await appPrompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal()), {title:"Transaction date"}); if (date === null) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim()) { setAdminUserMsg("Raqam 2 decimal places tak, note aur date sahi likhein.", false); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > 10000000 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim() || note.trim().length > 500) { setAdminUserMsg("Raqam 2 decimal places tak (zyada se zyada Rs 10,000,000), note 500 harf tak, aur date sahi likhein.", false); return; }
     sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
       if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. Dobara koshish karein.", false); return; }
       t.amount = Number(amount); t.note = note.trim(); t.txn_date = date;
@@ -3047,7 +3046,7 @@
         var created = res.body && res.body[0];
         if (created) {
           sendNotif(u.id, "admin", created);
-          triggerPush(u.id, "Admin ne record add kiya", notifBodyFor(created, u.id));
+          triggerPush(u.id, "Admin ne record add kiya", notifBodyFor(created, u.id), created.id);
           txns.unshift(created);
         }
         $("adminSetAmount").value = "";
@@ -3571,7 +3570,7 @@
           setPeopleMsg("Hisaab barabar nahi ho saka" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
-        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id)); }
+        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id), created.id); }
         setPeopleMsg("Hisaab barabar ho gaya!", true);
         loadAll();
       }).catch(function () {
@@ -3986,11 +3985,35 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     setTxnMsg("CSV download ho gaya (" + list.length + " records).", true);
   }
+  // v75: report libs LAZY load — jsPDF (~364KB) + xlsx-js-style (~425KB)
+  // pehli visit par download NAHI hote; sirf jab export button dabao.
+  // SRI hash wahi jo index.html ke (hataye gaye) tags par tha. SW CDN_LIBS
+  // inhein pehli use ke baad offline ke liye cache karta hai. Load fail ho
+  // to promise null deta hai aur agli koshish dobara try karti hai.
+  var REPORT_LIBS = {
+    jspdf: { url: "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", integrity: "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk", global: function () { return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null; } },
+    xlsx: { url: "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js", integrity: "sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb", global: function () { return window.XLSX || null; } }
+  };
+  var reportLibLoading = {};
+  function ensureReportLib(kind) {
+    var lib = REPORT_LIBS[kind];
+    var existing = lib.global();
+    if (existing) return Promise.resolve(existing);
+    if (reportLibLoading[kind]) return reportLibLoading[kind];
+    reportLibLoading[kind] = new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = lib.url; s.setAttribute("integrity", lib.integrity); s.setAttribute("crossorigin", "anonymous"); s.async = true;
+      s.onload = function () { resolve(lib.global()); };
+      s.onerror = function () { reportLibLoading[kind] = null; resolve(null); };
+      document.head.appendChild(s);
+    });
+    return reportLibLoading[kind];
+  }
   // Khata screen PDF: current user's own transactions in the active community,
   // respecting the live search, member and date filters. Never export another
   // member's personal ledger just because the community ledger is shared.
-  function exportFilteredLedgerPdf() {
-    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+  async function exportFilteredLedgerPdf() {
+    var PdfCtor = await ensureReportLib("jspdf");
     if (!PdfCtor) { setTxnMsg("PDF tayyar nahi ho saki. Internet check karke dobara try karein.", false); return; }
     try {
       var me = myId();
@@ -4361,8 +4384,8 @@
     }
     return { doc: doc, st: st, W: W, M: M, R: R, C: C, trunc: trunc, hline: hline, needPage: needPage, section: section, headerBand: headerBand, metaLine: metaLine, summaryCards: summaryCards, tableHead: tableHead, tableRow: tableRow, totalsRow: totalsRow, emptyBox: emptyBox, addFooter: addFooter, fileName: fileName };
   }
-  function exportPdf() {
-    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+  async function exportPdf() {
+    var PdfCtor = await ensureReportLib("jspdf");
     if (!PdfCtor) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
     try {
       var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
@@ -4466,8 +4489,8 @@
   // nahi. v24.9: professional redesign (pdfBase layout). Sirf in-memory data
   // (guest mode mein bhi chalta hai, ZERO network calls). Locked (Settled)
   // records bhi list mein aate hain — read-only report hai, edit/delete nahi.
-  function exportPersonPdf(personId) {
-    var PdfCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+  async function exportPersonPdf(personId) {
+    var PdfCtor = await ensureReportLib("jspdf");
     if (!PdfCtor) { setDetailPdfMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
     var p = findPerson(personId);
     if (!p) { setDetailPdfMsg("PDF nahi ban saka — dobara try karein.", false); return; }
@@ -4606,8 +4629,8 @@
     return { font: f, alignment: { horizontal: right ? "right" : "left", vertical: "center" },
       border: { left: { style: "thin", color: { rgb: XS.line } }, right: { style: "thin", color: { rgb: XS.line } }, bottom: { style: "thin", color: { rgb: XS.line } }, top: { style: "medium", color: { rgb: XS.dark } } } };
   }
-  function exportPersonXlsx(personId) {
-    var X = window.XLSX || null;
+  async function exportPersonXlsx(personId) {
+    var X = await ensureReportLib("xlsx");
     if (!X) { setDetailPdfMsg("Excel library load nahi hui — internet check kar ke dobara try karein.", false); return; }
     var p = findPerson(personId);
     if (!p) { setDetailPdfMsg("Excel nahi ban saka — dobara try karein.", false); return; }
@@ -4672,8 +4695,8 @@
       setDetailPdfMsg("Excel nahi ban saka — dobara try karein.", false);
     }
   }
-  function exportXlsx() {
-    var X = window.XLSX || null;
+  async function exportXlsx() {
+    var X = await ensureReportLib("xlsx");
     if (!X) { setAcctBackupMsg("Excel library load nahi hui — internet check kar ke dobara try karein.", false); return; }
     try {
       var d = fullReportData();
@@ -4952,7 +4975,7 @@
         note: note, txn_date: date, created_by: me
       };
       sb("khata_transactions", { method: "POST", prefer: "return=representation", body: recBody }).then(function (res) {
-        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id)); } }
+        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id), created.id); } }
         else failed++;
         next();
       })
@@ -4977,6 +5000,8 @@
     var date = $("txnDate").value;
     if (!splitMode && !person) { setTxnMsg("Pehle dost chunein.", false); return; }
     if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setTxnMsg("Raqam 0 se zyada aur maximum 2 decimal places mein likhein.", false); return; }
+    if (amount > 10000000) { setTxnMsg("Raqam zyada se zyada Rs 10,000,000 ho sakti hai.", false); return; }
+    if (note.length > 500) { setTxnMsg("Note zyada se zyada 500 harf ka ho sakta hai.", false); return; }
     amount = moneyFromMinor(moneyToMinor(amount));
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
     if (splitMode && !editingId) {
@@ -5053,7 +5078,7 @@
           setTxnMsg("Record save nahi hua" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
-        if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person)); }
+        if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person), created.id); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
         loadAll(); // v68: pehle — yeh txnMsg saaf karta hai

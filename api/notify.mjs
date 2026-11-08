@@ -52,6 +52,20 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+// v75: per-transaction dedupe — aik record par aik hi push. Vercel functions
+// stateless hote hain, is liye ye Map sirf warm instance ke andar kaam karta
+// hai; is ke saath txnId-pin (neeche) mil kar abuse ko chand duplicate tak
+// mehdood kar deta hai. Map kabhi barhta nahi — purani entries 5 min baad
+// saaf ho jati hain (sweep har call par).
+const seenNotify = new Map();
+function alreadyNotified(key) {
+  const now = Date.now();
+  for (const [k, t] of seenNotify) { if (now - t > 5 * 60 * 1000) seenNotify.delete(k); }
+  if (seenNotify.has(key)) return true;
+  seenNotify.set(key, now);
+  return false;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { error: "method_not_allowed" });
   if (!SUPABASE_URL || !SERVICE_KEY) return json(res, 500, { error: "server_not_configured" });
@@ -77,17 +91,23 @@ export default async function handler(req, res) {
   const recipientId = String(body.recipientId || "");
   const title = String(body.title || "Easy Khata").slice(0, 80);
   const text = String(body.body || "A new record arrived.").slice(0, 200);
+  // v75: txnId — jis record par push bheja ja raha hai. Dedupe + pinned
+  // recent-record check ke liye zaroori hai (aik record → aik push).
+  const txnId = String(body.txnId || "");
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   // recipientId is interpolated into a PostgREST filter expression below.
   // Accept only canonical UUID-shaped auth user IDs to prevent filter injection.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recipientId) || recipientId === sender.id) {
+  if (!uuidRe.test(recipientId) || recipientId === sender.id) {
     return json(res, 400, { error: "bad_recipient" });
   }
+  if (!uuidRe.test(txnId)) return json(res, 400, { error: "bad_txn" });
 
-  // Verify: a record was just created between the sender and the recipient (last 5 min).
-  // This stops anyone from spamming random users through this endpoint.
+  // Verify: YEHI record abhi (last 5 min) sender aur recipient ke beech
+  // bana ho. Pehle koi bhi recent record kaafi tha — ab sirf wahi txn.
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const q = new URLSearchParams({
     select: "id",
+    id: "eq." + txnId,
     created_at: "gte." + since,
     created_by: "eq." + sender.id,
     or: "(and(payer_id.eq." + sender.id + ",receiver_id.eq." + recipientId + "),and(payer_id.eq." + recipientId + ",receiver_id.eq." + sender.id + "))",
@@ -101,6 +121,9 @@ export default async function handler(req, res) {
     if (r.ok) { const rows = await r.json(); recent = Array.isArray(rows) && rows.length > 0; }
   } catch (e) { recent = false; }
   if (!recent) return json(res, 403, { error: "no_recent_record" });
+  // Dedupe sirf tab mark karo jab record verify ho gaya ho — warna aik
+  // ghalat/early call asli retry ko bhi rok deta.
+  if (alreadyNotified(sender.id + ":" + txnId)) return json(res, 200, { sent: 0, reason: "already_notified" });
 
   // Read the recipient's subscriptions (VAPID rows + FCM token rows).
   let subs = [];

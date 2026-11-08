@@ -680,25 +680,19 @@ window.addEventListener("error", function (e) {
 </div>
 <button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
 
-<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onload="window.EASY_KHATA_ON_SUPABASE_READY&&window.EASY_KHATA_ON_SUPABASE_READY()"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous" onload="window.EASY_KHATA_ON_SUPABASE_READY&&window.EASY_KHATA_ON_SUPABASE_READY()"></script>
 <script src="config.js?v=4"></script>
 <!-- Firebase (v23): Cloud Messaging for closed-app push notifications.
      Compat builds — plain script tags, no bundler. If the CDN fails the app
      still works: app.js guards every Firebase call and falls back to the
      VAPID web-push path. -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-<!-- jsPDF (v24.5): PDF Report ke liye. Agar CDN fail ho to app phir bhi
-     chalti hai — exportPdf() saaf error dikhata hai, crash nahi hota. -->
-<script async src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<!-- xlsx-js-style (v24.10): Excel (.xlsx) Report ke liye. SheetJS 0.18.5 ka
-     drop-in fork (wahi API + window.XLSX global) — farq sirf itna hai ke ye
-     cell styles (bold/fill/border/numFmt) ASAL .xlsx mein LIKHTA hai;
-     SheetJS Community Edition styles drop kar deta tha (probe se verify).
-     jsPDF ki tarah — load na ho to export functions saaf error dikhate
-     hain, crash nahi hota. Freeze panes / gridlines-hide / fit-to-page is
-     writer mein supported NAHI hain — fake nahi kiye. -->
-<script async src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js" integrity="sha384-XtSlZdmg0Ad5zf0AX4W9TGdm+dGjaNK4KG3lNFjfgbnxkCEuT9ugWXkLExgQTJ+6" crossorigin="anonymous"></script>
+<!-- jsPDF (v24.5) + xlsx-js-style (v24.10): PDF/Excel reports ke liye.
+     v75: dono LAZY load hote hain (ensureReportLib, app.js) — sirf jab export
+     button dabao, pehli visit par ~790KB download nahi hota. SRI hashes wahi
+     hain jo loader use karta hai; SW CDN_LIBS inhein offline ke liye cache
+     karta hai (pehli use ke baad). -->
   <div id="communityOverlay" class="modal-overlay" hidden>
     <section class="community-modal" role="dialog" aria-modal="true" aria-labelledby="communityModalTitle">
       <header class="community-modal-head">
@@ -772,6 +766,6 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
-<script src="app.js?v=81"></script>
+<script src="app.js?v=82"></script>
 </body>
 </html>
