@@ -411,6 +411,18 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 #refreshBtn::before{content:"↻";margin-right:5px}
 #ledgerCard .filter-count{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:.75rem;font-weight:700}
 #ledgerCard .date-cell span{text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+/* v106 — search-icon overlap fix (user's 02:10 screenshot: 🔍 ke upar "Search"
+   ka S chadh raha tha). Root cause = CSS specificity, NOT cache:
+   (a) #txnSearch: v103 rule #ledgerCard .toolbar input (1,1,1) beat
+       .search-wrap input[type="search"] (0,2,1) — shorthand padding:7px 10px
+       ne padding-left:36px ko 10px kar diya, jab ke icon left:12px par hai.
+   (b) Admin searches (3×): .admin-toolbar input (line 679, 0,1,1, BAAD mein)
+       ne .admin-search input (0,1,1) ko tie-break se hara diya — wahi overlap.
+   Deep check: baaki search boxes THEEK hain — #peopleSearch (311 rule barkarar),
+   .community-search (right icon + padding-right:42px), .cm-search (koi icon
+   nahi), #signupCommunitySearch (koi icon nahi), .pw-wrap eye (padding-right:44px). */
+#ledgerCard .search-wrap input[type="search"]{padding-left:36px}
+.admin-toolbar .admin-search input{padding-left:36px}
 /* Scrollable history box (v21, fixed v21.1): Poora hisaab + LEN-DEN sirf ~5-7 rows
    dikhate hain, baaki andar scroll hota hai. v21.1: (1) overscroll-behavior:auto
    (contain NAHI) — box ke end par scroll page ko chain karta hai, is liye jab
