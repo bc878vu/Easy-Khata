@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=65">
+<link rel="stylesheet" href="styles.css?v=66">
 </head>
 <body>
 
@@ -244,6 +244,14 @@ window.addEventListener("error", function (e) {
 
       <div id="monthStats" class="month-stats" hidden></div>
       <div id="insightStats" class="month-stats" hidden></div>
+
+      <div id="monthlyReportBanner" class="monthly-banner" hidden>
+        <span id="monthlyBannerText" class="monthly-banner-text"></span>
+        <span class="monthly-banner-actions">
+          <button id="monthlyBannerDownloadBtn" class="btn btn-primary" type="button">📄 Download karein</button>
+          <button id="monthlyBannerDismissBtn" class="btn btn-ghost" type="button" aria-label="Band karein">✕</button>
+        </span>
+      </div>
 
       <div class="card accent txn-form-card" id="txnFormCard">
         <div class="txn-form-heading">
@@ -487,6 +495,7 @@ window.addEventListener("error", function (e) {
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
         <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
         <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span>Recurring records</span><span class="menu-right">›</span></button>
+        <button id="acctMonthlyReportBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>Monthly report</span><span class="menu-right">›</span></button>
         <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
         <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
         <p id="acctBackupMsg" class="msg" role="status"></p>
@@ -525,6 +534,7 @@ window.addEventListener("error", function (e) {
         <p id="acctJsonMsg" class="msg" role="status"></p>
     </div></div></section>
     <section id="recurringView" hidden><div class="card"><button id="recurringBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Recurring records</h2><p class="muted">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p><div id="recurringList" class="txns"></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
+    <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Monthly report</h2><p class="muted">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
@@ -789,6 +799,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=93"></script>
+<script src="app.js?v=94"></script>
 </body>
 </html>

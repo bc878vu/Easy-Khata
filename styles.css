@@ -1526,3 +1526,11 @@ input,select,textarea,button{max-width:100%}
 .rec-rule-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .rec-actions{display:flex;gap:8px;flex-shrink:0}
 @media(max-width:520px){.rec-rule{flex-direction:column}.rec-actions{width:100%}.rec-actions .btn{flex:1}}
+
+/* v88: monthly report banner — khata view ke upar, compact + responsive */
+.monthly-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:14px;background:color-mix(in srgb,var(--primary) 6%,var(--card));color:var(--text);font-size:13.5px;line-height:1.5}
+.monthly-banner[hidden]{display:none}
+.monthly-banner-text{min-width:0}
+.monthly-banner-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.monthly-banner-actions .btn{min-height:38px}
+@media(max-width:520px){.monthly-banner{flex-direction:column;align-items:stretch}.monthly-banner-actions{width:100%}.monthly-banner-actions .btn-primary{flex:1}}

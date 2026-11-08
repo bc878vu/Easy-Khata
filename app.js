@@ -364,7 +364,7 @@
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
         contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now(),
-        recurring: recurringRules
+        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen
       }));
     } catch (e) {}
   }
@@ -403,6 +403,7 @@
     // v87: guest recurring rules — sirf woh jin mein guest shamil ho
     // (dono taraf se bahar wala rule purani leak hai, txns ki tarah hatao).
     recurringRules = ((g && g.recurring) || []).filter(function (r) { return r.payer_id === guestMeId || r.receiver_id === guestMeId; });
+    monthlyReportSeen = (g && g.monthlyReportSeen) || ""; // v88
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -423,6 +424,7 @@
     showApp();
     renderAll();
     runRecurringDue(); // v87: guest boot par bhi due rules ke local record banein
+    maybeMonthlyReport(); // v88: guest boot par bhi pichhle mahine ka report
     maybeShowPinLock(); // v78: PIN set ho to boot par lock screen
   }
   // v24.1: reload par bhi seedha guest mode (saved hisaab ho ya naya) —
@@ -472,7 +474,7 @@
       var payload = {
         profiles: profiles, txns: txns, contacts: myContacts, notifs: notifs,
         workspaces: workspaces, hidden: Object.keys(hiddenTxnIds), workspaceId: currentWorkspaceId, savedAt: Date.now(), txnFullSyncAt: fullAt || 0,
-        recurring: recurringRules
+        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen
       };
       window.localStorage.setItem(workspaceCacheKey(currentWorkspaceId), JSON.stringify(payload));
       window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId);
@@ -793,8 +795,9 @@
     if ($("hiddenView")) $("hiddenView").hidden = name !== "hidden";
     if ($("backupView")) $("backupView").hidden = name !== "backup";
     if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
+    if ($("monthlyView")) $("monthlyView").hidden = name !== "monthly";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
-    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
     // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
@@ -1863,6 +1866,7 @@
       loadGuestIntoState();
       renderAll();
       runRecurringDue(); // v87: guest rules bhi due hon to local record bane
+      maybeMonthlyReport(); // v88: naye mahine mein pichhle mahine ka report
       setTxnMsg("", true);
       return;
     }
@@ -1906,6 +1910,11 @@
         loadNotifs();
         loadContacts();
         loadRecurringRules().then(function () { runRecurringDue(); }); // v87: due rules ke record banein
+        // v88: online path par bhi marker cache se wapas lao — warna har boot
+        // par banner dobara aata (cache sirf offline branch mein restore hota tha).
+        var savedMark = loadCache(currentWorkspaceId);
+        if (savedMark && savedMark.monthlyReportSeen) monthlyReportSeen = savedMark.monthlyReportSeen;
+        maybeMonthlyReport(); // v88: naye mahine mein pichhle mahine ka report
         saveCache();
         flushOutbox();
       });
@@ -1926,12 +1935,14 @@
         myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
         notifs = c.notifs || [];
         recurringRules = c.recurring || []; // v87: offline bhi rules cache se
+        monthlyReportSeen = c.monthlyReportSeen || ""; // v88
         renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
         setTxnMsg("Connection nahi mil raha. Filhal aapko is community ka aakhri saved hisaab dikhaya ja raha hai.", false);
         renderOffline();
         runRecurringDue(); // v87: offline bhi due record queue ho jaye
+        maybeMonthlyReport(); // v88: offline bhi banner dikhe, PDF online aate hi
         return;
       }
       setTxnMsg("Records load nahi hue — refresh karein.", false);
@@ -5180,17 +5191,18 @@
     }
     return { doc: doc, st: st, W: W, M: M, R: R, C: C, trunc: trunc, hline: hline, needPage: needPage, section: section, headerBand: headerBand, metaLine: metaLine, summaryCards: summaryCards, tableHead: tableHead, tableRow: tableRow, totalsRow: totalsRow, emptyBox: emptyBox, addFooter: addFooter, fileName: fileName };
   }
-  async function exportPdf() {
+  // v88: shared report builder — exportPdf (poora hisaab) aur monthly report
+  // (aik mahina) dono isi se page banate hain, taake layout kabhi alag na ho.
+  // d = { list, given, taken, net, people } (fullReportData / monthReportData).
+  async function buildReportPdf(d, opts) {
     var PdfCtor = await ensureReportLib("jspdf");
-    if (!PdfCtor) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
-    try {
-      var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
-      var doc = base.doc, M = base.M, R = base.R, C = base.C;
-      var d = fullReportData();
-      var list = d.list, given = d.given, taken = d.taken, net = d.net, people = d.people;
-      var netSigned = netSignedTxt(net);
-      base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
-      base.metaLine("Naam: " + myName() + "  ·  Records: " + list.length);
+    if (!PdfCtor) return null;
+    var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
+    var doc = base.doc, M = base.M, R = base.R, C = base.C;
+    var list = d.list, given = d.given, taken = d.taken, net = d.net, people = d.people;
+    var netSigned = netSignedTxt(net);
+    base.headerBand(opts.title || "Hisaab Report", opts.subtitle || "");
+    base.metaLine(opts.meta || "");
       base.summaryCards([
         { label: "Diye", value: fmtRs(given), color: C.red },
         { label: "Liye", value: fmtRs(taken), color: C.green },
@@ -5262,16 +5274,164 @@
         ]);
       }
       base.addFooter();
-      var blob = doc.output("blob");
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "easy-khata-report-" + todayLocal() + ".pdf";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-      setAcctBackupMsg("PDF Report download ho gaya (" + list.length + " records).", true);
+      return doc.output("blob");
+  }
+  function downloadBlob(blob, filename) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  async function exportPdf() {
+    var d = fullReportData();
+    try {
+      var blob = await buildReportPdf(d, {
+        title: "Hisaab Report", subtitle: fmtDateLong(todayLocal()),
+        meta: "Naam: " + myName() + "  ·  Records: " + d.list.length
+      });
+      if (!blob) { setAcctBackupMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+      downloadBlob(blob, "easy-khata-report-" + todayLocal() + ".pdf");
+      setAcctBackupMsg("PDF Report download ho gaya (" + d.list.length + " records).", true);
     } catch (e) {
       setAcctBackupMsg("PDF nahi ban saka — dobara try karein.", false);
+    }
+  }
+
+  /* ---------- monthly auto-report (v88) ----------
+     Naye mahine ki pehli khulne par pichhle mahine ka PDF report tayyar
+     milta hai — khata view mein banner + Account mein Monthly report page.
+     - Marker monthlyReportSeen ("YYYY-MM") cache/guest store mein persist —
+       aik mahine ka banner sirf aik dafa.
+     - PDF background mein banta hai (buildReportPdf, wahi layout jo exportPdf
+       ka hai); lib offline ho to banner phir bhi dikhta hai aur Download
+       dabane par dobara try hota hai. Blob sirf memory mein (session-scoped);
+       reload par Download dobara banata hai. */
+  var monthlyReportSeen = "";
+  var monthlyReport = null;
+  function prevMonthKey(todayISO) {
+    var p = String(todayISO || todayLocal()).slice(0, 7).split("-");
+    var d = new Date(Number(p[0]), Number(p[1]) - 2, 1);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1);
+  }
+  function monthReportData(monthKey) {
+    var me = myId();
+    var givenMinor = 0, takenMinor = 0;
+    var list = visibleTxns().filter(function (t) {
+      return String(t.txn_date || "").slice(0, 7) === monthKey && (t.payer_id === me || t.receiver_id === me);
+    }).slice().sort(function (a, b) { return String(b.txn_date || "").localeCompare(String(a.txn_date || "")); });
+    var people = {};
+    list.forEach(function (t) {
+      var a = moneyToMinor(t.amount);
+      if (t.payer_id === me) givenMinor += a;
+      if (t.receiver_id === me) takenMinor += a;
+      var otherId = t.payer_id === me ? t.receiver_id : t.payer_id;
+      if (!people[otherId]) people[otherId] = { name: profileName(otherId), givenMinor: 0, takenMinor: 0 };
+      if (t.payer_id === me) people[otherId].givenMinor += a;
+      else people[otherId].takenMinor += a;
+    });
+    var peopleList = Object.keys(people).map(function (id) {
+      var p = people[id];
+      p.given = moneyFromMinor(p.givenMinor);
+      p.taken = moneyFromMinor(p.takenMinor);
+      p.net = moneyFromMinor(p.givenMinor - p.takenMinor);
+      return p;
+    }).sort(function (a, b) { return b.net - a.net; });
+    return { list: list, given: moneyFromMinor(givenMinor), taken: moneyFromMinor(takenMinor), net: moneyFromMinor(givenMinor - takenMinor), people: peopleList };
+  }
+  function saveMonthlyReportSeen() {
+    if (guestMode) { saveGuestStore(); return; }
+    saveCache();
+  }
+  function maybeMonthlyReport() {
+    var prev = prevMonthKey(todayLocal());
+    if (monthlyReportSeen === prev) return;
+    var d = monthReportData(prev);
+    if (!d.list.length) return;
+    monthlyReportSeen = prev;
+    saveMonthlyReportSeen();
+    monthlyReport = { month: prev, count: d.list.length, given: d.given, taken: d.taken, net: d.net, blobUrl: null, filename: "easy-khata-report-" + prev + ".pdf", generating: true };
+    renderMonthlyBanner();
+    buildReportPdf(d, {
+      title: "Hisaab Report", subtitle: monthName(prev + "-01"),
+      meta: "Naam: " + myName() + "  ·  Records: " + d.list.length + "  ·  " + monthName(prev + "-01")
+    }).then(function (blob) {
+      if (!monthlyReport || monthlyReport.month !== prev) return;
+      if (!blob) { monthlyReport.generating = false; renderMonthlyBanner(); renderMonthlyView(); return; }
+      monthlyReport.blobUrl = URL.createObjectURL(blob);
+      monthlyReport.generating = false;
+      renderMonthlyBanner();
+      renderMonthlyView();
+    }).catch(function () {
+      if (monthlyReport && monthlyReport.month === prev) { monthlyReport.generating = false; renderMonthlyBanner(); renderMonthlyView(); }
+    });
+  }
+  function renderMonthlyBanner() {
+    var banner = $("monthlyReportBanner");
+    if (!banner) return;
+    if (!monthlyReport) { banner.hidden = true; return; }
+    banner.hidden = false;
+    var name = monthName(monthlyReport.month + "-01");
+    $("monthlyBannerText").innerHTML = "<strong>" + esc(name) + " ka report tayyar hai</strong> — " + monthlyReport.count + " records · Diye " + esc(fmtRs(monthlyReport.given)) + " · Liye " + esc(fmtRs(monthlyReport.taken)) + " · Net " + esc(netSignedTxt(monthlyReport.net));
+    var dl = $("monthlyBannerDownloadBtn");
+    dl.disabled = !!monthlyReport.generating;
+    dl.textContent = monthlyReport.generating ? "Tayyar ho raha hai…" : "📄 Download karein";
+  }
+  function setMonthlyMsg(text, ok) {
+    var el = $("monthlyMsg");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (ok ? " ok" : text ? " err" : "");
+  }
+  function renderMonthlyView() {
+    var info = $("monthlyInfo");
+    if (!info) return;
+    var prev = prevMonthKey(todayLocal());
+    var d = monthReportData(prev);
+    if (!d.list.length) {
+      info.innerHTML = '<p class="muted">Pichhle mahine (' + esc(monthName(prev + "-01")) + ') mein aap ka koi record nahi — report banane ke liye kuch nahi.</p>';
+      $("monthlyDownloadBtn").disabled = true;
+      setMonthlyMsg("", true);
+      return;
+    }
+    info.innerHTML = "<p><strong>" + esc(monthName(prev + "-01")) + "</strong> — " + d.list.length + " records</p>"
+      + '<p class="muted">Diye ' + esc(fmtRs(d.given)) + " · Liye " + esc(fmtRs(d.taken)) + " · Net " + esc(netSignedTxt(d.net)) + "</p>"
+      + (monthlyReport && monthlyReport.month === prev
+        ? (monthlyReport.generating ? '<p class="muted">PDF tayyar ho raha hai…</p>' : '<p class="muted">PDF tayyar hai — Download dabayein.</p>')
+        : '<p class="muted">Download dabate hi PDF ban jayega.</p>');
+    $("monthlyDownloadBtn").disabled = false;
+  }
+  async function downloadMonthlyReport() {
+    var prev = prevMonthKey(todayLocal());
+    var d = monthReportData(prev);
+    if (!d.list.length) { setMonthlyMsg("Pichhle mahine ka koi record nahi.", false); return; }
+    if (monthlyReport && monthlyReport.month === prev && monthlyReport.blobUrl) {
+      var a = document.createElement("a");
+      a.href = monthlyReport.blobUrl;
+      a.download = monthlyReport.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      var bdl = $("monthlyBannerDownloadBtn");
+      if (bdl) bdl.textContent = "✓ Download ho gaya";
+      setMonthlyMsg("Monthly report download ho gaya (" + d.list.length + " records).", true);
+      return;
+    }
+    setMonthlyMsg("PDF ban raha hai…", true);
+    try {
+      var blob = await buildReportPdf(d, {
+        title: "Hisaab Report", subtitle: monthName(prev + "-01"),
+        meta: "Naam: " + myName() + "  ·  Records: " + d.list.length + "  ·  " + monthName(prev + "-01")
+      });
+      if (!blob) { setMonthlyMsg("PDF library load nahi hui — internet check kar ke dobara try karein.", false); return; }
+      if (monthlyReport && monthlyReport.month === prev) { monthlyReport.blobUrl = URL.createObjectURL(blob); monthlyReport.generating = false; renderMonthlyBanner(); }
+      downloadBlob(blob, "easy-khata-report-" + prev + ".pdf");
+      var bdl2 = $("monthlyBannerDownloadBtn");
+      if (bdl2) bdl2.textContent = "✓ Download ho gaya";
+      setMonthlyMsg("Monthly report download ho gaya (" + d.list.length + " records).", true);
+    } catch (e) {
+      setMonthlyMsg("PDF nahi ban saka — dobara try karein.", false);
     }
   }
   function setDetailPdfMsg(text, ok) {
@@ -6336,6 +6496,12 @@
     var d = e.target.closest("[data-rec-del]");
     if (d) deleteRecurringRule(d.getAttribute("data-rec-del"));
   });
+  // v88: monthly report — banner download/dismiss + Account page.
+  $("monthlyBannerDownloadBtn").addEventListener("click", downloadMonthlyReport);
+  $("monthlyBannerDismissBtn").addEventListener("click", function () { monthlyReport = null; renderMonthlyBanner(); });
+  $("acctMonthlyReportBtn").addEventListener("click", function () { renderMonthlyView(); showView("monthly"); });
+  $("monthlyBackBtn").addEventListener("click", function () { showView("account"); });
+  $("monthlyDownloadBtn").addEventListener("click", downloadMonthlyReport);
   $("backupBackBtn").addEventListener("click", function () { showView("account"); });
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
