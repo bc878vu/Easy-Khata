@@ -1921,6 +1921,14 @@
     }
   }
   window.EASY_KHATA_ON_SUPABASE_READY = function () { if (session && !guestMode) setupRealtime(); };
+  // v82: CSP — supabase script tag ka inline onload attribute hata diya;
+  // SDK ready hone ka signal JS se sunte hain (sync load ho to foran)
+  (function () {
+    var s = document.getElementById("supabaseSdk");
+    if (!s) return;
+    if (window.supabase) { window.EASY_KHATA_ON_SUPABASE_READY && window.EASY_KHATA_ON_SUPABASE_READY(); }
+    else s.addEventListener("load", function () { window.EASY_KHATA_ON_SUPABASE_READY && window.EASY_KHATA_ON_SUPABASE_READY(); });
+  })();
   function teardownRealtime() {
     try {
       rtGeneration++;
@@ -3267,9 +3275,18 @@
   function jsq(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
   function avatarHtml(url, initial) {
     var ini = initial || "?";
-    if (url) return '<img src="' + esc(url) + '" alt="" onerror="this.onerror=null;this.outerHTML=\'' + jsq(ini) + '\'">';
+    // v82: CSP — inline onerror attribute hata diya; fallback data-fallback
+    // par hai, document-level error listener (capture) img ko initial se badalta hai
+    if (url) return '<img src="' + esc(url) + '" alt="" data-fallback="' + esc(ini) + '">';
     return esc(ini);
   }
+  document.addEventListener("error", function (e) {
+    var t = e.target;
+    if (t && t.tagName === "IMG" && t.getAttribute && t.getAttribute("data-fallback") != null) {
+      var ini = t.getAttribute("data-fallback");
+      if (t.parentNode) t.parentNode.replaceChild(document.createTextNode(ini), t);
+    }
+  }, true); // capture — img error events bubble nahi karte
   function setAvatarEl(el, url, initial) {
     if (!el) return;
     el.innerHTML = avatarHtml(url, initial);
