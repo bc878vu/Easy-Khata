@@ -4519,7 +4519,7 @@
   function renderTxnFilterOptions() {
     var sel = $("txnFilterPerson");
     var prev = sel.value;
-    var html = '<option value="">Sab</option>';
+    var html = '<option value="">All</option>';
     profiles.forEach(function (p) {
       html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
@@ -5868,7 +5868,7 @@
     if (fc) {
       var anyFilter = !!(txnSearchText || txnFilterPerson || txnFromDate || txnToDate);
       fc.hidden = !anyFilter;
-      if (anyFilter) fc.textContent = list.length + " records dikh rahe hain";
+      if (anyFilter) fc.textContent = list.length + " records shown";
     }
     if (!visibleTxns().length) {
       $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
@@ -6456,7 +6456,7 @@
   $("clearFilterBtn").addEventListener("click", function () {
     txnSearchText = ""; txnFilterPerson = ""; txnFromDate = ""; txnToDate = "";
     $("txnSearch").value = ""; $("txnFilterPerson").value = ""; $("txnFrom").value = ""; $("txnTo").value = "";
-    cdSync($("txnFilterPerson")); // v73: filter saaf karte waqt dropdown label bhi "Sab" par le jao
+    cdSync($("txnFilterPerson")); // v73: filter saaf karte waqt dropdown label bhi "All" par le jao
     renderTxns();
   });
   $("exportCsvBtn").addEventListener("click", exportFilteredLedgerPdf);

@@ -372,6 +372,27 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .date-cell input{width:100%;min-width:0}
 .toolbar .btn{padding:8px 10px;min-height:38px;font-size:.88rem}
 .filter-count{grid-column:1/-1;margin:0;font-size:.78rem;color:var(--muted)}
+
+/* v103 — All Records section (#ledgerCard): full English, compact, responsive.
+   Search gets the wide column (person filter capped at 150px); the PDF
+   button gets the wider share of the actions row so its label never wraps;
+   buttons never wrap (ellipsis safety). Very narrow screens stack the
+   search row and the actions row full-width. */
+#ledgerCard .list-head{gap:8px}
+#ledgerCard .list-head h2{font-size:1.05rem}
+#ledgerCard .list-head .btn{padding:6px 10px;min-height:32px;font-size:.82rem}
+#ledgerCard .toolbar{gap:6px;margin:8px 0 4px}
+#ledgerCard .tb-search-row{grid-template-columns:minmax(0,1fr) minmax(96px,150px)}
+#ledgerCard .tb-dates-row{grid-template-columns:1fr 1fr}
+#ledgerCard .tb-actions-row{grid-template-columns:1fr 1.35fr}
+#ledgerCard .toolbar input,#ledgerCard .toolbar select{font-size:.86rem;padding:7px 10px}
+#ledgerCard .toolbar .btn{padding:7px 10px;min-height:36px;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ledgerCard .date-cell span{font-size:.68rem}
+#ledgerCard .toolbar .cd-btn{min-height:36px;padding:7px 10px;font-size:.86rem}
+@media(max-width:360px){
+  #ledgerCard .tb-search-row{grid-template-columns:1fr}
+  #ledgerCard .tb-actions-row{grid-template-columns:1fr}
+}
 /* Scrollable history box (v21, fixed v21.1): Poora hisaab + LEN-DEN sirf ~5-7 rows
    dikhate hain, baaki andar scroll hota hai. v21.1: (1) overscroll-behavior:auto
    (contain NAHI) — box ke end par scroll page ko chain karta hai, is liye jab
