@@ -418,6 +418,11 @@
     return removed;
   }
 
+
+  function appDialog(message,opts){opts=opts||{};return new Promise(function(resolve){var overlay=$("appDialogOverlay"),title=$("appDialogTitle"),body=$("appDialogMessage"),input=$("appDialogInput"),cancel=$("appDialogCancel"),ok=$("appDialogOk");if(!overlay){resolve(opts.mode==="prompt"?null:false);return;}title.textContent=opts.title||"Easy Khata";body.textContent=String(message||"");input.hidden=opts.mode!=="prompt";input.value=opts.value==null?"":String(opts.value);input.placeholder=opts.placeholder||"";input.type=opts.inputType||"text";cancel.hidden=opts.mode==="notice";cancel.textContent=opts.cancelText||"Cancel";ok.textContent=opts.okText||(opts.mode==="notice"?"OK":opts.mode==="prompt"?"Save":"Continue");overlay.hidden=false;document.body.classList.add("dialog-open");var settled=false;function finish(value){if(settled)return;settled=true;overlay.hidden=true;document.body.classList.remove("dialog-open");cancel.removeEventListener("click",onCancel);ok.removeEventListener("click",onOk);overlay.removeEventListener("click",onBackdrop);document.removeEventListener("keydown",onKey);resolve(value);}function onCancel(){finish(opts.mode==="prompt"?null:false);}function onOk(){finish(opts.mode==="prompt"?input.value:true);}function onBackdrop(e){if(e.target===overlay&&opts.dismissible!==false)onCancel();}function onKey(e){if(e.key==="Escape"&&opts.dismissible!==false)onCancel();if(e.key==="Enter"&&opts.mode==="prompt"&&document.activeElement===input){e.preventDefault();onOk();}}cancel.addEventListener("click",onCancel);ok.addEventListener("click",onOk);overlay.addEventListener("click",onBackdrop);document.addEventListener("keydown",onKey);setTimeout(function(){(opts.mode==="prompt"?input:ok).focus();},30);});}
+  function appConfirm(message,opts){return appDialog(message,Object.assign({mode:"confirm",title:"Confirm action"},opts||{}));}
+  function appPrompt(message,value,opts){return appDialog(message,Object.assign({mode:"prompt",title:"Enter details",value:value},opts||{}));}
+
   function profileName(id) {
     for (var i = 0; i < profiles.length; i++) {
       if (profiles[i].id === id) return profiles[i].name || profiles[i].email || "Unknown";
@@ -441,9 +446,9 @@
     if (!name && id === myId()) name = myName();
     return name ? esc(name) : '<button class="btn-danger" type="button" data-missing-name="' + esc(id) + '">Naam set karein</button>';
   }
-  function saveMissingPartyName(id) {
-    if (!id || !myId()) return;
-    var name = window.prompt("Is record mein is shakhs ka asal naam likhein:");
+  async function saveMissingPartyName(id) {
+    if (!id || !myId())) return;
+    var name = await appPrompt("Is record mein is shakhs ka asal naam likhein:", "", {title:"Contact name"});
     if (name === null) return;
     name = name.trim();
     if (!name) { setTxnMsg("Naam khali nahi ho sakta.", false); return; }
@@ -541,7 +546,7 @@
     // pair dated on/before it is locked history. Settlement rows are always locked.
     var latestByPair = {};
     txns.forEach(function (t) {
-      if (!isSettlementNote(t.note)) return;
+      if (!isSettlementNote(t.note))) return;
       var d = String(t.txn_date || "");
       var k = pairKey(t.payer_id, t.receiver_id);
       if (d && (!latestByPair[k] || d > latestByPair[k])) latestByPair[k] = d;
@@ -678,7 +683,7 @@
     showView("khata");
   }
   function showAdminView() {
-    if (!isAdmin()) return;
+    if (!isAdmin())) return;
     showView("admin");
     renderAdmin();
   }
@@ -1201,7 +1206,7 @@
           var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
           saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
           var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
-          remove.addEventListener("click",function(){if(!window.confirm("Is member ka community access band karein? Purana hisaab mehfooz rahega."))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
+          remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
           actions.appendChild(roleSelect);actions.appendChild(saveRole);actions.appendChild(remove);card.appendChild(actions);
         }
         box.appendChild(card);
@@ -1584,7 +1589,7 @@
   var guestMigrationOffered = false;
   function maybeOfferGuestMigration() {
     if (guestMigrationOffered || guestMode) return;
-    if (!guestHasData()) return;
+    if (!guestHasData())) return;
     guestMigrationOffered = true;
     var g = loadGuestStore();
     var n = (g.txns || []).length, c = (g.contacts || []).length;
@@ -1842,7 +1847,7 @@
   }
   function syncAppBadge() {
     try {
-      if (typeof navigator === "undefined" || !("setAppBadge" in navigator)) return;
+      if (typeof navigator === "undefined" || !("setAppBadge" in navigator))) return;
       if (!$("notifView").hidden) return; // Yaad Dehani khuli hai — user dekh raha hai
       var n = unreadNotifCount();
       if (n === appBadgeCount) return; // pehle se wahi hai — dobara set nahi
@@ -2472,7 +2477,7 @@
     }).join('');
   }
   function exportAdminUsers() {
-    if(!isAdmin()) return;
+    if(!isAdmin())) return;
     var rows=[["Name","Email","Phone","Status","Records","Joined"]];
     (adminUsers||[]).forEach(function(u){rows.push([u.name||"",u.email||"",u.phone||"",u.blocked?"Blocked":"Active",Number(u.records)||0,u.created_at||""]);});
     var csv=rows.map(function(row){return row.map(function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
@@ -2593,17 +2598,17 @@
       setAdminMsg("Community update ho gayi.",true);loadAdminWorkspaceManagement();
     }).catch(function(){btn.disabled=false;adminSetCommunityEditMsg("Connection issue — changes save nahi huay.",false);});
   }
-  function setAdminCommunityStatus(id,status) {
+  async function setAdminCommunityStatus(id,status) {
     var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
-    if(!window.confirm((status==="suspended"?"Community suspend":"Community restore")+" karein? Ledger history delete nahi hogi."))return;
+    if(!(await appConfirm((status==="suspended"?"Community suspend":"Community restore")+" karein? Ledger history delete nahi hogi.")))return;
     sb("rpc/admin_set_workspace_status",{method:"POST",body:{p_workspace_id:id,p_status:status}}).then(function(res){
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community status update nahi hua.",false);return;}
       setAdminMsg("Community status update ho gaya.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — status update nahi hua.",false);});
   }
-  function deleteAdminCommunity(id) {
+  async function deleteAdminCommunity(id) {
     var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
-    if(!window.confirm("'"+w.name+"' permanently delete sirf tab hoga jab is mein transactions aur contacts na hon aur sirf ek active member ho. Financial data wali community delete nahi hogi. Continue?"))return;
+    if(!(await appConfirm("'"+w.name+"' permanently delete sirf tab hoga jab is mein transactions aur contacts na hon aur sirf ek active member ho. Financial data wali community delete nahi hogi. Continue?")))return;
     sb("rpc/admin_delete_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community delete nahi hui. Data wali community ko suspend karein.",false);return;}
       setAdminMsg("Empty community delete ho gayi.",true);loadAdminWorkspaceManagement();
@@ -2627,22 +2632,22 @@
       setAdminMsg("Community member update ho gaya.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);});
   }
-  function adminMakeCommunityOwner(key) {
+  async function adminMakeCommunityOwner(key) {
     var parts=key.split("|");
-    if(!window.confirm("Is member ko community owner banayein? Current active owner admin ban jayega."))return;
+    if(!(await appConfirm("Is member ko community owner banayein? Current active owner admin ban jayega.")))return;
     sb("rpc/admin_transfer_workspace_owner",{method:"POST",body:{p_workspace_id:parts[0],p_new_owner:parts[1]}}).then(function(res){
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Ownership transfer nahi hui.",false);return;}
       setAdminMsg("Community ownership transfer ho gayi.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — ownership transfer nahi hui.",false);});
   }
 
-  function deleteUser(id) {
+  async function deleteUser(id) {
     var p = null;
     adminUsers.forEach(function (x) { if (x.id === id) p = x; });
     if (!p) p = findPerson(id);
-    if (!p || id === myId()) return;
+    if (!p || id === myId())) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
-    if (!window.confirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur community ka access ruk jayega. Purane hisaab mehfooz rahenge.")) return;
+    if (!(await appConfirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur community ka access ruk jayega. Purane hisaab mehfooz rahenge."))) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
         if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
@@ -2663,7 +2668,7 @@
   // admin_create_user RPC auth user + profile banata hai; naya user
   // foran login kar sakta hai. Admin ka kaam online-only hai.
   function createAdminUser() {
-    if (!isAdmin()) return;
+    if (!isAdmin())) return;
     var name = $("adminAddName").value.trim();
     var email = $("adminAddEmail").value.trim();
     var phone = $("adminAddPhone").value.trim();
@@ -2724,13 +2729,13 @@
     });
     $("adminUserTxns").innerHTML = html;
   }
-  function adminEditTxn(id) {
-    if (!isAdmin()) return;
+  async function adminEditTxn(id) {
+    if (!isAdmin())) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
-    var amount = window.prompt("Nayi raqam (Rs):", String(t.amount)); if (amount === null) return;
-    var note = window.prompt("Note:", t.note || "Food"); if (note === null) return;
-    var date = window.prompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal())); if (date === null) return;
+    var amount = await appPrompt("Nayi raqam (Rs):", String(t.amount), {title:"Edit transaction",inputType:"number"}); if (amount === null) return;
+    var note = await appPrompt("Note:", t.note || "Food", {title:"Transaction note"}); if (note === null) return;
+    var date = await appPrompt("Date (YYYY-MM-DD):", String(t.txn_date || todayLocal()), {title:"Transaction date"}); if (date === null) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7 || !note.trim()) { setAdminUserMsg("Raqam 2 decimal places tak, note aur date sahi likhein.", false); return; }
     sb("rpc/admin_update_txn", { method: "POST", body: { p_txn_id: id, p_amount: Number(amount), p_note: note.trim(), p_txn_date: date } }).then(function (res) {
       if (!res.ok) { setAdminUserMsg("Admin update nahi ho saki. Dobara koshish karein.", false); return; }
@@ -2739,11 +2744,11 @@
       setAdminUserMsg("Record update ho gaya.", true);
     }).catch(function (e) { setAdminUserMsg("Record update nahi ho saka. Dobara try karein.", false); });
   }
-  function adminDeleteTxn(id) {
-    if (!isAdmin()) return;
+  async function adminDeleteTxn(id) {
+    if (!isAdmin())) return;
     var t = txns.find(function (x) { return x.id === id; }); if (!t) return;
     if (isTxnLocked(t)) { setAdminUserMsg(LOCK_MSG, false); return; }
-    if (!window.confirm("Ye record dono users ki history se hamesha ke liye delete ho jayega. Isay wapas nahi la sakenge. Kya aap jari rakhna chahte hain?")) return;
+    if (!(await appConfirm("Ye record dono users ki history se hamesha ke liye delete ho jayega. Isay wapas nahi la sakenge. Kya aap jari rakhna chahte hain?"))) return;
     sb("rpc/admin_delete_txn", { method: "POST", body: { p_txn_id: id } }).then(function (res) {
       if (!res.ok) { setAdminUserMsg("Delete nahi ho saka. Dobara koshish karein.", false); return; }
       txns = txns.filter(function (x) { return x.id !== id; });
@@ -2752,7 +2757,7 @@
     }).catch(function (e) { setAdminUserMsg("Record delete nahi ho saka. Dobara try karein.", false); });
   }
   function openAdminUser(id) {
-    if (!isAdmin()) return;
+    if (!isAdmin())) return;
     var u = null;
     adminUsers.forEach(function (x) { if (x.id === id) u = x; });
     if (!u) return;
@@ -2834,14 +2839,14 @@
         setAdminPassMsg("Password badal gaya — user naye password se login kar sakta hai.", true);
       }).catch(function () { btn.disabled = false; setAdminPassMsg("Internet connection nahi mil raha. Dobara koshish karein.", false); });
   }
-  function toggleAdminBlock() {
+  async function toggleAdminBlock() {
     if (!isAdmin() || !adminCurrentUser) return;
     var u = adminCurrentUser;
     if (u.id === myId()) { setAdminUserMsg("Khud ko block nahi kar sakte.", false); return; }
     var blocking = !u.blocked;
-    if (!window.confirm(blocking
+    if (!(await appConfirm(blocking
       ? ("'" + (u.name || u.email) + "' — BLOCK karein?\n\nWo dobara login nahi kar sakega (un ka data mehfooz rahega).")
-      : ("'" + (u.name || u.email) + "' — UNBLOCK karein?"))) return;
+      : ("'" + (u.name || u.email) + "' — UNBLOCK karein?")))) return;
     sb("rpc/admin_set_user_blocked", { method: "POST", body: { p_target: u.id, p_blocked: blocking } })
       .then(function (res) {
         if (!res.ok) { setAdminUserMsg("Block update nahi hua — dobara try karein.", false); return; }
@@ -2899,7 +2904,7 @@
     var givenMinor = 0, takenMinor = 0, count = 0;
     visibleTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
-      if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
+      if (t.payer_id !== myId() && t.receiver_id !== myId())) return;
       var a = moneyToMinor(t.amount);
       count++;
       if (t.payer_id === myId()) givenMinor += a;
@@ -3482,7 +3487,7 @@
     renderWorkspaceBar();
   }
   function openPersonDetail(id) {
-    if (!findPerson(id)) return;
+    if (!findPerson(id))) return;
     detailPersonId = id;
     renderPersonDetail();
     showView("detail");
@@ -4506,7 +4511,7 @@
   function startEditTxn(id) {
     var t = null;
     txns.forEach(function (x) { if (x.id === id) t = x; });
-    if (!t || t.created_by !== myId()) return;
+    if (!t || t.created_by !== myId())) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
     showView("khata");
     setSplitMode(false);
@@ -4754,7 +4759,7 @@
     txns.forEach(function (x) { if (x.id === id) t = x; });
     if (!t) return;
     if (isTxnLocked(t)) { setTxnMsg(LOCK_MSG, false); return; } // settled history — handler-level guard
-    if (t.payer_id !== myId() && t.receiver_id !== myId()) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
+    if (t.payer_id !== myId() && t.receiver_id !== myId())) return; // sirf involved user apne liye hide kar sakta hai (admin bhi normal view mein aam user hai)
     askConfirm("Record history se hatayein?", "Ye record sirf history se hide hoga. Aapka total balance aur dost ki list ka balance bilkul change nahi hoga. Doosre dost ko bhi koi fark nahi parega.", "History se hatayein", function () {
     if (guestMode) {
       // Guest history hide only: preserve the underlying transaction for balances.
@@ -5068,12 +5073,12 @@
     }).catch(function () { return false; });
   }
   function wireAppUpdate() {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator))) return;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
       // No reload on first install — only when moving from an old version to a new one.
       if (!hadControllerAtLoad) return;
       if (updateReloaded) return;
-      if (isFormDirty()) return; // if the form is filled, the new version comes on the next open
+      if (isFormDirty())) return; // if the form is filled, the new version comes on the next open
       updateReloaded = true;
       window.location.reload();
     });
