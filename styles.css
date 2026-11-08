@@ -1128,6 +1128,33 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .contact-add-copy strong{font-size:.88rem}
 .contact-add-copy small{font-size:.71rem}
 .contact-add-chevron{font-size:1.1rem}
+
+/* v100 — form checkbox rows (split + recurring): bara custom box, saaf tick,
+   checked row highlight, expand chevron (neeche options khulte hain) */
+#txnForm .check{
+  align-items:flex-start;gap:12px;min-height:48px;
+  padding:12px 14px;border-radius:13px;font-size:.88rem;line-height:1.45;
+}
+#txnForm .check input{
+  position:absolute;opacity:0;width:24px;height:24px;margin:0;pointer-events:none;
+}
+#txnForm .check-box{
+  flex:0 0 24px;width:24px;height:24px;margin-top:1px;border-radius:7px;
+  border:2px solid var(--input-border);background:var(--card);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:800;line-height:1;color:#fff;
+}
+#txnForm .check input:checked + .check-box{background:var(--accent);border-color:var(--accent)}
+#txnForm .check input:checked + .check-box::after{content:"\2713"}
+#txnForm .check input:focus-visible + .check-box{outline:2px solid var(--accent);outline-offset:2px}
+#txnForm .check-text{flex:1;min-width:0}
+#txnForm .check-chev{flex:0 0 auto;margin-left:2px;color:var(--muted);font-size:1.05rem;line-height:1.2;transition:transform .18s ease}
+#txnForm .check:has(input:checked){
+  background:color-mix(in srgb,var(--accent) 9%,transparent);
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--line));
+}
+#txnForm .check:has(input:checked) .check-chev{transform:rotate(180deg);color:var(--accent)}
+@media(prefers-reduced-motion:reduce){#txnForm .check-chev{transition:none}}
 .contact-add-panel{margin-top:7px;padding:11px;border-radius:13px}
 .contact-add-heading{gap:8px;margin-bottom:10px}
 .contact-add-avatar{width:33px;height:33px;border-radius:10px;font-size:1rem}
