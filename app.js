@@ -325,18 +325,44 @@
     // Guest store -> in-memory state. Logged-in data ko kabhi nahi chhoota:
     // ye sirf guest mode mein chalta hai (loadAll / enterGuestMode se).
     var g = loadGuestStore();
+    var hadMeId = !!(g && g.me && g.me.id);
     guestMeId = (g && g.me && g.me.id) || ("guest-" + newUuid());
     guestMeName = (g && g.me && g.me.name) || "Aap";
     profiles = [{ id: guestMeId, name: guestMeName, email: "", phone: "" }];
-    myContacts = (g && g.contacts ? g.contacts : []).map(function (c) { c.manual = true; return c; });
-    txns = (g && g.txns) || [];
+    // v71 PRIVACY PURGE: guest ka har apna record us se jura hota hai
+    // (payer ya receiver = guest me). Jo record dono taraf se guest se na
+    // jura ho, woh purani leak se account ka record hai (2026-11-08: liveReload
+    // ne Business workspace ke records guest view mein daal diye the) — use
+    // hamesha ke liye hata do. Aise records se bane contacts (sirf un mein
+    // aane wale ids) bhi hata do. Sirf tab jab store mein me.id ho — warna
+    // (kharab store) kuch na hatao, taake guest ka apna hisaab kabhi na mite.
+    var allTxns = (g && g.txns) || [];
+    var keptTxns = allTxns, droppedIds = {}, keptPartyIds = {};
+    if (hadMeId) {
+      keptTxns = allTxns.filter(function (t) { return t.payer_id === guestMeId || t.receiver_id === guestMeId; });
+      allTxns.forEach(function (t) { if (t.payer_id !== guestMeId && t.receiver_id !== guestMeId) { droppedIds[t.payer_id] = true; droppedIds[t.receiver_id] = true; } });
+      keptTxns.forEach(function (t) { keptPartyIds[t.payer_id] = true; keptPartyIds[t.receiver_id] = true; });
+    }
+    var purged = allTxns.length - keptTxns.length;
+    txns = keptTxns;
+    myContacts = (g && g.contacts ? g.contacts : []).map(function (c) { c.manual = true; return c; })
+      .filter(function (c) { return !droppedIds[c.id] || keptPartyIds[c.id]; });
     hiddenTxnIds = {};
-    (g && Array.isArray(g.hidden) ? g.hidden : []).forEach(function (id) { hiddenTxnIds[id] = true; });
+    (g && Array.isArray(g.hidden) ? g.hidden : []).forEach(function (id) { if (keptTxns.some(function (t) { return t.id === id; })) hiddenTxnIds[id] = true; });
     notifs = [];
     dbReady = true;
     offlineMode = false;
+    if (purged > 0) saveGuestStore(); // saaf store foran persist karo taake leak dobara na dikhe
   }
   function enterGuestMode() {
+    // v71 PRIVACY: guest mode mein account ka session/token/workspace bilkul
+    // nahi rehna chahiye. Pehle session wipe karo (saveSession(null) memory +
+    // realtime bhi saaf karta hai), phir guest store — warna visibilitychange
+    // → liveReload account ka hisaab guest view mein le aata tha.
+    saveSession(null);
+    currentWorkspaceId = "";
+    workspaces = [];
+    teardownRealtime();
     guestMode = true;
     loadGuestIntoState();
     saveGuestStore(); // pehli dafa: guest id persist ho jaye taake reload par wahi rahe
@@ -1677,12 +1703,14 @@
   var rtLastFetch = 0;
   var rtGeneration = 0;
   function liveReload() {
+    if (guestMode) return; // v71: guest mode mein kabhi account data fetch nahi
     var ind = $("liveUpdating");
     var slowTimer = setTimeout(function () { if (ind) ind.hidden = false; }, 800);
     var done = function () { clearTimeout(slowTimer); if (ind) ind.hidden = true; rtLastFetch = Date.now(); };
     refreshTxns().then(function () { loadNotifs(); loadContacts(); done(); }).catch(function () { done(); });
   }
   function scheduleLiveReload() {
+    if (guestMode) return; // v71: guest mode mein live reload kabhi nahi
     if (rtTimer) clearTimeout(rtTimer);
     rtTimer = setTimeout(function () { rtTimer = null; liveReload(); }, 300);
   }
@@ -1729,7 +1757,7 @@
     } catch (e) { rtChannel = null; }
   }
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden && session && Date.now() - rtLastFetch > 30000) {
+    if (!document.hidden && session && !guestMode && Date.now() - rtLastFetch > 30000) { // v71: guestMode guard — warna guest view mein account data aa jata tha
       scheduleLiveReload();
       if (!rtChannel) setupRealtime();
     }
@@ -1809,7 +1837,7 @@
   document.addEventListener("pointerdown", unlockNotifAudio, { passive: true });
   document.addEventListener("keydown", unlockNotifAudio);
   function loadNotifs() {
-    if (!session || !session.access_token) return;
+    if (guestMode || !session || !session.access_token) return; // v71: guest mode mein kabhi account notifs nahi
     sb("khata_notifications?select=*&user_id=eq." + encodeURIComponent(myId()) + "&order=created_at.desc&limit=50")
       .then(function (res) {
         if (!res.ok) return;
@@ -1902,7 +1930,7 @@
   /* ---------- manual contacts ---------- */
   var myContacts = [];
   function loadContacts() {
-    if (!session || !session.access_token) return Promise.resolve(0);
+    if (guestMode || !session || !session.access_token) return Promise.resolve(0); // v71: guest mode mein kabhi account contacts nahi
     return sb("khata_contacts?select=*&workspace_id=eq." + encodeURIComponent(currentWorkspaceId) + "&owner_id=eq." + encodeURIComponent(myId()) + "&order=created_at.asc")
       .then(function (res) {
         if (!res.ok) return 0;
@@ -1979,6 +2007,7 @@
     }).catch(function () { return false; });
   }
   function refreshTxns() {
+    if (guestMode) return Promise.resolve(); // v71: guest mode mein kabhi account txns fetch nahi
     return loadAllTransactions()
       .then(function (rows) {
         txns = rows;
