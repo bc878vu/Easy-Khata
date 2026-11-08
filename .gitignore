@@ -1,0 +1,19 @@
+# Secrets & credentials — never commit
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.pfx
+*service-account*.json
+*service_account*.json
+keystore-password.txt
+
+# Dependencies & build output
+node_modules/
+dist/
+.vercel
+
+# OS files
+.DS_Store
+Thumbs.db
