@@ -1129,20 +1129,24 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .contact-add-copy small{font-size:.71rem}
 .contact-add-chevron{font-size:1.1rem}
 
-/* v100 — form checkbox rows (split + recurring): bara custom box, saaf tick,
-   checked row highlight, expand chevron (neeche options khulte hain) */
+/* v102 — form checkbox rows (split + recurring): ONE row, guaranteed.
+   v100 relied on the base .check{display:flex} rule + the v75 URL; two
+   independent browsers rendered the rows as two lines (box above text), so
+   the scoped rule now carries display:flex itself (row, nowrap, centered)
+   and the CSS gets a fresh ?v=76 URL. Compact: 44px row, 22px box. */
 #txnForm .check{
-  align-items:flex-start;gap:12px;min-height:48px;
-  padding:12px 14px;border-radius:13px;font-size:.88rem;line-height:1.45;
+  display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;
+  gap:10px;min-height:44px;padding:9px 12px;border-radius:13px;
+  font-size:.86rem;line-height:1.35;
 }
 #txnForm .check input{
-  position:absolute;opacity:0;width:24px;height:24px;margin:0;pointer-events:none;
+  position:absolute;opacity:0;width:22px;height:22px;margin:0;pointer-events:none;
 }
 #txnForm .check-box{
-  flex:0 0 24px;width:24px;height:24px;margin-top:1px;border-radius:7px;
+  flex:0 0 22px;width:22px;height:22px;margin-top:0;border-radius:7px;
   border:2px solid var(--input-border);background:var(--card);
   display:flex;align-items:center;justify-content:center;
-  font-size:15px;font-weight:800;line-height:1;color:#fff;
+  font-size:14px;font-weight:800;line-height:1;color:#fff;
 }
 #txnForm .check input:checked + .check-box{background:var(--accent);border-color:var(--accent)}
 #txnForm .check input:checked + .check-box::after{content:"\2713"}
