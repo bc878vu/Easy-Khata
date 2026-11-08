@@ -1161,6 +1161,7 @@
   }
   function cdAttach(sel) {
     if (!sel || sel.dataset.cdAttached) return;
+    if (sel.hasAttribute("data-native")) return; // v84: native select — custom dropdown nahi
     sel.dataset.cdAttached = "1";
     sel.classList.add("cd-native");
     var wrap = document.createElement("div");
@@ -1190,7 +1191,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole"].forEach(function (id) {
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter"].forEach(function (id) {
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -2849,7 +2850,7 @@
         '<button class="btn btn-soft btn-mini" data-admin-community-status="'+esc(w.id)+'" data-next-status="'+(suspended?'active':'suspended')+'" type="button">'+(suspended?'Restore':'Suspend')+'</button>'+
         '<button class="btn btn-danger btn-mini" data-admin-community-delete="'+esc(w.id)+'" type="button">Delete if empty</button></div>'+
         '<div class="admin-community-add-member"><input type="email" data-admin-add-email="'+esc(w.id)+'" placeholder="Existing user email">'+
-        '<select data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
+        '<select data-native data-admin-add-role="'+esc(w.id)+'"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'+
         '<button class="btn btn-primary btn-mini" data-admin-add-member="'+esc(w.id)+'" type="button">Add member</button></div></article>';
     }).join("")+(rows.length>shown.length?'<button class="btn btn-soft btn-block" id="adminCommunityMoreBtn" type="button">Show more — '+(rows.length-shown.length)+' baqi</button>':"");
     var commMoreBtn=$("adminCommunityMoreBtn");
@@ -2874,8 +2875,8 @@
       return '<article class="admin-user-card admin-community-member-card">'+
         '<div class="admin-community-head"><span class="cm-avatar">'+initial+'</span><div><strong>'+esc(m.user_name||m.user_email||"Member")+'</strong><small>'+esc(m.user_email||"")+' · '+esc(m.workspace_name)+'</small></div><span class="cm-role-chip role-'+esc(String(m.role||"staff").toLowerCase())+'">'+esc(m.role)+'</span><span class="admin-user-status '+(m.member_status==="active"?"active":"blocked")+'">'+esc(m.member_status)+'</span></div>'+
         '<div class="admin-user-meta"><span>Joined '+esc(fmtDate(m.joined_at))+'</span><span>'+(m.blocked?'Account blocked':'Account active')+'</span></div>'+
-        '<div class="admin-community-member-controls"><select aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
-        '<select data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
+        '<div class="admin-community-member-controls"><select data-native aria-label="Role for '+esc(m.user_name||m.user_email||"member")+'" data-admin-member-role="'+esc(m.workspace_id+"|"+m.user_id)+'">'+(owner?'<option value="owner" selected>owner</option>':'')+["admin","accountant","staff","viewer"].map(function(role){return '<option value="'+role+'" '+(m.role===role?'selected':'')+'>'+role+'</option>';}).join("")+'</select>'+
+        '<select data-native data-admin-member-status="'+esc(m.workspace_id+"|"+m.user_id)+'">'+["active","suspended","removed"].map(function(st){return '<option value="'+st+'" '+(m.member_status===st?'selected':'')+'>'+st+'</option>';}).join("")+'</select>'+
         '<button class="btn btn-primary btn-mini" data-admin-member-save="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Save</button>'+
         (owner?'':'<button class="btn btn-soft btn-mini" data-admin-member-owner="'+esc(m.workspace_id+"|"+m.user_id)+'" type="button">Make owner</button>')+
         '</div></article>';
@@ -3649,17 +3650,10 @@
     if (!p) return;
     shareText(personShareText(p));
   }
-  var confirmCallback = null;
+  // v84: aik hi alert-box design — legacy confirmOverlay hata diya; sab
+  // confirmations appDialog (app-styled, z-3000, blur backdrop) se hote hain.
   function askConfirm(title, text, okLabel, cb) {
-    $("confirmTitle").textContent = title;
-    $("confirmText").textContent = text;
-    $("confirmOkBtn").textContent = okLabel || "Confirm";
-    confirmCallback = cb;
-    $("confirmOverlay").hidden = false;
-  }
-  function closeConfirm() {
-    $("confirmOverlay").hidden = true;
-    confirmCallback = null;
+    appDialog(text, { mode: "confirm", title: title, okText: okLabel || "Confirm" }).then(function (v) { if (v && cb) cb(); });
   }
   function openWaLink(url) {
     // window.open often does nothing in a PWA — clicking a real link is more reliable.
@@ -5797,9 +5791,6 @@
   // v22: Account mein "Notifications On karein" button (acctPushBtn) — user
   // gesture se enablePush chalti hai; auto-ask (maybeAskPushPermission) bhi
   // app open par chalta hai. Off karna browser ke site settings se hota hai.
-  $("confirmOkBtn").addEventListener("click", function () { var cb = confirmCallback; closeConfirm(); if (cb) cb(); });
-  $("confirmCancelBtn").addEventListener("click", closeConfirm);
-  $("confirmOverlay").addEventListener("click", function (e) { if (e.target === $("confirmOverlay")) closeConfirm(); });
   $("saveContactBtn").addEventListener("click", addContact);
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});

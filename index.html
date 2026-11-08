@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=62">
+<link rel="stylesheet" href="styles.css?v=63">
 </head>
 <body>
 
@@ -765,7 +765,7 @@ window.addEventListener("error", function (e) {
         <button id="workspaceCopyCommunityLinkBtn" class="btn btn-soft btn-block" type="button">Copy community join link</button>
         <div class="community-invite-row">
           <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address">
-          <select id="workspaceInviteRole" aria-label="Invite role"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+          <select id="workspaceInviteRole" data-native aria-label="Invite role"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
           <button id="workspaceInviteSubmit" class="btn btn-primary" type="button">Copy invite link</button>
         </div>
       </div>
@@ -777,17 +777,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-  <div id="confirmOverlay" class="confirm-overlay" hidden>
-    <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
-      <h3 id="confirmTitle">Confirm?</h3>
-      <p id="confirmText" class="muted"></p>
-      <div class="row">
-        <button id="confirmCancelBtn" class="btn btn-neutral" type="button">Cancel</button>
-        <button id="confirmOkBtn" class="btn btn-primary" type="button">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-<script src="app.js?v=90"></script>
+<script src="app.js?v=91"></script>
 </body>
 </html>

@@ -574,13 +574,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   background:var(--ink);color:var(--card);font-size:1.7rem;line-height:1;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
-.confirm-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;
-  display:flex;align-items:center;justify-content:center;padding:20px;
-}
-.confirm-card{background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:100%;box-shadow:var(--shadow)}
-.confirm-card .row{justify-content:flex-end;margin-top:14px}
-
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important}
 }
@@ -800,7 +793,7 @@ small,.hint,.muted,.app-sub,.p-detail,.p-last,.d-note,.sum-label,.sum-sub,
 .notif-body,.notif-time,.kv dt,.menu-right,.admin-panel-head p,
 .admin-kpi small,.admin-result-count,.admin-footnote{color:var(--muted)}
 .card,.total-card,.person-card,.detail-action,.shortcut,.menu-list,
-.notif,.drow,.admin-panel,.admin-kpi,.admin-user-card,.confirm-card{
+.notif,.drow,.admin-panel,.admin-kpi,.admin-user-card{
   color:var(--ink);
   border-color:var(--line);
 }
@@ -836,7 +829,6 @@ small,.hint,.muted,.app-sub,.p-detail,.p-last,.d-note,.sum-label,.sum-sub,
 .nav-btn{color:var(--muted)}
 .nav-btn.active{color:var(--accent)}
 .fab{background:var(--accent-btn);color:#fff}
-.confirm-overlay{background:var(--overlay)}
 /* Admin hero deliberately retains brand gradient; text remains high contrast. */
 .admin-hero{background:linear-gradient(120deg,#132342 0%,#1b3e70 58%,#28558d 100%);color:#fff}
 .admin-hero p{color:#e0ebfb}
