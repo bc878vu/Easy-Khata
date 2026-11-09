@@ -1784,3 +1784,13 @@ input,select,textarea,button{max-width:100%}
   .bottomnav{left:50%;right:auto;transform:translateX(-50%);width:100%;max-width:760px}
   .fab{right:calc(50% - 380px + 16px)}
 }
+
+/* v124: Diary modal — calendar ab sirf modal card mein khulta hai (inline card hata).
+   app-dialog-overlay pattern reuse karta hai (fixed overlay + blur backdrop + body.dialog-open).
+   Diary dialog standard app-dialog se chauda hai (7-column calendar ke liye) aur lamba
+   (calendar + day records), andar scroll hota hai (overflow:auto from .app-dialog). */
+.app-dialog.diary-dialog{width:min(560px,100%);max-height:min(92dvh,780px);padding:16px}
+.diary-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.diary-modal-head h2{margin:0;font-size:1.15rem}
+.diary-filter-row{display:flex;justify-content:flex-end;margin-bottom:6px}
+@media(max-width:420px){.app-dialog.diary-dialog{padding:12px}.diary-modal-head h2{font-size:1.05rem}}

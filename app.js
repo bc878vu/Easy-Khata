@@ -789,6 +789,7 @@
   /* ---------- views (bottom nav: Khata | Account) ---------- */
   var currentView = "khata";
   function showView(name) {
+    closeDiaryModal(); // v124: view badle to diary modal band
     currentView = name;
     $("khataView").hidden = name !== "khata";
     $("personDetailView").hidden = name !== "detail";
@@ -6781,10 +6782,17 @@
   function renderAcctLang() {
     var v = $("acctLangValue"); if (v) v.textContent = lang === "ur" ? "Roman Urdu" : "English";
   }
-  // v123: Diary button → Expense Diary (calendar) card par scroll karein.
+  // v124: Diary button → diary modal card kholein (inline card hata diya gaya).
+  // Modal app-dialog-overlay pattern use karta hai (body.dialog-open = background scroll band).
   function jumpToDiary() {
-    var el = $("diaryCard"); if (!el) return;
-    try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { el.scrollIntoView(); }
+    var m = $("diaryModal"); if (!m) return;
+    renderDiary(); // taaza calendar
+    m.hidden = false;
+    document.body.classList.add("dialog-open");
+  }
+  function closeDiaryModal() {
+    var m = $("diaryModal"); if (m) m.hidden = true;
+    document.body.classList.remove("dialog-open");
   }
   function toggleLanguage() {
     lang = lang === "ur" ? "en" : "ur";
@@ -7786,6 +7794,9 @@
     if (b) remindDue(b.getAttribute("data-remind"));
   });
   $("diaryJumpBtn").addEventListener("click", jumpToDiary); // v123: Diary button → calendar kholein
+  $("diaryCloseBtn").addEventListener("click", closeDiaryModal); // v124: modal band karein
+  $("diaryModal").addEventListener("click", function (e) { if (e.target === $("diaryModal")) closeDiaryModal(); }); // v124: backdrop tap = band
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDiaryModal(); }); // v124: Escape = band
   // v118: language switch.
   applyLanguage();
   $("acctLangBtn").addEventListener("click", toggleLanguage); // v123: Language ab Account list mein hai

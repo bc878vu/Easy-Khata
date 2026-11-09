@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=94">
+<link rel="stylesheet" href="styles.css?v=95">
 </head>
 <body>
 
@@ -397,22 +397,6 @@ window.addEventListener("error", function (e) {
       </div>
 
       <!-- v114: Kharcha Diary + Calendar -->
-      <div class="card" id="diaryCard">
-        <div class="list-head">
-          <h2 data-i18n="diary">📅 Kharcha Diary</h2>
-          <select id="diaryCategory" title="Category filter" data-i18n-title="Category filter"><option value="" data-i18n="All categories">All categories</option><option data-i18n="Khana">Khana</option><option data-i18n="Udhaar">Udhaar</option><option data-i18n="Kiraya">Kiraya</option><option data-i18n="Bijli">Bijli</option><option data-i18n="Petrol">Petrol</option><option data-i18n="Shopping">Shopping</option><option data-i18n="Transport">Transport</option><option data-i18n="Health">Health</option><option data-i18n="Education">Education</option><option data-i18n="Other">Other</option></select>
-        </div>
-        <p class="muted" data-i18n="Har din ka hisaab — din par tap karein, us din ke records dekhein.">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p>
-        <div class="cal-nav">
-          <button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina" data-i18n-title="Pichhla mahina">‹</button>
-          <strong id="calMonthLabel">—</strong>
-          <button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina" data-i18n-title="Agla mahina">›</button>
-        </div>
-        <div class="cal-weekdays" aria-hidden="true"><span data-i18n="Mon">Mon</span><span data-i18n="Tue">Tue</span><span data-i18n="Wed">Wed</span><span data-i18n="Thu">Thu</span><span data-i18n="Fri">Fri</span><span data-i18n="Sat">Sat</span><span data-i18n="Sun">Sun</span></div>
-        <div id="calGrid" class="cal-grid"></div>
-        <div id="calDayDetail" class="cal-day-detail"></div>
-      </div>
-
       <!-- v115: Ghar ka kharcha -->
       <div class="card" id="householdCard">
         <div class="list-head">
@@ -841,6 +825,7 @@ window.addEventListener("error", function (e) {
     <p id="adminCommunityEditMsg" class="msg" role="status"></p>
   </section>
 </div>
+<div id="diaryModal" class="app-dialog-overlay" hidden><section class="app-dialog diary-dialog card" role="dialog" aria-modal="true" aria-labelledby="diaryModalTitle"><div class="diary-modal-head"><h2 id="diaryModalTitle" data-i18n="diary">📅 Kharcha Diary</h2><button id="diaryCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="diaryCard"><div class="diary-filter-row"><select id="diaryCategory" title="Category filter" data-i18n-title="Category filter"><option value="" data-i18n="All categories">All categories</option><option data-i18n="Khana">Khana</option><option data-i18n="Udhaar">Udhaar</option><option data-i18n="Kiraya">Kiraya</option><option data-i18n="Bijli">Bijli</option><option data-i18n="Petrol">Petrol</option><option data-i18n="Shopping">Shopping</option><option data-i18n="Transport">Transport</option><option data-i18n="Health">Health</option><option data-i18n="Education">Education</option><option data-i18n="Other">Other</option></select></div><p class="muted" data-i18n="Har din ka hisaab — din par tap karein, us din ke records dekhein.">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p><div class="cal-nav"><button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina" data-i18n-title="Pichhla mahina">‹</button><strong id="calMonthLabel">—</strong><button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina" data-i18n-title="Agla mahina">›</button></div><div class="cal-weekdays" aria-hidden="true"><span data-i18n="Mon">Mon</span><span data-i18n="Tue">Tue</span><span data-i18n="Wed">Wed</span><span data-i18n="Thu">Thu</span><span data-i18n="Fri">Fri</span><span data-i18n="Sat">Sat</span><span data-i18n="Sun">Sun</span></div><div id="calGrid" class="cal-grid"></div><div id="calDayDetail" class="cal-day-detail"></div></div></section></div>
 <button id="fabAdd" class="fab" type="button" title="New record" hidden data-i18n-title="New record">+</button>
 
 <script id="supabaseSdk" async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
@@ -920,6 +905,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=122"></script>
+<script src="app.js?v=123"></script>
 </body>
 </html>
