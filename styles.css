@@ -1713,6 +1713,9 @@ input,select,textarea,button{max-width:100%}
 
 /* v115: Dukaan mode + credit limit + Ghar ka kharcha */
 .people-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* v129: Dukaan toggle — proper pill, On par accent tint (state saaf dikhe). */
+.dukaan-pill{border-radius:999px}
+.dukaan-pill.is-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .people-head-row .section-label{margin:0}
 .p-limit{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 .p-limit-warn{display:block;font-size:11px;font-weight:700;color:var(--red);margin-top:2px}
@@ -1752,7 +1755,9 @@ input,select,textarea,button{max-width:100%}
 .budget-alert.over{color:var(--red)}
 
 /* v117: Bachat Goal + JazzCash/Easypaisa settle */
-.goal-set-row{display:flex;gap:8px;margin-top:8px}
+/* v129: Goal modal — pehle naam+target+save aik line mein 94px each thay, placeholder kat-ta tha ("Goal ka n…"). Ab naam poori line, target+save dosri line. */
+.goal-set-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#goalNameInput{flex:1 1 100%}
 .goal-set-row input{flex:1;min-width:0}
 .goal-head{display:flex;justify-content:space-between;font-size:15px;margin-top:4px}
 .goal-done{font-weight:700;color:var(--green-dark);margin-top:8px}
@@ -1813,4 +1818,6 @@ input,select,textarea,button{max-width:100%}
 .tool-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .tool-modal-head h2{margin:0;font-size:1.15rem}
 @media(max-width:420px){.app-dialog.tool-dialog{padding:12px}.tool-modal-head h2{font-size:1.05rem}.tool-btn{font-size:.78rem;padding:6px 8px;min-height:36px}}
+/* v129: toolbar 3+2 grid (≤420px) — pehle 4+1 wrap hota tha, Goal akela dosri line par orphan lagta tha. Ab 3 upar + 2 neeche, sab barabar. */
+@media(max-width:420px){.tools-row{display:grid;grid-template-columns:repeat(3,1fr)}}
 @media(max-width:420px){.txn-form-card{padding:14px}} /* v126: phone par form aur compact */

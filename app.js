@@ -6112,6 +6112,7 @@
   function applyDukaanMode() {
     var btn = $("dukaanToggleBtn"); if (!btn) return;
     btn.textContent = tr(dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off"); // v122: tr() — warna English mode mein bhi Urdu text rehta tha
+    btn.classList.toggle("is-on", dukaanMode); // v129: On par pill accent tint (state saaf dikhe)
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText(); // v118: language ke hisaab se
     var search = $("peopleSearch"); if (search) search.placeholder = tr(dukaanMode ? "Customer dhoondhein…" : "Dost dhoondhein…"); // v122: tr() + chhota placeholder (360px par kat-ta tha)
   }
