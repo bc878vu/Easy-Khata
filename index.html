@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=88">
+<link rel="stylesheet" href="styles.css?v=89">
 </head>
 <body>
 
@@ -186,13 +186,14 @@ window.addEventListener("error", function (e) {
           <strong id="headerName">Easy Khata</strong>
           <span id="guestBadge" class="guest-badge" hidden>👤 Guest</span>
         </span>
-        <span class="app-sub">Aapka rozmarra ka hisaab</span>
+        <span class="app-sub" data-i18n="subtitle">Aapka rozmarra ka hisaab</span>
       </div>
     </div>
     <div class="header-actions">
       <span id="liveUpdating" class="live-updating" hidden>Updating…</span>
       <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
       <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein">🌙</button>
+      <button id="langToggleBtn" class="icon-btn" type="button" title="Language badlein">🌐 EN</button>
       <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden>🔑 Login</button>
       <button id="notifBtn" class="icon-btn" type="button" title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     </div>
@@ -398,7 +399,7 @@ window.addEventListener("error", function (e) {
       <!-- v114: Kharcha Diary + Calendar -->
       <div class="card" id="diaryCard">
         <div class="list-head">
-          <h2>📅 Kharcha Diary</h2>
+          <h2 data-i18n="diary">📅 Kharcha Diary</h2>
           <select id="diaryCategory" title="Category filter"><option value="">All categories</option><option>Khana</option><option>Udhaar</option><option>Kiraya</option><option>Bijli</option><option>Petrol</option><option>Shopping</option><option>Transport</option><option>Health</option><option>Education</option><option>Other</option></select>
         </div>
         <p class="muted">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p>
@@ -415,7 +416,7 @@ window.addEventListener("error", function (e) {
       <!-- v115: Ghar ka kharcha -->
       <div class="card" id="householdCard">
         <div class="list-head">
-          <h2>🏠 Ghar ka kharcha</h2>
+          <h2 data-i18n="household">🏠 Ghar ka kharcha</h2>
         </div>
         <p class="muted">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
         <div id="householdBody"></div>
@@ -424,7 +425,7 @@ window.addEventListener("error", function (e) {
       <!-- v116: Due-soon + Budget -->
       <div class="card" id="dueCard">
         <div class="list-head">
-          <h2>⏰ Due-soon</h2>
+          <h2 data-i18n="due">⏰ Due-soon</h2>
         </div>
         <p class="muted">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p>
         <p id="dueMsg" class="msg" role="status"></p>
@@ -433,7 +434,7 @@ window.addEventListener("error", function (e) {
 
       <div class="card" id="budgetCard">
         <div class="list-head">
-          <h2>💰 Monthly Budget</h2>
+          <h2 data-i18n="budget">💰 Monthly Budget</h2>
         </div>
         <p class="muted">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p>
         <div class="budget-set-row">
@@ -447,7 +448,7 @@ window.addEventListener("error", function (e) {
       <!-- v117: Bachat Goal -->
       <div class="card" id="goalCard">
         <div class="list-head">
-          <h2>🎯 Bachat Goal</h2>
+          <h2 data-i18n="goal">🎯 Bachat Goal</h2>
         </div>
         <p class="muted">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p>
         <div id="goalBody"></div>
@@ -476,8 +477,8 @@ window.addEventListener("error", function (e) {
       </div>
       <div id="detailBanner" class="detail-banner"></div>
       <div class="detail-bottom detail-top-actions">
-        <button id="detailDiyeBtn" class="btn btn-diye" type="button">↑ Mainey Diye</button>
-        <button id="detailLiyeBtn" class="btn btn-liye" type="button">↓ Mainey Liye</button>
+        <button id="detailDiyeBtn" class="btn btn-diye" type="button" data-i18n="gave">↑ Mainey Diye</button>
+        <button id="detailLiyeBtn" class="btn btn-liye" type="button" data-i18n="took">↓ Mainey Liye</button>
       </div>
       <div class="detail-actions-row">
         <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span>Share</span></button>
@@ -502,7 +503,7 @@ window.addEventListener("error", function (e) {
         <p id="detailPayMsg" class="msg" role="status"></p>
       </div>
       <div class="detail-len-head">
-        <p class="section-label">LEN-DEN</p>
+        <p class="section-label" data-i18n="lenden">LEN-DEN</p>
         <span class="detail-report-btns">
           <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button">📄 PDF Report</button>
           <button id="detailXlsxBtn" class="btn btn-soft detail-pdf-btn" type="button">📊 Excel</button>
@@ -816,8 +817,8 @@ window.addEventListener("error", function (e) {
   </main>
 
   <nav class="bottomnav">
-    <button id="navKhata" class="nav-btn active" type="button"><span class="nav-ico">📒</span><span>Khata</span></button>
-    <button id="navAccount" class="nav-btn" type="button"><span class="nav-ico">👤</span><span>Account</span></button>
+    <button id="navKhata" class="nav-btn active" type="button"><span class="nav-ico">📒</span><span data-i18n="nav_khata">Khata</span></button>
+    <button id="navAccount" class="nav-btn" type="button"><span class="nav-ico">👤</span><span data-i18n="nav_account">Account</span></button>
   </nav>
 </div>
 
@@ -918,6 +919,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=116"></script>
+<script src="app.js?v=117"></script>
 </body>
 </html>

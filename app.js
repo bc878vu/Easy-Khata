@@ -768,6 +768,7 @@
     renderAccount();
     renderWorkspaceBar();
     showView("khata");
+    handleShortcutAction(); // v118: manifest shortcut (?action=add / ?action=balance)
     $("txnDate").value = todayLocal();
     if (!guestMode) { var communityLinkName=""; try { communityLinkName=new URLSearchParams(window.location.search).get("community")||""; } catch(e) {} if (communityLinkName) setTimeout(function(){ if(session&&!guestMode){openCommunityModal("join");$("joinCommunityUsername").value=communityLinkName.toLowerCase();} },700); }
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
@@ -6106,7 +6107,7 @@
   function applyDukaanMode() {
     var btn = $("dukaanToggleBtn"); if (!btn) return;
     btn.textContent = dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off";
-    var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = dukaanMode ? "CUSTOMERS" : "DOST";
+    var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText(); // v118: language ke hisaab se
     var search = $("peopleSearch"); if (search) search.placeholder = dukaanMode ? "Customer dhoondhein — naam likhein..." : "Dost dhoondhein — naam likhein...";
   }
   function toggleDukaanMode() {
@@ -6172,6 +6173,59 @@
       });
     }
     el.innerHTML = html;
+  }
+
+  /* ---------- v118: English/Urdu switch (core labels) + Home shortcuts ---------- */
+  var LANG_KEY = "easykhata_lang_v1";
+  var lang = "ur";
+  try { var savedLang = window.localStorage.getItem(LANG_KEY); if (savedLang === "en" || savedLang === "ur") lang = savedLang; } catch (e) {}
+  var I18N = {
+    ur: {
+      subtitle: "Aapka rozmarra ka hisaab", nav_khata: "Khata", nav_account: "Account",
+      friends: "DOST", customers: "CUSTOMERS", lenden: "LEN-DEN",
+      diary: "\uD83D\uDCC5 Kharcha Diary", household: "\uD83C\uDFE0 Ghar ka kharcha",
+      due: "\u23F0 Due-soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Bachat Goal",
+      gave: "\u2191 Mainey Diye", took: "\u2193 Mainey Liye"
+    },
+    en: {
+      subtitle: "Your daily ledger", nav_khata: "Ledger", nav_account: "Account",
+      friends: "FRIENDS", customers: "CUSTOMERS", lenden: "TRANSACTIONS",
+      diary: "\uD83D\uDCC5 Expense Diary", household: "\uD83C\uDFE0 Household Expenses",
+      due: "\u23F0 Due Soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Savings Goal",
+      gave: "\u2191 I Gave", took: "\u2193 I Took"
+    }
+  };
+  function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.ur[key] || key; }
+  function peopleLabelText() { return t(dukaanMode ? "customers" : "friends"); }
+  function applyLanguage() {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = t(el.getAttribute("data-i18n")); });
+    var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText();
+    var btn = $("langToggleBtn"); if (btn) btn.textContent = lang === "ur" ? "\uD83C\uDF10 EN" : "\uD83C\uDF10 \u0627\u0631\u062F\u0648";
+  }
+  function toggleLanguage() {
+    lang = lang === "ur" ? "en" : "ur";
+    try { window.localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    applyLanguage();
+  }
+  var shortcutHandled = false;
+  function handleShortcutAction() {
+    if (shortcutHandled) return;
+    var action = null;
+    try { action = new URLSearchParams(window.location.search).get("action"); } catch (e) {}
+    if (!action) return;
+    shortcutHandled = true;
+    if (action === "add") {
+      showView("khata");
+      var card = $("txnFormCard");
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      var amt = $("txnAmount");
+      if (amt) setTimeout(function () { amt.focus({ preventScroll: true }); }, 400);
+    } else if (action === "balance") {
+      showView("khata");
+      var people = $("peopleList"); // #peopleCard does not exist — boot-repro flags unknown ids
+      if (people) people.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    try { window.history.replaceState(null, "", window.location.pathname); } catch (e) {}
   }
 
   /* ---------- v117: Bachat Goal + JazzCash/Easypaisa settle ---------- */
@@ -7140,6 +7194,9 @@
     var b = e.target && e.target.closest ? e.target.closest("[data-remind]") : null;
     if (b) remindDue(b.getAttribute("data-remind"));
   });
+  // v118: language switch.
+  applyLanguage();
+  $("langToggleBtn").addEventListener("click", toggleLanguage);
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   $("dukaanToggleBtn").addEventListener("click", toggleDukaanMode);
