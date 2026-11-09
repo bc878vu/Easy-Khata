@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Easy Khata — Rozmarra ka Hisaab</title>
+<title data-i18n="Easy Khata — Rozmarra ka Hisaab">Easy Khata — Rozmarra ka Hisaab</title>
 <meta name="description" content="Easy Khata — doston ke saath khane ka rozmarra hisaab aasani se rakhein: kis ne kitne diye, kis se kitne liye, aur balance — sab ek jagah, bilkul free.">
 <meta name="keywords" content="easy khata, khana hisaab, food balance, doston ka hisaab, rozmarra hisaab, udhar hisaab, len den, pakistan">
 <meta name="robots" content="index, follow">
@@ -35,16 +35,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=91">
+<link rel="stylesheet" href="styles.css?v=92">
 </head>
 <body>
 
 <!-- Splash: dikhta hai jab app khul raha ho; app ready hote hi chhup jata hai -->
 <div id="splash" class="splash" aria-hidden="true">
   <img class="splash-logo" src="icons/icon.svg" alt="Easy Khata logo" width="96" height="96">
-  <div class="splash-name">Easy Khata</div>
-  <div class="splash-tag">Doston ke saath khane ka hisaab</div>
-  <div class="splash-spinner" aria-label="Loading"></div>
+  <div class="splash-name" data-i18n="Easy Khata">Easy Khata</div>
+  <div class="splash-tag" data-i18n="Doston ke saath khane ka hisaab">Doston ke saath khane ka hisaab</div>
+  <div class="splash-spinner" aria-label="Loading" data-i18n-aria="Loading"></div>
 </div>
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('hide');},6000);</script>
 
@@ -74,103 +74,103 @@ window.addEventListener("error", function (e) {
 </script>
 
 <div id="setupBox" class="card setup" hidden>
-  <h2>Easy Khata abhi tayyar nahi</h2>
-  <p>Barah-e-karam kuch dair baad dobara koshish karein ya support se rabta karein.</p>
+  <h2 data-i18n="Easy Khata abhi tayyar nahi">Easy Khata abhi tayyar nahi</h2>
+  <p data-i18n="Barah-e-karam kuch dair baad dobara koshish karein ya support se rabta karein.">Barah-e-karam kuch dair baad dobara koshish karein ya support se rabta karein.</p>
 </div>
 
 <main class="wrap" id="authWrap">
   <!-- Brand -->
   <div class="auth-brand">
     <img class="auth-logo" src="icons/icon.svg" alt="Easy Khata logo" width="72" height="72">
-    <h1>Easy Khata</h1>
-    <p>Doston aur family ke saath kharchon ka hisaab — asaan tareeqe se</p>
+    <h1 data-i18n="Easy Khata">Easy Khata</h1>
+    <p data-i18n="Doston aur family ke saath kharchon ka hisaab — asaan tareeqe se">Doston aur family ke saath kharchon ka hisaab — asaan tareeqe se</p>
     <div class="auth-chips">
-      <span>📒 Poora hisaab</span><span>💬 WhatsApp reminders</span><span>⚡ Fori updates</span>
+      <span data-i18n="📒 Poora hisaab">📒 Poora hisaab</span><span data-i18n="💬 WhatsApp reminders">💬 WhatsApp reminders</span><span data-i18n="⚡ Fori updates">⚡ Fori updates</span>
     </div>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
     <div id="authForm">
     <div class="tabs">
-      <button id="tabLogin" class="tab active" type="button">Login</button>
-      <button id="tabSignup" class="tab" type="button">Naya Account</button>
+      <button id="tabLogin" class="tab active" type="button" data-i18n="Login">Login</button>
+      <button id="tabSignup" class="tab" type="button" data-i18n="Naya Account">Naya Account</button>
     </div>
 
     <div id="signupNameRow" class="field" hidden>
-      <label for="authName">Aap ka naam</label>
-      <input id="authName" type="text" placeholder="Example: Asad" autocomplete="name">
+      <label for="authName" data-i18n="Aap ka naam">Aap ka naam</label>
+      <input id="authName" type="text" placeholder="Example: Asad" autocomplete="name" data-i18n-ph="Example: Asad">
     </div>
     <div id="signupPhoneRow" class="field" hidden>
-      <label for="authPhone">Phone / WhatsApp number</label>
-      <input id="authPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
+      <label for="authPhone" data-i18n="Phone / WhatsApp number">Phone / WhatsApp number</label>
+      <input id="authPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel" data-i18n-ph="Example: 0300 1234567">
     </div>
     <div class="field">
-      <label for="authEmail">Email</label>
-      <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email">
+      <label for="authEmail" data-i18n="Email">Email</label>
+      <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email" data-i18n-ph="you@email.com">
     </div>
     <div class="field">
-      <label for="authPassword">Password</label>
+      <label for="authPassword" data-i18n="Password">Password</label>
       <div class="pw-wrap">
-        <input id="authPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="current-password">
-        <button id="authEye" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+        <input id="authPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="current-password" data-i18n-ph="Kam se kam 8 harf">
+        <button id="authEye" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
       </div>
-      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button">Password bhool gaye?</button></div>
+      <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button" data-i18n="Password bhool gaye?">Password bhool gaye?</button></div>
     </div>
-    <section id="signupCommunityBox" class="community-onboarding" hidden aria-label="Community options">
-      <h3>Community <span class="muted">(optional)</span></h3>
-      <p class="muted">Apni community dhoondhein ya account banane ke baad nayi community banayein.</p>
+    <section id="signupCommunityBox" class="community-onboarding" hidden aria-label="Community options" data-i18n-aria="Community options">
+      <h3 data-i18n="Community">Community <span class="muted" data-i18n="(optional)">(optional)</span></h3>
+      <p class="muted" data-i18n="Apni community dhoondhein ya account banane ke baad nayi community banayein.">Apni community dhoondhein ya account banane ke baad nayi community banayein.</p>
       <div class="community-onboarding-actions">
-        <button id="signupJoinCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupJoinCommunityPanel">Find Community</button>
-        <button id="signupCreateCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupCommunityCreateHint">Create Community</button>
+        <button id="signupJoinCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupJoinCommunityPanel" data-i18n="Find Community">Find Community</button>
+        <button id="signupCreateCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupCommunityCreateHint" data-i18n="Create Community">Create Community</button>
       </div>
       <div id="signupJoinCommunityPanel" hidden>
-        <div class="field"><label for="signupCommunitySearch">Community dhoondhein</label><input id="signupCommunitySearch" type="search" autocomplete="off" aria-label="Search public communities" placeholder="Community name ya @username"></div>
-        <div id="signupCommunityDirectory" class="community-directory" aria-live="polite"><p class="muted">Community list load karne ke liye search karein.</p></div>
+        <div class="field"><label for="signupCommunitySearch" data-i18n="Community dhoondhein">Community dhoondhein</label><input id="signupCommunitySearch" type="search" autocomplete="off" aria-label="Search public communities" placeholder="Community name ya @username" data-i18n-aria="Search public communities" data-i18n-ph="Community name ya @username"></div>
+        <div id="signupCommunityDirectory" class="community-directory" aria-live="polite"><p class="muted" data-i18n="Community list load karne ke liye search karein.">Community list load karne ke liye search karein.</p></div>
         <p id="signupCommunityChoice" class="msg" role="status"></p>
       </div>
-      <p id="signupCommunityCreateHint" class="muted" hidden>Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.</p>
+      <p id="signupCommunityCreateHint" class="muted" hidden data-i18n="Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.">Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.</p>
     </section>
     <p id="authMsg" class="msg" role="status"></p>
-    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button">Login karein</button>
+    <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button" data-i18n="Login karein">Login karein</button>
     <!-- v24: GUEST MODE — bina login ke personal manual hisaab. Koi email,
          password ya account nahi chahiye; data sirf is phone/browser par
          sirf isi device par rehta hai; kahin online save nahi hota
          nahi jata. -->
-    <div class="guest-divider"><span>ya</span></div>
-    <button id="guestBtn" class="btn btn-ghost btn-block" type="button">Bina Login Ke Istemal Karein</button>
+    <div class="guest-divider"><span data-i18n="ya">ya</span></div>
+    <button id="guestBtn" class="btn btn-ghost btn-block" type="button" data-i18n="Bina Login Ke Istemal Karein">Bina Login Ke Istemal Karein</button>
     <!-- v24.3: do lambe paragraphs ki jagah compact info box — dono meanings
          wahi (guest local-only + account benefits), text chhota. -->
     <div class="auth-info">
-      <p>👤 <b>Bina login ke:</b> hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.</p>
-      <p>☁️ <b>Account banane par:</b> aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.</p>
+      <p>👤 <b data-i18n="Bina login ke:">Bina login ke:</b> <span data-i18n="hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.">hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.</span></p>
+      <p>☁️ <b data-i18n="Account banane par:">Account banane par:</b> <span data-i18n="aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.">aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.</span></p>
     </div>
     </div>
     <div id="forgotBox" hidden>
       <div class="field">
-        <label for="forgotEmail">Email</label>
-        <input id="forgotEmail" type="email" placeholder="you@email.com" autocomplete="email">
+        <label for="forgotEmail" data-i18n="Email">Email</label>
+        <input id="forgotEmail" type="email" placeholder="you@email.com" autocomplete="email" data-i18n-ph="you@email.com">
       </div>
-      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button">Reset link bhejein</button>
+      <button id="forgotSendBtn" class="btn btn-primary btn-block" type="button" data-i18n="Reset link bhejein">Reset link bhejein</button>
       <p id="forgotMsg" class="msg" role="status"></p>
-      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button">Login par wapas</button></p>
+      <p class="muted"><button id="forgotBackBtn" class="linklike" type="button" data-i18n="Login par wapas">Login par wapas</button></p>
     </div>
     <div id="resetBox" hidden>
-      <p class="muted">Naya password likhein.</p>
+      <p class="muted" data-i18n="Naya password likhein.">Naya password likhein.</p>
       <div class="field">
-        <label for="resetPassword">Naya password</label>
+        <label for="resetPassword" data-i18n="Naya password">Naya password</label>
         <div class="pw-wrap">
-          <input id="resetPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="new-password">
-          <button id="resetEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+          <input id="resetPassword" type="password" placeholder="Kam se kam 8 harf" autocomplete="new-password" data-i18n-ph="Kam se kam 8 harf">
+          <button id="resetEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
         </div>
       </div>
       <div class="field">
-        <label for="resetPassword2">Naya password dobara</label>
+        <label for="resetPassword2" data-i18n="Naya password dobara">Naya password dobara</label>
         <div class="pw-wrap">
-          <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password">
-          <button id="resetEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+          <input id="resetPassword2" type="password" placeholder="Dobara likhein" autocomplete="new-password" data-i18n-ph="Dobara likhein">
+          <button id="resetEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
         </div>
       </div>
-      <button id="resetBtn" class="btn btn-primary btn-block" type="button">Password badlein</button>
+      <button id="resetBtn" class="btn btn-primary btn-block" type="button" data-i18n="Password badlein">Password badlein</button>
       <p id="resetMsg" class="msg" role="status"></p>
     </div>
   </section>
@@ -183,32 +183,32 @@ window.addEventListener("error", function (e) {
       <span id="headerAvatar" class="avatar">?</span>
       <div class="app-user-text">
         <span class="header-name-row">
-          <strong id="headerName">Easy Khata</strong>
-          <span id="guestBadge" class="guest-badge" hidden>👤 Guest</span>
+          <strong id="headerName" data-i18n="Easy Khata">Easy Khata</strong>
+          <span id="guestBadge" class="guest-badge" hidden data-i18n="👤 Guest">👤 Guest</span>
         </span>
         <span class="app-sub" data-i18n="subtitle">Aapka rozmarra ka hisaab</span>
       </div>
     </div>
     <div class="header-actions">
-      <span id="liveUpdating" class="live-updating" hidden>Updating…</span>
-      <span id="offlineBadge" class="offline-badge" hidden>Offline</span>
-      <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein">🌙</button>
-      <button id="langToggleBtn" class="icon-btn" type="button" title="Language badlein">🌐 EN</button>
-      <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden>🔑 Login</button>
-      <button id="notifBtn" class="icon-btn" type="button" title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
+      <span id="liveUpdating" class="live-updating" hidden data-i18n="Updating…">Updating…</span>
+      <span id="offlineBadge" class="offline-badge" hidden data-i18n="Offline">Offline</span>
+      <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein" data-i18n-title="Theme badlein">🌙</button>
+      <button id="langToggleBtn" class="icon-btn" type="button" title="Language badlein" data-i18n="🌐 EN" data-i18n-title="Language badlein">🌐 EN</button>
+      <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden data-i18n="🔑 Login" data-i18n-title="Login / Sign up">🔑 Login</button>
+      <button id="notifBtn" class="icon-btn" type="button" title="Notifications" data-i18n-title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     </div>
   </header>
 
   <div id="workspaceBar" class="workspace-bar" hidden>
     <span id="workspaceIcon" class="ws-icon" aria-hidden="true">🏢</span>
-    <select id="workspaceSelect" aria-label="Hisaab ya community select karein"></select>
-    <button id="workspaceMenuBtn" class="ws-menu-btn" type="button" aria-expanded="false" aria-controls="workspaceMenu" aria-label="Community options">⋯</button>
-    <div id="workspaceMenu" class="ws-menu" hidden role="menu" aria-label="Community options">
-      <button id="workspaceExploreBtn" class="ws-menu-item" type="button" role="menuitem">🔍 Find Community</button>
-      <button id="workspaceCreateBtn" class="ws-menu-item" type="button" role="menuitem">＋ Nayi Community</button>
-      <button id="workspaceSetupBtn" class="ws-menu-item" type="button" role="menuitem" hidden>🔒 Community Password</button>
-      <button id="workspaceInviteBtn" class="ws-menu-item" type="button" role="menuitem" hidden>✉️ Invite Member</button>
-      <button id="workspaceMembersBtn" class="ws-menu-item" type="button" role="menuitem" hidden>👥 Manage Members</button>
+    <select id="workspaceSelect" aria-label="Hisaab ya community select karein" data-i18n-aria="Hisaab ya community select karein"></select>
+    <button id="workspaceMenuBtn" class="ws-menu-btn" type="button" aria-expanded="false" aria-controls="workspaceMenu" aria-label="Community options" data-i18n-aria="Community options">⋯</button>
+    <div id="workspaceMenu" class="ws-menu" hidden role="menu" aria-label="Community options" data-i18n-aria="Community options">
+      <button id="workspaceExploreBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="🔍 Find Community">🔍 Find Community</button>
+      <button id="workspaceCreateBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="＋ Nayi Community">＋ Nayi Community</button>
+      <button id="workspaceSetupBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="🔒 Community Password">🔒 Community Password</button>
+      <button id="workspaceInviteBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="✉️ Invite Member">✉️ Invite Member</button>
+      <button id="workspaceMembersBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="👥 Manage Members">👥 Manage Members</button>
     </div>
   </div>
 
@@ -217,35 +217,35 @@ window.addEventListener("error", function (e) {
     <!-- Khata (main) -->
     <section id="khataView">
       <div class="total-head">
-        <p class="total-label">TOTAL BALANCE</p>
-        <button id="balanceEyeBtn" class="eye-btn" type="button" aria-label="Balance chhupayein" aria-pressed="false" title="Balance chhupayein / dikhayein">👁️</button>
+        <p class="total-label" data-i18n="TOTAL BALANCE">TOTAL BALANCE</p>
+        <button id="balanceEyeBtn" class="eye-btn" type="button" aria-label="Balance chhupayein" aria-pressed="false" title="Balance chhupayein / dikhayein" data-i18n-aria="Balance chhupayein" data-i18n-title="Balance chhupayein / dikhayein">👁️</button>
       </div>
       <div class="total-cards">
         <div class="total-card receive">
           <span class="tc-icon">↓</span>
-          <div class="tc-text"><strong id="sumReceive">Rs 0</strong><span>Maine lene hain</span><span id="sumReceiveCount" class="tc-sub"></span></div>
+          <div class="tc-text"><strong id="sumReceive" data-i18n="Rs 0">Rs 0</strong><span data-i18n="Maine lene hain">Maine lene hain</span><span id="sumReceiveCount" class="tc-sub"></span></div>
         </div>
         <div class="total-card give">
           <span class="tc-icon">↑</span>
-          <div class="tc-text"><strong id="sumPay">Rs 0</strong><span>Maine dene hain</span><span id="sumPayCount" class="tc-sub"></span></div>
+          <div class="tc-text"><strong id="sumPay" data-i18n="Rs 0">Rs 0</strong><span data-i18n="Maine dene hain">Maine dene hain</span><span id="sumPayCount" class="tc-sub"></span></div>
         </div>
       </div>
 
       <div class="people-search-wrap search-wrap">
         <span class="search-icon" aria-hidden="true">🔍</span>
-        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein — naam likhein...">
+        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein — naam likhein..." data-i18n-ph="Dost dhoondhein — naam likhein...">
       </div>
 
       <div class="people-head-row">
-        <p class="section-label" id="peopleSectionLabel">DOST</p>
-        <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
-        <button id="nfcScanBtn" class="btn btn-soft" type="button" title="NFC card tap kar ke us bande ka khata kholein">📶 NFC Scan</button>
+        <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
+        <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
+        <button id="nfcScanBtn" class="btn btn-soft" type="button" title="NFC card tap kar ke us bande ka khata kholein" data-i18n="📶 NFC Scan" data-i18n-title="NFC card tap kar ke us bande ka khata kholein">📶 NFC Scan</button>
       </div>
       <p id="nfcMsg" class="msg" role="status"></p>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
       <div class="actions-row">
-        <button id="shareAllBtn" class="btn btn-soft" type="button">📤 Apna balance share karein</button>
+        <button id="shareAllBtn" class="btn btn-soft" type="button" data-i18n="📤 Apna balance share karein">📤 Apna balance share karein</button>
       </div>
 
       <div id="monthStats" class="month-stats" hidden></div>
@@ -254,8 +254,8 @@ window.addEventListener("error", function (e) {
       <div id="monthlyReportBanner" class="monthly-banner" hidden>
         <span id="monthlyBannerText" class="monthly-banner-text"></span>
         <span class="monthly-banner-actions">
-          <button id="monthlyBannerDownloadBtn" class="btn btn-primary" type="button">📄 Download karein</button>
-          <button id="monthlyBannerDismissBtn" class="btn btn-ghost" type="button" aria-label="Band karein">✕</button>
+          <button id="monthlyBannerDownloadBtn" class="btn btn-primary" type="button" data-i18n="📄 Download karein">📄 Download karein</button>
+          <button id="monthlyBannerDismissBtn" class="btn btn-ghost" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button>
         </span>
       </div>
 
@@ -263,154 +263,154 @@ window.addEventListener("error", function (e) {
         <div class="txn-form-heading">
           <span class="txn-form-mark" aria-hidden="true">＋</span>
           <div class="txn-form-heading-copy">
-            <p class="txn-form-eyebrow">QUICK ENTRY</p>
-            <h2 id="txnFormTitle">Naya record</h2>
-            <p class="txn-form-subtitle">Apna len-den asaani se darj karein</p>
+            <p class="txn-form-eyebrow" data-i18n="QUICK ENTRY">QUICK ENTRY</p>
+            <h2 id="txnFormTitle" data-i18n="Naya record">Naya record</h2>
+            <p class="txn-form-subtitle" data-i18n="Apna len-den asaani se darj karein">Apna len-den asaani se darj karein</p>
           </div>
         </div>
         <form id="txnForm">
           <div class="field" id="txnPersonRow">
-            <label for="txnPerson">Kis ke saath?</label>
+            <label for="txnPerson" data-i18n="Kis ke saath?">Kis ke saath?</label>
             <select id="txnPerson"></select>
           </div>
           <div class="contact-add-wrap">
             <button id="addContactToggleBtn" class="contact-add-trigger" type="button" aria-expanded="false" aria-controls="addContactBox">
               <span class="contact-add-icon" aria-hidden="true">＋</span>
-              <span class="contact-add-copy"><strong>Dost add karein</strong><small>Jo abhi Easy Khata par nahi hain</small></span>
+              <span class="contact-add-copy"><strong data-i18n="Dost add karein">Dost add karein</strong><small data-i18n="Jo abhi Easy Khata par nahi hain">Jo abhi Easy Khata par nahi hain</small></span>
               <span class="contact-add-chevron" aria-hidden="true">⌄</span>
             </button>
             <div id="addContactBox" class="contact-add-panel" hidden>
               <div class="contact-add-heading">
                 <span class="contact-add-avatar" aria-hidden="true">👤</span>
-                <span><strong>Naya dost</strong><small>Naam aur number add karein</small></span>
+                <span><strong data-i18n="Naya dost">Naya dost</strong><small data-i18n="Naam aur number add karein">Naam aur number add karein</small></span>
               </div>
               <div class="field">
-                <label for="newContactName">Dost ka naam</label>
-                <input id="newContactName" type="text" maxlength="80" autocomplete="off" placeholder="Misal: Yaseen">
+                <label for="newContactName" data-i18n="Dost ka naam">Dost ka naam</label>
+                <input id="newContactName" type="text" maxlength="80" autocomplete="off" placeholder="Misal: Yaseen" data-i18n-ph="Misal: Yaseen">
               </div>
               <div class="field">
-                <label for="newContactPhone">Phone / WhatsApp number <span class="optional-label">Optional</span></label>
+                <label for="newContactPhone" data-i18n="Phone / WhatsApp number">Phone / WhatsApp number <span class="optional-label" data-i18n="Optional">Optional</span></label>
                 <input id="newContactPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0300 1234567">
-                <p class="contact-field-hint">Number dene se baad mein unka account banne par dost automatically link ho sakta hai.</p>
+                <p class="contact-field-hint" data-i18n="Number dene se baad mein unka account banne par dost automatically link ho sakta hai.">Number dene se baad mein unka account banne par dost automatically link ho sakta hai.</p>
               </div>
               <div class="contact-add-actions">
-                <button id="pickContactBtn" class="btn btn-soft" type="button" hidden>Contacts se chunein</button>
-                <button id="saveContactBtn" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> Dost save karein</button>
+                <button id="pickContactBtn" class="btn btn-soft" type="button" hidden data-i18n="Contacts se chunein">Contacts se chunein</button>
+                <button id="saveContactBtn" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> <span data-i18n="Dost save karein">Dost save karein</span></button>
               </div>
               <p id="contactMsg" class="msg" role="status" aria-live="polite"></p>
             </div>
           </div>
           <div class="field" id="txnDirRow">
-            <label>Kisam</label>
+            <label data-i18n="Kisam">Kisam</label>
             <div class="seg seg-dir">
-              <label class="seg-opt opt-given"><input type="radio" name="txnDir" value="given" checked> ↑ Mainey Diye</label>
-              <label class="seg-opt opt-taken"><input type="radio" name="txnDir" value="taken"> ↓ Mainey Liye</label>
+              <label class="seg-opt opt-given"><input type="radio" name="txnDir" value="given" checked data-i18n="↑ Mainey Diye"> ↑ Mainey Diye</label>
+              <label class="seg-opt opt-taken"><input type="radio" name="txnDir" value="taken" data-i18n="↓ Mainey Liye"> ↓ Mainey Liye</label>
             </div>
           </div>
           <div class="field">
-            <label class="check"><input id="txnSplit" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text">Aik khana, kai dost — barabar baant lein</span><span class="check-chev" aria-hidden="true">⌄</span></label>
+            <label class="check"><input id="txnSplit" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text" data-i18n="Aik khana, kai dost — barabar baant lein">Aik khana, kai dost — barabar baant lein</span><span class="check-chev" aria-hidden="true">⌄</span></label>
           </div>
           <div id="splitBox" class="field" hidden>
-            <label>Dost chunein (baantne ke liye)</label>
+            <label data-i18n="Dost chunein (baantne ke liye)">Dost chunein (baantne ke liye)</label>
             <div id="splitList" class="split-list"></div>
             <p id="splitHint" class="muted"></p>
           </div>
           <div class="field">
-            <label for="txnAmount">Raqam (Rs)</label>
-            <input id="txnAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500" required>
+            <label for="txnAmount" data-i18n="Raqam (Rs)">Raqam (Rs)</label>
+            <input id="txnAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500" required data-i18n-ph="Example: 500">
           </div>
           <div class="field">
-            <label for="txnNote">Detail / category <span class="optional-label">Optional</span></label>
-            <input id="txnNote" type="text" placeholder="Khana, Cash, Other ya kuch bhi likhein" maxlength="120" autocomplete="off">
+            <label for="txnNote" data-i18n="Detail / category">Detail / category <span class="optional-label" data-i18n="Optional">Optional</span></label>
+            <input id="txnNote" type="text" placeholder="Khana, Cash, Other ya kuch bhi likhein" maxlength="120" autocomplete="off" data-i18n-ph="Khana, Cash, Other ya kuch bhi likhein">
             
           </div>
           <div class="field">
-            <label for="txnCategory">Category</label>
+            <label for="txnCategory" data-i18n="Category">Category</label>
             <select id="txnCategory">
-              <option value="Khana" selected>Khana</option>
-              <option value="Udhaar">Udhaar</option>
-              <option value="Kiraya">Kiraya</option>
-              <option value="Bijli">Bijli</option>
-              <option value="Petrol">Petrol</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Transport">Transport</option>
-              <option value="Health">Health</option>
-              <option value="Education">Education</option>
-              <option value="Other">Other</option>
+              <option value="Khana" selected data-i18n="Khana">Khana</option>
+              <option value="Udhaar" data-i18n="Udhaar">Udhaar</option>
+              <option value="Kiraya" data-i18n="Kiraya">Kiraya</option>
+              <option value="Bijli" data-i18n="Bijli">Bijli</option>
+              <option value="Petrol" data-i18n="Petrol">Petrol</option>
+              <option value="Shopping" data-i18n="Shopping">Shopping</option>
+              <option value="Transport" data-i18n="Transport">Transport</option>
+              <option value="Health" data-i18n="Health">Health</option>
+              <option value="Education" data-i18n="Education">Education</option>
+              <option value="Other" data-i18n="Other">Other</option>
             </select>
           </div>
           <div class="field">
-            <label for="txnDueDate">Wapsi ki tareekh <span class="optional-label">Optional</span></label>
+            <label for="txnDueDate" data-i18n="Wapsi ki tareekh">Wapsi ki tareekh <span class="optional-label" data-i18n="Optional">Optional</span></label>
             <input id="txnDueDate" type="date">
-            <p class="muted">Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.</p>
+            <p class="muted" data-i18n="Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.">Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.</p>
           </div>
           <div class="field">
-            <label for="txnPhoto">Bill ki photo <span class="optional-label">Optional</span></label>
+            <label for="txnPhoto" data-i18n="Bill ki photo">Bill ki photo <span class="optional-label" data-i18n="Optional">Optional</span></label>
             <input id="txnPhoto" type="file" accept="image/*">
             <img id="txnPhotoPreview" class="txn-photo-preview" hidden alt="Bill ki photo">
-            <button id="txnPhotoRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Photo hatayein</button>
+            <button id="txnPhotoRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px" data-i18n="Photo hatayein">Photo hatayein</button>
           </div>
           <div class="field">
-            <label for="txnDate">Tareekh</label>
+            <label for="txnDate" data-i18n="Tareekh">Tareekh</label>
             <input id="txnDate" type="date" required>
           </div>
           <div class="field" id="txnRepeatRow">
-            <label class="check"><input id="txnRepeat" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text">🔁 Har dafa repeat karein</span> <span class="optional-label">Recurring</span><span class="check-chev" aria-hidden="true">⌄</span></label>
+            <label class="check"><input id="txnRepeat" type="checkbox"><span class="check-box" aria-hidden="true"></span><span class="check-text" data-i18n="🔁 Har dafa repeat karein">🔁 Har dafa repeat karein</span> <span class="optional-label" data-i18n="Recurring">Recurring</span><span class="check-chev" aria-hidden="true">⌄</span></label>
           </div>
           <div id="repeatBox" class="field" hidden>
-            <label for="txnRepeatFreq">Kab repeat ho?</label>
-            <select id="txnRepeatFreq"><option value="monthly">Har mahina</option><option value="weekly">Har hafta</option></select>
-            <label for="txnRepeatDay" style="margin-top:10px">Kis din?</label>
+            <label for="txnRepeatFreq" data-i18n="Kab repeat ho?">Kab repeat ho?</label>
+            <select id="txnRepeatFreq"><option value="monthly" data-i18n="Har mahina">Har mahina</option><option value="weekly" data-i18n="Har hafta">Har hafta</option></select>
+            <label for="txnRepeatDay" style="margin-top:10px" data-i18n="Kis din?">Kis din?</label>
             <select id="txnRepeatDay"></select>
             <p id="repeatHint" class="muted"></p>
           </div>
           <p id="txnMsg" class="msg" role="status"></p>
-          <button class="btn btn-primary btn-block" type="submit">Save karein</button>
-          <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Cancel karein</button>
+          <button class="btn btn-primary btn-block" type="submit" data-i18n="Save karein">Save karein</button>
+          <button id="cancelEditBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px" data-i18n="Cancel karein">Cancel karein</button>
         </form>
       </div>
 
       <div class="card accent" id="ledgerCard">
         <div class="list-head">
-          <h2>All Records</h2>
-          <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
+          <h2 data-i18n="All Records">All Records</h2>
+          <button id="refreshBtn" class="btn btn-ghost" type="button" data-i18n="Refresh">Refresh</button>
         </div>
-        <p class="muted">All records — newest first.</p>
+        <p class="muted" data-i18n="All records — newest first.">All records — newest first.</p>
         <div class="toolbar">
           <div class="tb-row tb-search-row">
             <span class="search-wrap tb-search">
               <span class="search-icon" aria-hidden="true">🔍</span>
-              <input id="txnSearch" type="search" placeholder="Search name, food or amount...">
+              <input id="txnSearch" type="search" placeholder="Search name, food or amount..." data-i18n-ph="Search name, food or amount...">
             </span>
-            <select id="txnFilterPerson"><option value="">All</option></select>
+            <select id="txnFilterPerson"><option value="" data-i18n="All">All</option></select>
           </div>
           <div class="tb-row tb-dates-row">
-            <label class="date-cell"><span>From</span><input id="txnFrom" type="date" title="From (date)"></label>
-            <label class="date-cell"><span>To</span><input id="txnTo" type="date" title="To (date)"></label>
+            <label class="date-cell"><span data-i18n="From">From</span><input id="txnFrom" type="date" title="From (date)" data-i18n-title="From (date)"></label>
+            <label class="date-cell"><span data-i18n="To">To</span><input id="txnTo" type="date" title="To (date)" data-i18n-title="To (date)"></label>
           </div>
           <div class="tb-row tb-actions-row">
-            <button id="clearFilterBtn" class="btn btn-ghost" type="button">Clear filters</button>
-            <button id="exportCsvBtn" class="btn btn-soft" type="button">📄 Download PDF Report</button>
+            <button id="clearFilterBtn" class="btn btn-ghost" type="button" data-i18n="Clear filters">Clear filters</button>
+            <button id="exportCsvBtn" class="btn btn-soft" type="button" data-i18n="📄 Download PDF Report">📄 Download PDF Report</button>
           </div>
           <p id="filterCount" class="filter-count" hidden></p>
         </div>
         <div id="txnList" class="txns scroll-box"></div>
-        <p id="txnScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane records dekhne ke liye</p>
+        <p id="txnScrollHint" class="scroll-hint" hidden data-i18n="↓ Neeche scroll karein — purane records dekhne ke liye">↓ Neeche scroll karein — purane records dekhne ke liye</p>
       </div>
 
       <!-- v114: Kharcha Diary + Calendar -->
       <div class="card" id="diaryCard">
         <div class="list-head">
           <h2 data-i18n="diary">📅 Kharcha Diary</h2>
-          <select id="diaryCategory" title="Category filter"><option value="">All categories</option><option>Khana</option><option>Udhaar</option><option>Kiraya</option><option>Bijli</option><option>Petrol</option><option>Shopping</option><option>Transport</option><option>Health</option><option>Education</option><option>Other</option></select>
+          <select id="diaryCategory" title="Category filter" data-i18n-title="Category filter"><option value="" data-i18n="All categories">All categories</option><option data-i18n="Khana">Khana</option><option data-i18n="Udhaar">Udhaar</option><option data-i18n="Kiraya">Kiraya</option><option data-i18n="Bijli">Bijli</option><option data-i18n="Petrol">Petrol</option><option data-i18n="Shopping">Shopping</option><option data-i18n="Transport">Transport</option><option data-i18n="Health">Health</option><option data-i18n="Education">Education</option><option data-i18n="Other">Other</option></select>
         </div>
-        <p class="muted">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p>
+        <p class="muted" data-i18n="Har din ka hisaab — din par tap karein, us din ke records dekhein.">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p>
         <div class="cal-nav">
-          <button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina">‹</button>
+          <button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina" data-i18n-title="Pichhla mahina">‹</button>
           <strong id="calMonthLabel">—</strong>
-          <button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina">›</button>
+          <button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina" data-i18n-title="Agla mahina">›</button>
         </div>
-        <div class="cal-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="cal-weekdays" aria-hidden="true"><span data-i18n="Mon">Mon</span><span data-i18n="Tue">Tue</span><span data-i18n="Wed">Wed</span><span data-i18n="Thu">Thu</span><span data-i18n="Fri">Fri</span><span data-i18n="Sat">Sat</span><span data-i18n="Sun">Sun</span></div>
         <div id="calGrid" class="cal-grid"></div>
         <div id="calDayDetail" class="cal-day-detail"></div>
       </div>
@@ -420,7 +420,7 @@ window.addEventListener("error", function (e) {
         <div class="list-head">
           <h2 data-i18n="household">🏠 Ghar ka kharcha</h2>
         </div>
-        <p class="muted">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
+        <p class="muted" data-i18n="Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
         <div id="householdBody"></div>
       </div>
 
@@ -429,7 +429,7 @@ window.addEventListener("error", function (e) {
         <div class="list-head">
           <h2 data-i18n="due">⏰ Due-soon</h2>
         </div>
-        <p class="muted">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p>
+        <p class="muted" data-i18n="Aane wale 7 din mein due hone wale udhaar — aur overdue.">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p>
         <p id="dueMsg" class="msg" role="status"></p>
         <div id="dueBody"></div>
       </div>
@@ -438,10 +438,10 @@ window.addEventListener("error", function (e) {
         <div class="list-head">
           <h2 data-i18n="budget">💰 Monthly Budget</h2>
         </div>
-        <p class="muted">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p>
+        <p class="muted" data-i18n="Is mahine kitna kharch kar sakte hain — 80% par alert milega.">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p>
         <div class="budget-set-row">
-          <input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000">
-          <button id="budgetSaveBtn" class="btn btn-primary" type="button">Save</button>
+          <input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000" data-i18n-ph="e.g. 20000">
+          <button id="budgetSaveBtn" class="btn btn-primary" type="button" data-i18n="Save">Save</button>
         </div>
         <p id="budgetMsg" class="msg" role="status"></p>
         <div id="budgetBody"></div>
@@ -452,16 +452,16 @@ window.addEventListener("error", function (e) {
         <div class="list-head">
           <h2 data-i18n="goal">🎯 Bachat Goal</h2>
         </div>
-        <p class="muted">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p>
+        <p class="muted" data-i18n="Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p>
         <div id="goalBody"></div>
         <div class="goal-set-row">
-          <input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)">
-          <input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)">
-          <button id="goalSaveBtn" class="btn btn-soft" type="button">Goal Save</button>
+          <input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)" data-i18n-ph="Goal ka naam (e.g. Bike)">
+          <input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)" data-i18n-ph="Target (Rs)">
+          <button id="goalSaveBtn" class="btn btn-soft" type="button" data-i18n="Goal Save">Goal Save</button>
         </div>
         <div class="goal-set-row">
-          <input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)">
-          <button id="goalAddBtn" class="btn btn-primary" type="button">Add</button>
+          <input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)" data-i18n-ph="Bachat add karein (Rs)">
+          <button id="goalAddBtn" class="btn btn-primary" type="button" data-i18n="Add">Add</button>
         </div>
         <p id="goalMsg" class="msg" role="status"></p>
       </div>
@@ -470,7 +470,7 @@ window.addEventListener("error", function (e) {
     <!-- Person detail -->
     <section id="personDetailView" hidden>
       <div class="detail-head">
-        <button id="detailBackBtn" class="icon-btn light" type="button" title="Back">←</button>
+        <button id="detailBackBtn" class="icon-btn light" type="button" title="Back" data-i18n-title="Back">←</button>
         <div class="detail-title">
           <strong id="detailName">—</strong>
           <span id="detailSince" class="muted">—</span>
@@ -483,76 +483,76 @@ window.addEventListener("error", function (e) {
         <button id="detailLiyeBtn" class="btn btn-liye" type="button" data-i18n="took">↓ Mainey Liye</button>
       </div>
       <div class="detail-actions-row">
-        <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span>Share</span></button>
-        <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span>WhatsApp</span></button>
-        <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span>Hisaab barabar</span></button>
+        <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span data-i18n="Share">Share</span></button>
+        <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span data-i18n="WhatsApp">WhatsApp</span></button>
+        <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span data-i18n="Hisaab barabar">Hisaab barabar</span></button>
       </div>
       <div id="detailCreditBox" class="detail-credit" hidden>
-        <label for="detailCreditLimit">Credit limit (Rs) — is customer ko kitna udhaar de sakte hain</label>
+        <label for="detailCreditLimit" data-i18n="Credit limit (Rs) — is customer ko kitna udhaar de sakte hain">Credit limit (Rs) — is customer ko kitna udhaar de sakte hain</label>
         <div class="detail-credit-row">
-          <input id="detailCreditLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 5000">
-          <button id="detailCreditSaveBtn" class="btn btn-primary" type="button">Save</button>
+          <input id="detailCreditLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 5000" data-i18n-ph="e.g. 5000">
+          <button id="detailCreditSaveBtn" class="btn btn-primary" type="button" data-i18n="Save">Save</button>
         </div>
         <p id="detailCreditMsg" class="msg" role="status"></p>
       </div>
       <div id="detailPayBox" class="detail-pay" hidden>
-        <p class="section-label">💸 Settle karein — JazzCash / Easypaisa</p>
+        <p class="section-label" data-i18n="💸 Settle karein — JazzCash / Easypaisa">💸 Settle karein — JazzCash / Easypaisa</p>
         <p id="detailPayText" class="muted"></p>
         <div class="detail-pay-row">
-          <button id="detailJazzBtn" class="btn btn-jazz" type="button">🟢 JazzCash</button>
-          <button id="detailEasyBtn" class="btn btn-easy" type="button">🟡 Easypaisa</button>
+          <button id="detailJazzBtn" class="btn btn-jazz" type="button" data-i18n="🟢 JazzCash">🟢 JazzCash</button>
+          <button id="detailEasyBtn" class="btn btn-easy" type="button" data-i18n="🟡 Easypaisa">🟡 Easypaisa</button>
         </div>
         <p id="detailPayMsg" class="msg" role="status"></p>
       </div>
       <div id="detailNfcBox" class="detail-nfc">
-        <p class="section-label">📶 NFC Card</p>
+        <p class="section-label" data-i18n="📶 NFC Card">📶 NFC Card</p>
         <p id="detailNfcText" class="muted"></p>
         <div class="detail-pay-row">
-          <button id="detailNfcLinkBtn" class="btn btn-soft" type="button">📶 Card Link Karein</button>
-          <button id="detailNfcUnlinkBtn" class="btn btn-ghost" type="button" hidden>Unlink</button>
+          <button id="detailNfcLinkBtn" class="btn btn-soft" type="button" data-i18n="📶 Card Link Karein">📶 Card Link Karein</button>
+          <button id="detailNfcUnlinkBtn" class="btn btn-ghost" type="button" hidden data-i18n="Unlink">Unlink</button>
         </div>
         <p id="detailNfcMsg" class="msg" role="status"></p>
       </div>
       <div class="detail-len-head">
         <p class="section-label" data-i18n="lenden">LEN-DEN</p>
         <span class="detail-report-btns">
-          <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button">📄 PDF Report</button>
-          <button id="detailXlsxBtn" class="btn btn-soft detail-pdf-btn" type="button">📊 Excel</button>
+          <button id="detailPdfBtn" class="btn btn-soft detail-pdf-btn" type="button" data-i18n="📄 PDF Report">📄 PDF Report</button>
+          <button id="detailXlsxBtn" class="btn btn-soft detail-pdf-btn" type="button" data-i18n="📊 Excel">📊 Excel</button>
         </span>
       </div>
       <p id="detailPdfMsg" class="msg" role="status"></p>
       <div id="detailTxns" class="dtable scroll-box"></div>
-      <p id="detailScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane len-den dekhne ke liye</p>
-      <button id="detailRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden>Dost ko remove karein</button>
+      <p id="detailScrollHint" class="scroll-hint" hidden data-i18n="↓ Neeche scroll karein — purane len-den dekhne ke liye">↓ Neeche scroll karein — purane len-den dekhne ke liye</p>
+      <button id="detailRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden data-i18n="Dost ko remove karein">Dost ko remove karein</button>
     </section>
 
     <!-- Account -->
     <section id="accountView" hidden>
-      <h2 class="page-title">Account</h2>
+      <h2 class="page-title" data-i18n="Account">Account</h2>
       <div class="card acct-card">
         <span id="acctAvatar" class="avatar big">?</span>
         <div class="acct-info">
           <strong id="acctName">—</strong>
           <span id="acctPhone" class="muted">—</span>
         </div>
-        <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit">✎</button>
+        <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit" data-i18n-title="Edit">✎</button>
       </div>
       <!-- v24: GUEST MODE account box — sirf guest mode mein dikhta hai.
            Naam (optional), Account Banayein (upgrade + migration offer) aur
            guest mode se bahar nikalna. Is mode mein NO push, NO admin,
            NO profile edit, NO cloud — sab kuch local hai. -->
       <div id="guestAcctBox" class="card" hidden>
-        <h3 style="margin-top:0">Guest mode — bina login ke</h3>
-        <p class="muted">Ye hisaab sirf is phone/browser par save hai — account banane par cloud par save hoga.</p>
+        <h3 style="margin-top:0" data-i18n="Guest mode — bina login ke">Guest mode — bina login ke</h3>
+        <p class="muted" data-i18n="Ye hisaab sirf is phone/browser par save hai — account banane par cloud par save hoga.">Ye hisaab sirf is phone/browser par save hai — account banane par cloud par save hoga.</p>
         <div class="field">
-          <label for="guestNameInput">Apna naam</label>
-          <input id="guestNameInput" type="text" maxlength="80" placeholder="Example: Asad" autocomplete="name">
+          <label for="guestNameInput" data-i18n="Apna naam">Apna naam</label>
+          <input id="guestNameInput" type="text" maxlength="80" placeholder="Example: Asad" autocomplete="name" data-i18n-ph="Example: Asad">
         </div>
-        <button id="guestSaveNameBtn" class="btn btn-primary" type="button">Naam save karein</button>
+        <button id="guestSaveNameBtn" class="btn btn-primary" type="button" data-i18n="Naam save karein">Naam save karein</button>
         <p id="guestNameMsg" class="msg" role="status"></p>
-        <button id="guestCreateAccountBtn" class="btn btn-primary btn-block" type="button" style="margin-top:10px">☁️ Account Banayein</button>
-        <p class="muted">Account banane ke baad aap se poocha jayega ke guest hisaab cloud mein save karna hai ya nahi.</p>
-        <button id="guestExitBtn" class="btn btn-ghost btn-block" type="button">Guest mode se bahar niklein</button>
+        <button id="guestCreateAccountBtn" class="btn btn-primary btn-block" type="button" style="margin-top:10px" data-i18n="☁️ Account Banayein">☁️ Account Banayein</button>
+        <p class="muted" data-i18n="Account banane ke baad aap se poocha jayega ke guest hisaab cloud mein save karna hai ya nahi.">Account banane ke baad aap se poocha jayega ke guest hisaab cloud mein save karna hai ya nahi.</p>
+        <button id="guestExitBtn" class="btn btn-ghost btn-block" type="button" data-i18n="Guest mode se bahar niklein">Guest mode se bahar niklein</button>
       </div>
       <!-- v23: poora profile edit — photo, naam, username, phone, password.
            Pencil dabate hi khulta hai; "Profile save karein" sab kuch aik
@@ -560,123 +560,123 @@ window.addEventListener("error", function (e) {
            box mein badalta hai (pehle se tha). Email sirf dikhta hai — badalna
            ho to confirmation wala flow chahiye, is liye v23 mein display-only. -->
       <div id="acctPhoneBox" class="card" hidden>
-        <h3 style="margin-top:0">Profile edit karein</h3>
+        <h3 style="margin-top:0" data-i18n="Profile edit karein">Profile edit karein</h3>
         <div class="profile-pic-row">
           <span id="profilePicPreview" class="avatar big">?</span>
           <div class="profile-pic-actions">
-            <label class="btn btn-soft" for="profilePicInput" style="cursor:pointer">📷 Photo badlein</label>
+            <label class="btn btn-soft" for="profilePicInput" style="cursor:pointer" data-i18n="📷 Photo badlein">📷 Photo badlein</label>
             <input id="profilePicInput" type="file" accept="image/*" hidden>
-            <button id="removePicBtn" class="btn btn-ghost" type="button" hidden>Photo hatayein</button>
-            <p class="muted" style="margin:4px 0 0">Photo 512px tak chhoti kar ke save hogi.</p>
+            <button id="removePicBtn" class="btn btn-ghost" type="button" hidden data-i18n="Photo hatayein">Photo hatayein</button>
+            <p class="muted" style="margin:4px 0 0" data-i18n="Photo 512px tak chhoti kar ke save hogi.">Photo 512px tak chhoti kar ke save hogi.</p>
           </div>
         </div>
         <div class="field">
-          <label for="myNameInput">Mera naam</label>
-          <input id="myNameInput" type="text" maxlength="80" placeholder="Example: Asad Amanat Ali" autocomplete="name">
+          <label for="myNameInput" data-i18n="Mera naam">Mera naam</label>
+          <input id="myNameInput" type="text" maxlength="80" placeholder="Example: Asad Amanat Ali" autocomplete="name" data-i18n-ph="Example: Asad Amanat Ali">
         </div>
         <div class="field">
-          <label for="myUsername">Username (optional — dosray aap ko is se pehchanenge)</label>
-          <input id="myUsername" type="text" maxlength="30" placeholder="Example: asad_ali" autocomplete="username">
+          <label for="myUsername" data-i18n="Username (optional — dosray aap ko is se pehchanenge)">Username (optional — dosray aap ko is se pehchanenge)</label>
+          <input id="myUsername" type="text" maxlength="30" placeholder="Example: asad_ali" autocomplete="username" data-i18n-ph="Example: asad_ali">
         </div>
         <div class="field">
-          <label for="myEmailView">Email (badla nahi ja sakta)</label>
+          <label for="myEmailView" data-i18n="Email (badla nahi ja sakta)">Email (badla nahi ja sakta)</label>
           <input id="myEmailView" type="email" readonly>
         </div>
         <div class="field">
-          <label for="myPhone">Mera WhatsApp number</label>
-          <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel">
+          <label for="myPhone" data-i18n="Mera WhatsApp number">Mera WhatsApp number</label>
+          <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel" data-i18n-ph="Example: 0300 1234567">
         </div>
-        <button id="savePhoneBtn" class="btn btn-primary" type="button">Profile save karein</button>
+        <button id="savePhoneBtn" class="btn btn-primary" type="button" data-i18n="Profile save karein">Profile save karein</button>
         <p id="phoneMsg" class="msg" role="status"></p>
-        <button id="changePassBtn" class="btn btn-soft" type="button">🔑 Password badlein</button>
+        <button id="changePassBtn" class="btn btn-soft" type="button" data-i18n="🔑 Password badlein">🔑 Password badlein</button>
         <div id="changePassBox" hidden>
           <div class="field">
-            <label for="newPass1">Naya password</label>
+            <label for="newPass1" data-i18n="Naya password">Naya password</label>
             <div class="pw-wrap">
-              <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf">
-              <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+              <input id="newPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf" data-i18n-ph="Kam se kam 8 harf">
+              <button id="changeEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
             </div>
           </div>
           <div class="field">
-            <label for="newPass2">Naya password dobara</label>
+            <label for="newPass2" data-i18n="Naya password dobara">Naya password dobara</label>
             <div class="pw-wrap">
-              <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
-              <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+              <input id="newPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein" data-i18n-ph="Dobara likhein">
+              <button id="changeEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
             </div>
           </div>
-          <button id="savePassBtn" class="btn btn-primary" type="button">Save karein</button>
+          <button id="savePassBtn" class="btn btn-primary" type="button" data-i18n="Save karein">Save karein</button>
           <p id="passMsg" class="msg" role="status"></p>
         </div>
       </div>
 
       <div class="acct-shortcuts">
-        <button id="acctShareBtn" class="shortcut" type="button"><span class="sc-ico">📤</span><span>Share Easy Khata</span></button>
-        <button id="acctLedgerBtn" class="shortcut" type="button"><span class="sc-ico">📒</span><span>Poora hisaab</span></button>
+        <button id="acctShareBtn" class="shortcut" type="button"><span class="sc-ico">📤</span><span data-i18n="Share Easy Khata">Share Easy Khata</span></button>
+        <button id="acctLedgerBtn" class="shortcut" type="button"><span class="sc-ico">📒</span><span data-i18n="Poora hisaab">Poora hisaab</span></button>
       </div>
 
       <div class="menu-list">
-        <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel">Notifications On karein</span><span class="menu-right">›</span></button>
+        <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
-        <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup</span><span class="menu-right">›</span></button>
-        <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel">PIN Lock set karein</span><span class="menu-right">›</span></button>
-        <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span>Abhi lock karein</span><span class="menu-right">›</span></button>
-        <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span>Recurring records</span><span class="menu-right">›</span></button>
-        <button id="acctMonthlyReportBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>Monthly report</span><span class="menu-right">›</span></button>
-        <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span>PDF Report download karein</span><span class="menu-right">›</span></button>
-        <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span>Excel Report download karein</span><span class="menu-right">›</span></button>
+        <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
+        <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
+        <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span data-i18n="Abhi lock karein">Abhi lock karein</span><span class="menu-right">›</span></button>
+        <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span data-i18n="Recurring records">Recurring records</span><span class="menu-right">›</span></button>
+        <button id="acctMonthlyReportBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span data-i18n="Monthly report">Monthly report</span><span class="menu-right">›</span></button>
+        <button id="acctPdfBtn" class="menu-item" type="button"><span class="mi-ico">📄</span><span data-i18n="PDF Report download karein">PDF Report download karein</span><span class="menu-right">›</span></button>
+        <button id="acctXlsxBtn" class="menu-item" type="button"><span class="mi-ico">📊</span><span data-i18n="Excel Report download karein">Excel Report download karein</span><span class="menu-right">›</span></button>
         <p id="acctBackupMsg" class="msg" role="status"></p>
-        <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span>Privacy</span><span class="menu-right">›</span></button>
+        <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span data-i18n="Privacy">Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
-          <p><strong>Privacy Policy — Easy Khata</strong></p>
-          <p><strong>Aap ka hisaab, aap ka data.</strong> Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.</p>
-          <p><strong>Kya save hota hai:</strong> aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.</p>
-          <p><strong>Kya share nahi hota:</strong> aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.</p>
-          <p><strong>Profile:</strong> aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.</p>
-          <p><strong>Account band karna:</strong> account band karwane ke liye WhatsApp helpline se rabta karein.</p>
-          <p><a href="privacy.html" target="_blank" rel="noopener">Full Privacy Policy parhein</a></p>
+          <p><strong data-i18n="Privacy Policy — Easy Khata">Privacy Policy — Easy Khata</strong></p>
+          <p><strong data-i18n="Aap ka hisaab, aap ka data.">Aap ka hisaab, aap ka data.</strong> <span data-i18n="Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.">Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.</span></p>
+          <p><strong data-i18n="Kya save hota hai:">Kya save hota hai:</strong> <span data-i18n="aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.">aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.</span></p>
+          <p><strong data-i18n="Kya share nahi hota:">Kya share nahi hota:</strong> <span data-i18n="aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.">aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.</span></p>
+          <p><strong data-i18n="Profile:">Profile:</strong> <span data-i18n="aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.">aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.</span></p>
+          <p><strong data-i18n="Account band karna:">Account band karna:</strong> <span data-i18n="account band karwane ke liye WhatsApp helpline se rabta karein.">account band karwane ke liye WhatsApp helpline se rabta karein.</span></p>
+          <p><a href="privacy.html" target="_blank" rel="noopener" data-i18n="Full Privacy Policy parhein">Full Privacy Policy parhein</a></p>
         </div>
-        <button id="acctShareMenuBtn" class="menu-item" type="button"><span class="mi-ico">📤</span><span>Share Easy Khata</span><span class="menu-right">›</span></button>
-        <button id="acctRateBtn" class="menu-item" type="button"><span class="mi-ico">⭐</span><span>Rate Easy Khata</span><span class="menu-right">›</span></button>
-        <button id="acctWaBtn" class="menu-item" type="button"><span class="mi-ico">💬</span><span>WhatsApp helpline</span><span class="menu-right">›</span></button>
-        <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span>Admin Panel</span><span class="menu-right">›</span></button>
-        <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span>Logout</span></button>
+        <button id="acctShareMenuBtn" class="menu-item" type="button"><span class="mi-ico">📤</span><span data-i18n="Share Easy Khata">Share Easy Khata</span><span class="menu-right">›</span></button>
+        <button id="acctRateBtn" class="menu-item" type="button"><span class="mi-ico">⭐</span><span data-i18n="Rate Easy Khata">Rate Easy Khata</span><span class="menu-right">›</span></button>
+        <button id="acctWaBtn" class="menu-item" type="button"><span class="mi-ico">💬</span><span data-i18n="WhatsApp helpline">WhatsApp helpline</span><span class="menu-right">›</span></button>
+        <button id="navAdminBtn" class="menu-item" type="button" hidden><span class="mi-ico">🛡️</span><span data-i18n="Admin Panel">Admin Panel</span><span class="menu-right">›</span></button>
+        <button id="logoutBtn" class="menu-item danger" type="button"><span class="mi-ico">🚪</span><span data-i18n="Logout">Logout</span></button>
       </div>
       <!-- v24.7: footer ab Account view ke andar, content ke bilkul aakhir mein
            (in-flow) — Diesel Converter ki tarah: alag fixed patti nahi, page ki
            neeche wali khaali jagah mein chhota compact credit. Text EXACTLY
            "Developed by Asad". showView("account") par dikhta hai, baaki views
            par hidden (accountView khud hidden hota hai + vf.hidden toggle). -->
-      <p class="version" id="versionFooter" hidden><span>Developed by Asad</span></p>
+      <p class="version" id="versionFooter" hidden><span data-i18n="Developed by Asad">Developed by Asad</span></p>
     </section>
 
-    <section id="hiddenView" hidden><div class="card"><button id="hiddenBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Hidden records</h2><p class="muted">Yahan se record apni history mein restore karein.</p><div id="hiddenTxnList" class="txns"></div></div></section>
-    <section id="backupView" hidden><div class="card"><button id="backupBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Backup</h2><p class="muted">Backup, restore aur transfer — apna hisaab mehfooz rakhein.</p><div class="menu-list">
-        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span>Hidden records — Restore</span><span class="menu-right">›</span></button>
-        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
+    <section id="hiddenView" hidden><div class="card"><button id="hiddenBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button><h2 style="margin-top:10px" data-i18n="Hidden records">Hidden records</h2><p class="muted" data-i18n="Yahan se record apni history mein restore karein.">Yahan se record apni history mein restore karein.</p><div id="hiddenTxnList" class="txns"></div></div></section>
+    <section id="backupView" hidden><div class="card"><button id="backupBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button><h2 style="margin-top:10px" data-i18n="Backup">Backup</h2><p class="muted" data-i18n="Backup, restore aur transfer — apna hisaab mehfooz rakhein.">Backup, restore aur transfer — apna hisaab mehfooz rakhein.</p><div class="menu-list">
+        <button id="acctHiddenBtn" class="menu-item" type="button"><span class="mi-ico">🗂️</span><span data-i18n="Hidden records — Restore">Hidden records — Restore</span><span class="menu-right">›</span></button>
+        <button id="acctGuestTransferBtn" class="menu-item" type="button"><span class="mi-ico">☁️</span><span id="acctGuestTransferLabel" data-i18n="Guest hisaab transfer karein">Guest hisaab transfer karein</span><span class="menu-right">›</span></button>
         <p id="acctGuestTransferMsg" class="msg" role="status"></p>
-        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span>Backup — CSV download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span>JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
-        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span>JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
+        <button id="acctBackupBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup — CSV download karein">Backup — CSV download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonBackupBtn" class="menu-item" type="button"><span class="mi-ico">🗄️</span><span data-i18n="JSON Backup — poora hisaab download karein">JSON Backup — poora hisaab download karein</span><span class="menu-right">›</span></button>
+        <button id="acctJsonRestoreBtn" class="menu-item" type="button"><span class="mi-ico">♻️</span><span data-i18n="JSON Restore — backup se wapas layein">JSON Restore — backup se wapas layein</span><span class="menu-right">›</span></button>
         <input id="acctJsonRestoreInput" type="file" accept=".json,application/json" hidden>
         <p id="acctJsonMsg" class="msg" role="status"></p>
     </div></div></section>
-    <section id="recurringView" hidden><div class="card rec-page"><div class="rec-head"><button id="recurringBackBtn" class="btn btn-ghost rec-back" type="button">← Wapas</button><div class="rec-head-text"><h2>🔁 Recurring records</h2><p class="muted">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p></div></div><div id="recurringStats" class="rec-stats" aria-live="polite"></div><div id="recurringList" class="txns"></div><div class="rec-how"><div class="rec-how-step"><span class="rec-how-num">1</span><span>Record banayein</span></div><div class="rec-how-step"><span class="rec-how-num">2</span><span>“Har dafa repeat karein” tick karein</span></div><div class="rec-how-step"><span class="rec-how-num">3</span><span>Agli tareekh par record khud ban jayega</span></div></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
-    <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button">← Wapas</button><h2 style="margin-top:10px">Monthly report</h2><p class="muted">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
+    <section id="recurringView" hidden><div class="card rec-page"><div class="rec-head"><button id="recurringBackBtn" class="btn btn-ghost rec-back" type="button" data-i18n="← Wapas">← Wapas</button><div class="rec-head-text"><h2 data-i18n="🔁 Recurring records">🔁 Recurring records</h2><p class="muted" data-i18n="Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p></div></div><div id="recurringStats" class="rec-stats" aria-live="polite"></div><div id="recurringList" class="txns"></div><div class="rec-how"><div class="rec-how-step"><span class="rec-how-num">1</span><span data-i18n="Record banayein">Record banayein</span></div><div class="rec-how-step"><span class="rec-how-num">2</span><span data-i18n="“Har dafa repeat karein” tick karein">“Har dafa repeat karein” tick karein</span></div><div class="rec-how-step"><span class="rec-how-num">3</span><span data-i18n="Agli tareekh par record khud ban jayega">Agli tareekh par record khud ban jayega</span></div></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
+    <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button><h2 style="margin-top:10px" data-i18n="Monthly report">Monthly report</h2><p class="muted" data-i18n="Pichhle mahine ka hisaab — PDF mein, aik dafa mein.">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button" data-i18n="📄 Download karein">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
     <section id="notifView" hidden>
       <div class="card">
-        <button id="notifBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+        <button id="notifBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
         <div class="notif-head">
-          <h2 style="margin-top:10px">Yaad Dehani</h2>
+          <h2 style="margin-top:10px" data-i18n="Yaad Dehani">Yaad Dehani</h2>
           <span id="notifCountBadge" class="notif-count" hidden></span>
         </div>
-        <p class="muted">Jab koi aap ke saath record save kare, to yahan message aayega.</p>
+        <p class="muted" data-i18n="Jab koi aap ke saath record save kare, to yahan message aayega.">Jab koi aap ke saath record save kare, to yahan message aayega.</p>
         <div class="notif-tools">
-          <div class="notif-filters" role="tablist" aria-label="Notifications filter">
-            <button type="button" class="notif-filter is-active" data-notif-filter="all">Sab (0)</button>
-            <button type="button" class="notif-filter" data-notif-filter="unread">Naye (0)</button>
-            <button type="button" class="notif-filter" data-notif-filter="read">Parhe hue (0)</button>
+          <div class="notif-filters" role="tablist" aria-label="Notifications filter" data-i18n-aria="Notifications filter">
+            <button type="button" class="notif-filter is-active" data-notif-filter="all" data-i18n="Sab (0)">Sab (0)</button>
+            <button type="button" class="notif-filter" data-notif-filter="unread" data-i18n="Naye (0)">Naye (0)</button>
+            <button type="button" class="notif-filter" data-notif-filter="read" data-i18n="Parhe hue (0)">Parhe hue (0)</button>
           </div>
-          <button id="markAllReadBtn" class="btn btn-soft notif-markall" type="button">Sab parha hua karein</button>
+          <button id="markAllReadBtn" class="btn btn-soft notif-markall" type="button" data-i18n="Sab parha hua karein">Sab parha hua karein</button>
         </div>
         <div id="notifList" class="notifs"></div>
       </div>
@@ -686,140 +686,140 @@ window.addEventListener("error", function (e) {
       <div class="admin-shell">
         <div class="admin-hero">
           <div>
-            <p class="admin-eyebrow">EASY KHATA · CONTROL CENTER</p>
-            <h1>Admin Dashboard</h1>
-            <p>Users, ledger activity aur platform health — sab aik jagah.</p>
+            <p class="admin-eyebrow" data-i18n="EASY KHATA · CONTROL CENTER">EASY KHATA · CONTROL CENTER</p>
+            <h1 data-i18n="Admin Dashboard">Admin Dashboard</h1>
+            <p data-i18n="Users, ledger activity aur platform health — sab aik jagah.">Users, ledger activity aur platform health — sab aik jagah.</p>
           </div>
           <div class="admin-hero-actions">
-            <button id="adminBackBtn" class="btn btn-soft" type="button">← Account</button>
-            <button id="adminRefreshBtn" class="btn btn-soft" type="button">↻ Refresh data</button>
-            <button id="adminExportUsersBtn" class="btn btn-primary" type="button">↓ Export users</button>
+            <button id="adminBackBtn" class="btn btn-soft" type="button" data-i18n="← Account">← Account</button>
+            <button id="adminRefreshBtn" class="btn btn-soft" type="button" data-i18n="↻ Refresh data">↻ Refresh data</button>
+            <button id="adminExportUsersBtn" class="btn btn-primary" type="button" data-i18n="↓ Export users">↓ Export users</button>
           </div>
         </div>
         <p id="adminMsg" class="msg" role="status"></p>
         <div class="admin-kpis" id="adminKpis" aria-live="polite"></div>
         <div class="admin-grid">
           <article class="admin-panel admin-chart-panel">
-            <div class="admin-panel-head"><div><h2>Transaction activity</h2><p>Last 14 days · loaded ledger records</p></div><span class="admin-live-tag">LIVE DATA</span></div>
-            <div id="adminDailyChart" class="admin-chart" role="img" aria-label="Daily transaction activity chart"></div>
+            <div class="admin-panel-head"><div><h2 data-i18n="Transaction activity">Transaction activity</h2><p data-i18n="Last 14 days · loaded ledger records">Last 14 days · loaded ledger records</p></div><span class="admin-live-tag" data-i18n="LIVE DATA">LIVE DATA</span></div>
+            <div id="adminDailyChart" class="admin-chart" role="img" aria-label="Daily transaction activity chart" data-i18n-aria="Daily transaction activity chart"></div>
           </article>
           <article class="admin-panel admin-chart-panel">
-            <div class="admin-panel-head"><div><h2>Monthly volume</h2><p>Last 6 months · total recorded amount</p></div></div>
-            <div id="adminMonthlyChart" class="admin-chart" role="img" aria-label="Monthly transaction volume chart"></div>
+            <div class="admin-panel-head"><div><h2 data-i18n="Monthly volume">Monthly volume</h2><p data-i18n="Last 6 months · total recorded amount">Last 6 months · total recorded amount</p></div></div>
+            <div id="adminMonthlyChart" class="admin-chart" role="img" aria-label="Monthly transaction volume chart" data-i18n-aria="Monthly transaction volume chart"></div>
           </article>
         </div>
         <div class="admin-grid admin-lower-grid">
           <article class="admin-panel">
-            <div class="admin-panel-head"><div><h2>Recent ledger activity</h2><p>Latest transactions available in this session</p></div></div>
+            <div class="admin-panel-head"><div><h2 data-i18n="Recent ledger activity">Recent ledger activity</h2><p data-i18n="Latest transactions available in this session">Latest transactions available in this session</p></div></div>
             <div id="adminRecentActivity" class="admin-recent-list"></div>
           </article>
           <article class="admin-panel">
-            <div class="admin-panel-head"><div><h2>Most active users</h2><p>Ranked by user record count</p></div></div>
+            <div class="admin-panel-head"><div><h2 data-i18n="Most active users">Most active users</h2><p data-i18n="Ranked by user record count">Ranked by user record count</p></div></div>
             <div id="adminTopUsers" class="admin-top-users"></div>
           </article>
         </div>
         <article class="admin-panel admin-users-panel">
           <div class="admin-panel-head admin-users-heading">
-            <div><h2>User management</h2><p id="adminStats">Users aur account controls</p></div>
-            <button id="adminAddUserBtn" class="btn btn-primary" type="button">＋ Add user</button>
+            <div><h2 data-i18n="User management">User management</h2><p id="adminStats" data-i18n="Users aur account controls">Users aur account controls</p></div>
+            <button id="adminAddUserBtn" class="btn btn-primary" type="button" data-i18n="＋ Add user">＋ Add user</button>
           </div>
           <div class="admin-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminUserSearch" type="search" placeholder="Search name, email or phone…" aria-label="Search users"></div>
-            <select id="adminUserStatus" aria-label="Filter users"><option value="all">All users</option><option value="active">Active only</option><option value="blocked">Blocked only</option></select>
-            <select id="adminUserSort" aria-label="Sort users"><option value="recent">Newest joined</option><option value="records">Most records</option><option value="name">Name A–Z</option></select>
+            <div class="admin-search"><span>⌕</span><input id="adminUserSearch" type="search" placeholder="Search name, email or phone…" aria-label="Search users" data-i18n-aria="Search users" data-i18n-ph="Search name, email or phone…"></div>
+            <select id="adminUserStatus" aria-label="Filter users" data-i18n-aria="Filter users"><option value="all" data-i18n="All users">All users</option><option value="active" data-i18n="Active only">Active only</option><option value="blocked" data-i18n="Blocked only">Blocked only</option></select>
+            <select id="adminUserSort" aria-label="Sort users" data-i18n-aria="Sort users"><option value="recent" data-i18n="Newest joined">Newest joined</option><option value="records" data-i18n="Most records">Most records</option><option value="name" data-i18n="Name A–Z">Name A–Z</option></select>
           </div>
           <div id="adminUserCount" class="admin-result-count"></div>
           <div id="adminAddUserBox" class="admin-add-box" hidden>
             <div class="admin-add-grid">
-              <div class="field"><label for="adminAddName">Full name</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan"></div>
-              <div class="field"><label for="adminAddEmail">Email address</label><input id="adminAddEmail" type="email" placeholder="ali@example.com"></div>
-              <div class="field"><label for="adminAddPhone">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="0300 1234567"></div>
-              <div class="field"><label for="adminAddPass">Temporary password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
+              <div class="field"><label for="adminAddName" data-i18n="Full name">Full name</label><input id="adminAddName" type="text" maxlength="80" placeholder="Example: Ali Khan" data-i18n-ph="Example: Ali Khan"></div>
+              <div class="field"><label for="adminAddEmail" data-i18n="Email address">Email address</label><input id="adminAddEmail" type="email" placeholder="ali@example.com" data-i18n-ph="ali@example.com"></div>
+              <div class="field"><label for="adminAddPhone" data-i18n="WhatsApp number">WhatsApp number</label><input id="adminAddPhone" type="tel" placeholder="0300 1234567"></div>
+              <div class="field"><label for="adminAddPass" data-i18n="Temporary password">Temporary password</label><input id="adminAddPass" type="password" autocomplete="new-password" placeholder="At least 8 characters" data-i18n-ph="At least 8 characters"></div>
             </div>
-            <button id="adminAddSaveBtn" class="btn btn-primary" type="button">Create account</button>
+            <button id="adminAddSaveBtn" class="btn btn-primary" type="button" data-i18n="Create account">Create account</button>
             <p id="adminAddMsg" class="msg" role="status"></p>
           </div>
           <div id="adminUserList" class="admin-user-grid"></div>
         </article>
         <article class="admin-panel admin-users-panel">
           <div class="admin-panel-head admin-users-heading">
-            <div><h2>Community management</h2><p>All business communities · edit, suspend, restore and safe delete</p></div>
-            <button id="adminCreateCommunityBtn" class="btn btn-primary" type="button">＋ Create community</button>
+            <div><h2 data-i18n="Community management">Community management</h2><p data-i18n="All business communities · edit, suspend, restore and safe delete">All business communities · edit, suspend, restore and safe delete</p></div>
+            <button id="adminCreateCommunityBtn" class="btn btn-primary" type="button" data-i18n="＋ Create community">＋ Create community</button>
           </div>
           <div id="adminCommunitySummary" class="admin-community-summary" aria-live="polite"></div>
           <div class="admin-toolbar admin-community-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search community name or username…" aria-label="Search communities"></div>
-            <select id="adminCommunityStatus"><option value="all">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option></select>
+            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search community name or username…" aria-label="Search communities" data-i18n-aria="Search communities" data-i18n-ph="Search community name or username…"></div>
+            <select id="adminCommunityStatus"><option value="all" data-i18n="All statuses">All statuses</option><option value="active" data-i18n="Active">Active</option><option value="suspended" data-i18n="Suspended">Suspended</option></select>
           </div>
           <div id="adminCommunityList" class="admin-user-grid"></div>
         </article>
         <article class="admin-panel admin-users-panel">
-          <div class="admin-panel-head"><div><h2>All community members</h2><p>Manage roles, access and community ownership. Ledger history remains intact.</p></div></div>
+          <div class="admin-panel-head"><div><h2 data-i18n="All community members">All community members</h2><p data-i18n="Manage roles, access and community ownership. Ledger history remains intact.">Manage roles, access and community ownership. Ledger history remains intact.</p></div></div>
           <div class="admin-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or community…" aria-label="Search community members"></div>
-            <select id="adminMemberCommunityFilter" aria-label="Filter members by community"><option value="">All communities</option></select>
+            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or community…" aria-label="Search community members" data-i18n-aria="Search community members" data-i18n-ph="Search member, email or community…"></div>
+            <select id="adminMemberCommunityFilter" aria-label="Filter members by community" data-i18n-aria="Filter members by community"><option value="" data-i18n="All communities">All communities</option></select>
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
           <div id="adminCommunityMemberCount" class="admin-result-count"></div>
         </article>
-        <p class="admin-footnote">Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.</p>
+        <p class="admin-footnote" data-i18n="Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.">Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.</p>
       </div>
     </section>
 
 <section id="adminUserView" hidden>
       <div class="card admin-user-page">
         <div class="admin-user-head">
-          <button id="adminUserBackBtn" class="btn btn-ghost" type="button">← Wapas</button>
+          <button id="adminUserBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
           <div class="admin-user-head-text"><h2 id="adminUserTitle"></h2><p id="adminUserBadges"></p></div>
         </div>
         <dl class="kv">
-          <dt>Email</dt><dd id="adminUserEmail"></dd>
-          <dt>WhatsApp</dt><dd id="adminUserPhone"></dd>
-          <dt>Joined</dt><dd id="adminUserJoined"></dd>
-          <dt>User ID</dt><dd id="adminUserId"></dd>
+          <dt data-i18n="Email">Email</dt><dd id="adminUserEmail"></dd>
+          <dt data-i18n="WhatsApp">WhatsApp</dt><dd id="adminUserPhone"></dd>
+          <dt data-i18n="Joined">Joined</dt><dd id="adminUserJoined"></dd>
+          <dt data-i18n="User ID">User ID</dt><dd id="adminUserId"></dd>
         </dl>
         <div id="adminUserSummary" class="summary"></div>
         <div class="detail-actions">
-          <button id="adminEditToggleBtn" class="btn btn-soft" type="button">Edit</button>
-          <button id="adminPassToggleBtn" class="btn btn-soft" type="button">Change password</button>
-          <button id="adminBlockBtn" class="btn btn-danger" type="button">Block</button>
-          <button id="adminDeleteBtn" class="btn btn-danger" type="button">Deactivate user</button>
+          <button id="adminEditToggleBtn" class="btn btn-soft" type="button" data-i18n="Edit">Edit</button>
+          <button id="adminPassToggleBtn" class="btn btn-soft" type="button" data-i18n="Change password">Change password</button>
+          <button id="adminBlockBtn" class="btn btn-danger" type="button" data-i18n="Block">Block</button>
+          <button id="adminDeleteBtn" class="btn btn-danger" type="button" data-i18n="Deactivate user">Deactivate user</button>
         </div>
         <div id="adminEditBox" hidden>
-          <div class="field"><label for="adminEditName">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
-          <div class="field"><label for="adminEditPhone">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567"></div>
-          <button id="adminEditSaveBtn" class="btn btn-primary" type="button">Save karein</button>
+          <div class="field"><label for="adminEditName" data-i18n="Naam">Naam</label><input id="adminEditName" type="text" maxlength="80"></div>
+          <div class="field"><label for="adminEditPhone" data-i18n="WhatsApp number">WhatsApp number</label><input id="adminEditPhone" type="tel" placeholder="Example: 0300 1234567" data-i18n-ph="Example: 0300 1234567"></div>
+          <button id="adminEditSaveBtn" class="btn btn-primary" type="button" data-i18n="Save karein">Save karein</button>
           <p id="adminEditMsg" class="msg" role="status"></p>
         </div>
         <div id="adminPassBox" hidden>
-          <div class="field"><label for="adminNewPass1">Naya password</label>
+          <div class="field"><label for="adminNewPass1" data-i18n="Naya password">Naya password</label>
             <div class="pw-wrap">
-              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf">
-              <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+              <input id="adminNewPass1" type="password" autocomplete="new-password" placeholder="Kam se kam 8 harf" data-i18n-ph="Kam se kam 8 harf">
+              <button id="adminEye1" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
             </div>
           </div>
-          <div class="field"><label for="adminNewPass2">Naya password dobara</label>
+          <div class="field"><label for="adminNewPass2" data-i18n="Naya password dobara">Naya password dobara</label>
             <div class="pw-wrap">
-              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein">
-              <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password">👁️</button>
+              <input id="adminNewPass2" type="password" autocomplete="new-password" placeholder="Dobara likhein" data-i18n-ph="Dobara likhein">
+              <button id="adminEye2" class="pw-eye" type="button" title="Show password" aria-label="Show password" data-i18n-aria="Show password" data-i18n-title="Show password">👁️</button>
             </div>
           </div>
-          <button id="adminPassSaveBtn" class="btn btn-primary" type="button">Password save karein</button>
+          <button id="adminPassSaveBtn" class="btn btn-primary" type="button" data-i18n="Password save karein">Password save karein</button>
           <p id="adminPassMsg" class="msg" role="status"></p>
         </div>
-        <h3 style="margin-top:16px">Raqam set karein (admin)</h3>
-        <p class="muted">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
-        <div class="field"><label for="adminSetAmount">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500"></div>
-        <div class="field"><label>Kisam</label>
+        <h3 style="margin-top:16px" data-i18n="Raqam set karein (admin)">Raqam set karein (admin)</h3>
+        <p class="muted" data-i18n="Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.">Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.</p>
+        <div class="field"><label for="adminSetAmount" data-i18n="Raqam (Rs)">Raqam (Rs)</label><input id="adminSetAmount" type="number" min="1" step="0.01" inputmode="decimal" placeholder="Example: 500" data-i18n-ph="Example: 500"></div>
+        <div class="field"><label data-i18n="Kisam">Kisam</label>
           <div class="seg">
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked> User se lene hain</label>
-            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give"> User ko dene hain</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="take" checked data-i18n="User se lene hain"> User se lene hain</label>
+            <label class="seg-opt"><input type="radio" name="adminSetDir" value="give" data-i18n="User ko dene hain"> User ko dene hain</label>
           </div>
         </div>
-        <div class="field"><label for="adminSetNote">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance"></div>
-        <button id="adminSetSaveBtn" class="btn btn-primary" type="button">Raqam set karein</button>
+        <div class="field"><label for="adminSetNote" data-i18n="Note">Note</label><input id="adminSetNote" type="text" maxlength="120" placeholder="Example: Opening balance" data-i18n-ph="Example: Opening balance"></div>
+        <button id="adminSetSaveBtn" class="btn btn-primary" type="button" data-i18n="Raqam set karein">Raqam set karein</button>
         <p id="adminSetMsg" class="msg" role="status"></p>
-        <h3 style="margin-top:16px">Is user ka hisaab</h3>
+        <h3 style="margin-top:16px" data-i18n="Is user ka hisaab">Is user ka hisaab</h3>
         <div id="adminUserTxns" class="txns"></div>
         <p id="adminUserMsg" class="msg" role="status"></p>
       </div>
@@ -833,25 +833,25 @@ window.addEventListener("error", function (e) {
   </nav>
 </div>
 
-<div id="appDialogOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage"><div class="app-dialog-mark" aria-hidden="true">✦</div><h2 id="appDialogTitle">Confirm action</h2><p id="appDialogMessage"></p><input id="appDialogInput" class="app-dialog-input" type="text" hidden><div class="app-dialog-actions"><button id="appDialogCancel" class="btn btn-neutral" type="button">Cancel</button><button id="appDialogOk" class="btn btn-primary" type="button">Continue</button></div></section></div>
-<div id="pinLockOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="pinLockTitle"><div class="app-dialog-mark" aria-hidden="true">🔒</div><h2 id="pinLockTitle">Easy Khata locked hai</h2><p>Apna 4-digit PIN likhein.</p><input id="pinLockInput" class="app-dialog-input pin-lock-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"><p id="pinLockMsg" class="msg" role="status"></p><div class="app-dialog-actions"><button id="pinLockForgotBtn" class="btn btn-neutral" type="button">PIN bhool gaye?</button><button id="pinLockUnlockBtn" class="btn btn-primary" type="button">Unlock</button></div></section></div>
-<div id="rateOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="rateTitle"><div class="app-dialog-mark" aria-hidden="true">⭐</div><h2 id="rateTitle">Easy Khata ko rate karein</h2><p>App kaisi lagi? Sitare chun kar batayein — aap ki rai se app behtar hoti hai.</p><div class="rate-stars" id="rateStars" role="radiogroup" aria-label="Rating"><button type="button" class="rate-star" data-stars="1" role="radio" aria-checked="false" aria-label="1 star">☆</button><button type="button" class="rate-star" data-stars="2" role="radio" aria-checked="false" aria-label="2 stars">☆</button><button type="button" class="rate-star" data-stars="3" role="radio" aria-checked="false" aria-label="3 stars">☆</button><button type="button" class="rate-star" data-stars="4" role="radio" aria-checked="false" aria-label="4 stars">☆</button><button type="button" class="rate-star" data-stars="5" role="radio" aria-checked="false" aria-label="5 stars">☆</button></div><textarea id="rateFeedback" class="rate-feedback" rows="3" maxlength="500" placeholder="Apni rai likhein (optional)"></textarea><p id="rateMsg" class="msg" role="status"></p><div class="app-dialog-actions"><button id="rateCancelBtn" class="btn btn-neutral" type="button">Cancel</button><button id="rateSubmitBtn" class="btn btn-primary" type="button" disabled>Rate karein</button></div></section></div>
-<div id="shareSheetOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="shareSheetTitle"><div class="app-dialog-mark" aria-hidden="true">📤</div><h2 id="shareSheetTitle">Kya share karein?</h2><p>Jo share karna hai woh chunein — preview neeche dikhe ga, aur sirf wohi jayega jo aap chunein ge.</p><div class="share-sheet-options" role="radiogroup" aria-label="Share options"><button type="button" class="share-sheet-opt is-active" data-share-kind="link" role="radio" aria-checked="true"><span class="share-opt-ic" aria-hidden="true">🔗</span><span class="share-opt-tx"><strong>Sirf app link</strong><span>Safe — sirf Easy Khata ka link, koi raqam nahi</span></span><span class="share-opt-radio" aria-hidden="true"></span></button><button type="button" class="share-sheet-opt" data-share-kind="balance" role="radio" aria-checked="false"><span class="share-opt-ic" aria-hidden="true">💰</span><span class="share-opt-tx"><strong>Apna balance</strong><span>Diye / Liye / Net + aakhri record — sirf apne liye ya kisi khaas bande ko</span></span><span class="share-opt-radio" aria-hidden="true"></span></button><button type="button" class="share-sheet-opt" data-share-kind="month" role="radio" aria-checked="false"><span class="share-opt-ic" aria-hidden="true">📅</span><span class="share-opt-tx"><strong>Is mahine ka hisaab</strong><span>Is mahine ke Diye / Liye / Records</span></span><span class="share-opt-radio" aria-hidden="true"></span></button></div><!-- v108/v109: share QR (barcode) — qrcode.js lazy-loads from vendor/ on "Sirf app link"; options ke foran baad taake bina scroll ke nazar aaye. -->
-<div id="shareSheetQr" class="share-sheet-qr" hidden><div class="share-sheet-qr-label">📷 Barcode — camera se scan kar ke app kholein</div><div id="shareSheetQrBox" class="share-sheet-qr-box" role="img" aria-label="Easy Khata app link QR code"></div></div>
-<div class="share-sheet-preview-label">👁 Preview — yehi jayega</div><pre id="shareSheetPreview" class="share-sheet-preview" aria-live="polite"></pre><div class="app-dialog-actions"><button id="shareSheetCancelBtn" class="btn btn-neutral" type="button">Band karein</button><button id="shareSheetSendBtn" class="btn btn-primary" type="button">↗ Share karein</button></div></section></div>
+<div id="appDialogOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage"><div class="app-dialog-mark" aria-hidden="true">✦</div><h2 id="appDialogTitle" data-i18n="Confirm action">Confirm action</h2><p id="appDialogMessage"></p><input id="appDialogInput" class="app-dialog-input" type="text" hidden><div class="app-dialog-actions"><button id="appDialogCancel" class="btn btn-neutral" type="button" data-i18n="Cancel">Cancel</button><button id="appDialogOk" class="btn btn-primary" type="button" data-i18n="Continue">Continue</button></div></section></div>
+<div id="pinLockOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="pinLockTitle"><div class="app-dialog-mark" aria-hidden="true">🔒</div><h2 id="pinLockTitle" data-i18n="Easy Khata locked hai">Easy Khata locked hai</h2><p data-i18n="Apna 4-digit PIN likhein.">Apna 4-digit PIN likhein.</p><input id="pinLockInput" class="app-dialog-input pin-lock-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"><p id="pinLockMsg" class="msg" role="status"></p><div class="app-dialog-actions"><button id="pinLockForgotBtn" class="btn btn-neutral" type="button" data-i18n="PIN bhool gaye?">PIN bhool gaye?</button><button id="pinLockUnlockBtn" class="btn btn-primary" type="button" data-i18n="Unlock">Unlock</button></div></section></div>
+<div id="rateOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="rateTitle"><div class="app-dialog-mark" aria-hidden="true">⭐</div><h2 id="rateTitle" data-i18n="Easy Khata ko rate karein">Easy Khata ko rate karein</h2><p data-i18n="App kaisi lagi? Sitare chun kar batayein — aap ki rai se app behtar hoti hai.">App kaisi lagi? Sitare chun kar batayein — aap ki rai se app behtar hoti hai.</p><div class="rate-stars" id="rateStars" role="radiogroup" aria-label="Rating" data-i18n-aria="Rating"><button type="button" class="rate-star" data-stars="1" role="radio" aria-checked="false" aria-label="1 star" data-i18n-aria="1 star">☆</button><button type="button" class="rate-star" data-stars="2" role="radio" aria-checked="false" aria-label="2 stars" data-i18n-aria="2 stars">☆</button><button type="button" class="rate-star" data-stars="3" role="radio" aria-checked="false" aria-label="3 stars" data-i18n-aria="3 stars">☆</button><button type="button" class="rate-star" data-stars="4" role="radio" aria-checked="false" aria-label="4 stars" data-i18n-aria="4 stars">☆</button><button type="button" class="rate-star" data-stars="5" role="radio" aria-checked="false" aria-label="5 stars" data-i18n-aria="5 stars">☆</button></div><textarea id="rateFeedback" class="rate-feedback" rows="3" maxlength="500" placeholder="Apni rai likhein (optional)" data-i18n-ph="Apni rai likhein (optional)"></textarea><p id="rateMsg" class="msg" role="status"></p><div class="app-dialog-actions"><button id="rateCancelBtn" class="btn btn-neutral" type="button" data-i18n="Cancel">Cancel</button><button id="rateSubmitBtn" class="btn btn-primary" type="button" disabled data-i18n="Rate karein">Rate karein</button></div></section></div>
+<div id="shareSheetOverlay" class="app-dialog-overlay" hidden><section class="app-dialog card" role="dialog" aria-modal="true" aria-labelledby="shareSheetTitle"><div class="app-dialog-mark" aria-hidden="true">📤</div><h2 id="shareSheetTitle" data-i18n="Kya share karein?">Kya share karein?</h2><p data-i18n="Jo share karna hai woh chunein — preview neeche dikhe ga, aur sirf wohi jayega jo aap chunein ge.">Jo share karna hai woh chunein — preview neeche dikhe ga, aur sirf wohi jayega jo aap chunein ge.</p><div class="share-sheet-options" role="radiogroup" aria-label="Share options" data-i18n-aria="Share options"><button type="button" class="share-sheet-opt is-active" data-share-kind="link" role="radio" aria-checked="true"><span class="share-opt-ic" aria-hidden="true">🔗</span><span class="share-opt-tx"><strong data-i18n="Sirf app link">Sirf app link</strong><span data-i18n="Safe — sirf Easy Khata ka link, koi raqam nahi">Safe — sirf Easy Khata ka link, koi raqam nahi</span></span><span class="share-opt-radio" aria-hidden="true"></span></button><button type="button" class="share-sheet-opt" data-share-kind="balance" role="radio" aria-checked="false"><span class="share-opt-ic" aria-hidden="true">💰</span><span class="share-opt-tx"><strong data-i18n="Apna balance">Apna balance</strong><span data-i18n="Diye / Liye / Net + aakhri record — sirf apne liye ya kisi khaas bande ko">Diye / Liye / Net + aakhri record — sirf apne liye ya kisi khaas bande ko</span></span><span class="share-opt-radio" aria-hidden="true"></span></button><button type="button" class="share-sheet-opt" data-share-kind="month" role="radio" aria-checked="false"><span class="share-opt-ic" aria-hidden="true">📅</span><span class="share-opt-tx"><strong data-i18n="Is mahine ka hisaab">Is mahine ka hisaab</strong><span data-i18n="Is mahine ke Diye / Liye / Records">Is mahine ke Diye / Liye / Records</span></span><span class="share-opt-radio" aria-hidden="true"></span></button></div><!-- v108/v109: share QR (barcode) — qrcode.js lazy-loads from vendor/ on "Sirf app link"; options ke foran baad taake bina scroll ke nazar aaye. -->
+<div id="shareSheetQr" class="share-sheet-qr" hidden><div class="share-sheet-qr-label" data-i18n="📷 Barcode — camera se scan kar ke app kholein">📷 Barcode — camera se scan kar ke app kholein</div><div id="shareSheetQrBox" class="share-sheet-qr-box" role="img" aria-label="Easy Khata app link QR code" data-i18n-aria="Easy Khata app link QR code"></div></div>
+<div class="share-sheet-preview-label" data-i18n="👁 Preview — yehi jayega">👁 Preview — yehi jayega</div><pre id="shareSheetPreview" class="share-sheet-preview" aria-live="polite"></pre><div class="app-dialog-actions"><button id="shareSheetCancelBtn" class="btn btn-neutral" type="button" data-i18n="Band karein">Band karein</button><button id="shareSheetSendBtn" class="btn btn-primary" type="button" data-i18n="↗ Share karein">↗ Share karein</button></div></section></div>
 <div id="adminCommunityEditOverlay" class="overlay" hidden>
   <section class="community-modal card" role="dialog" aria-modal="true" aria-labelledby="adminCommunityEditTitle">
-    <div class="community-modal-head"><div><p class="admin-eyebrow">PLATFORM ADMIN</p><h2 id="adminCommunityEditTitle">Edit community</h2></div><button id="adminCommunityEditClose" class="icon-btn light" type="button" aria-label="Close">✕</button></div>
-    <div class="field"><label for="adminCommunityName">Community name</label><input id="adminCommunityName" maxlength="100"></div>
-    <div class="field"><label for="adminCommunityUsername">Community username</label><input id="adminCommunityUsername" maxlength="30"></div>
-    <div class="field"><label for="adminCommunityDescription">Description</label><textarea id="adminCommunityDescription" maxlength="240" rows="3"></textarea></div>
-    <label class="check"><input id="adminCommunityListed" type="checkbox"> Show in public community directory</label>
-    <div class="field"><label for="adminCommunityPassword">New community password <span class="optional-label">Leave blank to keep current</span></label><input id="adminCommunityPassword" type="password" minlength="10" autocomplete="new-password"></div>
-    <button id="adminCommunityEditSave" class="btn btn-primary btn-block" type="button">Save community changes</button>
+    <div class="community-modal-head"><div><p class="admin-eyebrow" data-i18n="PLATFORM ADMIN">PLATFORM ADMIN</p><h2 id="adminCommunityEditTitle" data-i18n="Edit community">Edit community</h2></div><button id="adminCommunityEditClose" class="icon-btn light" type="button" aria-label="Close" data-i18n-aria="Close">✕</button></div>
+    <div class="field"><label for="adminCommunityName" data-i18n="Community name">Community name</label><input id="adminCommunityName" maxlength="100"></div>
+    <div class="field"><label for="adminCommunityUsername" data-i18n="Community username">Community username</label><input id="adminCommunityUsername" maxlength="30"></div>
+    <div class="field"><label for="adminCommunityDescription" data-i18n="Description">Description</label><textarea id="adminCommunityDescription" maxlength="240" rows="3"></textarea></div>
+    <label class="check"><input id="adminCommunityListed" type="checkbox" data-i18n="Show in public community directory"> Show in public community directory</label>
+    <div class="field"><label for="adminCommunityPassword" data-i18n="New community password">New community password <span class="optional-label" data-i18n="Leave blank to keep current">Leave blank to keep current</span></label><input id="adminCommunityPassword" type="password" minlength="10" autocomplete="new-password"></div>
+    <button id="adminCommunityEditSave" class="btn btn-primary btn-block" type="button" data-i18n="Save community changes">Save community changes</button>
     <p id="adminCommunityEditMsg" class="msg" role="status"></p>
   </section>
 </div>
-<button id="fabAdd" class="fab" type="button" title="New record" hidden>+</button>
+<button id="fabAdd" class="fab" type="button" title="New record" hidden data-i18n-title="New record">+</button>
 
 <script id="supabaseSdk" async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
 <script src="config.js?v=4"></script>
@@ -869,37 +869,37 @@ window.addEventListener("error", function (e) {
   <div id="communityOverlay" class="modal-overlay" hidden>
     <section class="community-modal" role="dialog" aria-modal="true" aria-labelledby="communityModalTitle">
       <header class="community-modal-head">
-        <div><span class="eyebrow">EASY KHATA COMMUNITIES</span><h2 id="communityModalTitle">Explore communities</h2></div>
-        <button id="communityModalClose" class="modal-close" type="button" aria-label="Close">×</button>
+        <div><span class="eyebrow" data-i18n="EASY KHATA COMMUNITIES">EASY KHATA COMMUNITIES</span><h2 id="communityModalTitle" data-i18n="Explore communities">Explore communities</h2></div>
+        <button id="communityModalClose" class="modal-close" type="button" aria-label="Close" data-i18n-aria="Close">×</button>
       </header>
       <div class="community-tabs">
-        <button id="communityTabCreate" type="button">Create community</button>
+        <button id="communityTabCreate" type="button" data-i18n="Create community">Create community</button>
         <button id="communityTabJoin" type="button">Find & join</button>
       </div>
       <div id="communityPanelCreate" class="community-panel" hidden>
-        <p class="muted">Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.</p>
-        <div class="field"><label for="newCommunityName">Community name</label><input id="newCommunityName" maxlength="100" placeholder="Example: Power House"></div>
-        <div class="field"><label for="newCommunityUsername">Community username</label><input id="newCommunityUsername" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="example: powerhouse"></div>
-        <div class="field"><label for="newCommunityPassword">Community password</label><input id="newCommunityPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters"></div>
-        <div class="field"><label for="newCommunityDescription">Short description (optional)</label><textarea id="newCommunityDescription" maxlength="240" rows="2" placeholder="What is this community for?"></textarea></div>
-        <button id="communityCreateSubmit" class="btn btn-primary btn-block" type="button">Create community</button>
+        <p class="muted" data-i18n="Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.">Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.</p>
+        <div class="field"><label for="newCommunityName" data-i18n="Community name">Community name</label><input id="newCommunityName" maxlength="100" placeholder="Example: Power House" data-i18n-ph="Example: Power House"></div>
+        <div class="field"><label for="newCommunityUsername" data-i18n="Community username">Community username</label><input id="newCommunityUsername" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="example: powerhouse" data-i18n-ph="example: powerhouse"></div>
+        <div class="field"><label for="newCommunityPassword" data-i18n="Community password">Community password</label><input id="newCommunityPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
+        <div class="field"><label for="newCommunityDescription" data-i18n="Short description (optional)">Short description (optional)</label><textarea id="newCommunityDescription" maxlength="240" rows="2" placeholder="What is this community for?" data-i18n-ph="What is this community for?"></textarea></div>
+        <button id="communityCreateSubmit" class="btn btn-primary btn-block" type="button" data-i18n="Create community">Create community</button>
       </div>
       <div id="communityPanelJoin" class="community-panel" hidden>
-        <p class="muted">Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.</p>
-        <div class="community-search"><input id="communitySearch" type="search" placeholder="Search community name or username"><span>⌕</span></div>
-        <div id="communityDirectory" class="community-directory"><p class="muted">Communities load ho rahi hain…</p></div>
+        <p class="muted" data-i18n="Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.">Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.</p>
+        <div class="community-search"><input id="communitySearch" type="search" placeholder="Search community name or username" data-i18n-ph="Search community name or username"><span>⌕</span></div>
+        <div id="communityDirectory" class="community-directory"><p class="muted" data-i18n="Communities load ho rahi hain…">Communities load ho rahi hain…</p></div>
         <div class="community-join-form">
-          <h3>Join a community</h3>
-          <div class="field"><label for="joinCommunityUsername">Community username</label><input id="joinCommunityUsername" autocapitalize="none" autocomplete="off" placeholder="Exact username"></div>
-          <div class="field"><label for="joinCommunityPassword">Community password</label><input id="joinCommunityPassword" type="password" autocomplete="off" placeholder="Community password"></div>
+          <h3 data-i18n="Join a community">Join a community</h3>
+          <div class="field"><label for="joinCommunityUsername" data-i18n="Community username">Community username</label><input id="joinCommunityUsername" autocapitalize="none" autocomplete="off" placeholder="Exact username" data-i18n-ph="Exact username"></div>
+          <div class="field"><label for="joinCommunityPassword" data-i18n="Community password">Community password</label><input id="joinCommunityPassword" type="password" autocomplete="off" placeholder="Community password" data-i18n-ph="Community password"></div>
           <button id="communityJoinSubmit" class="btn btn-primary btn-block" type="button">Verify & request to join</button>
         </div>
       </div>
       <div id="communityPanelSetup" class="community-panel" hidden>
-        <p class="muted">Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.</p>
-        <div class="community-username-chip" id="communitySetupUsername">@powerhouse</div>
-        <div class="field"><label for="communitySetupPassword">New community password</label><input id="communitySetupPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters"></div>
-        <button id="communitySetupSubmit" class="btn btn-primary btn-block" type="button">Save password</button>
+        <p class="muted" data-i18n="Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.">Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.</p>
+        <div class="community-username-chip" id="communitySetupUsername" data-i18n="@powerhouse">@powerhouse</div>
+        <div class="field"><label for="communitySetupPassword" data-i18n="New community password">New community password</label><input id="communitySetupPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
+        <button id="communitySetupSubmit" class="btn btn-primary btn-block" type="button" data-i18n="Save password">Save password</button>
       </div>
       <p id="communityMsg" class="msg" role="status" hidden></p>
     </section>
@@ -908,28 +908,28 @@ window.addEventListener("error", function (e) {
   <div id="membersOverlay" class="modal-overlay" hidden>
     <section class="community-modal members-modal" role="dialog" aria-modal="true" aria-labelledby="membersModalTitle">
       <header class="community-modal-head">
-        <div><span class="eyebrow">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle">Members & requests</h2><p id="membersModalSub" class="muted"></p></div>
-        <button id="membersModalClose" class="modal-close" type="button" aria-label="Close">×</button>
+        <div><span class="eyebrow" data-i18n="COMMUNITY MANAGEMENT">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle" data-i18n="Members">Members & requests</h2><p id="membersModalSub" class="muted"></p></div>
+        <button id="membersModalClose" class="modal-close" type="button" aria-label="Close" data-i18n-aria="Close">×</button>
       </header>
       <div class="community-invite-box" id="communityInviteBox">
-        <h3>✉️ Invite by email</h3>
-        <p class="muted">Join link ya email invite share karein — naya member password verify karke join karega.</p>
-        <button id="workspaceCopyCommunityLinkBtn" class="btn btn-soft btn-block" type="button">🔗 Copy community join link</button>
-        <div class="community-invite-divider"><span>ya</span></div>
+        <h3 data-i18n="✉️ Invite by email">✉️ Invite by email</h3>
+        <p class="muted" data-i18n="Join link ya email invite share karein — naya member password verify karke join karega.">Join link ya email invite share karein — naya member password verify karke join karega.</p>
+        <button id="workspaceCopyCommunityLinkBtn" class="btn btn-soft btn-block" type="button" data-i18n="🔗 Copy community join link">🔗 Copy community join link</button>
+        <div class="community-invite-divider"><span data-i18n="ya">ya</span></div>
         <div class="community-invite-row">
-          <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address">
-          <select id="workspaceInviteRole" aria-label="Invite role"><option value="staff">Staff</option><option value="accountant">Accountant</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
-          <button id="workspaceInviteSubmit" class="btn btn-primary" type="button">Copy invite link</button>
+          <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address" data-i18n-ph="Member email address">
+          <select id="workspaceInviteRole" aria-label="Invite role" data-i18n-aria="Invite role"><option value="staff" data-i18n="Staff">Staff</option><option value="accountant" data-i18n="Accountant">Accountant</option><option value="viewer" data-i18n="Viewer">Viewer</option><option value="admin" data-i18n="Admin">Admin</option></select>
+          <button id="workspaceInviteSubmit" class="btn btn-primary" type="button" data-i18n="Copy invite link">Copy invite link</button>
         </div>
       </div>
-      <h3 id="communityRequestsTitle">Pending join requests <span id="communityRequestsCount" class="cm-count"></span></h3>
+      <h3 id="communityRequestsTitle" data-i18n="Pending join requests">Pending join requests <span id="communityRequestsCount" class="cm-count"></span></h3>
       <div id="communityRequestsList" class="community-list"></div>
-      <h3 class="members-section-title">Members <span id="workspaceMemberCount" class="cm-count"></span></h3>
-      <div class="cm-search"><input id="workspaceMemberSearch" type="search" placeholder="Member search karein…" aria-label="Search members"><select id="workspaceMemberRoleFilter" aria-label="Filter members by role"><option value="">All roles</option><option value="owner">Owner</option><option value="admin">Admin</option><option value="accountant">Accountant</option><option value="staff">Staff</option><option value="viewer">Viewer</option></select></div>
+      <h3 class="members-section-title" data-i18n="Members">Members <span id="workspaceMemberCount" class="cm-count"></span></h3>
+      <div class="cm-search"><input id="workspaceMemberSearch" type="search" placeholder="Member search karein…" aria-label="Search members" data-i18n-aria="Search members" data-i18n-ph="Member search karein…"><select id="workspaceMemberRoleFilter" aria-label="Filter members by role" data-i18n-aria="Filter members by role"><option value="" data-i18n="All roles">All roles</option><option value="owner" data-i18n="Owner">Owner</option><option value="admin" data-i18n="Admin">Admin</option><option value="accountant" data-i18n="Accountant">Accountant</option><option value="staff" data-i18n="Staff">Staff</option><option value="viewer" data-i18n="Viewer">Viewer</option></select></div>
       <div id="workspaceMemberCards" class="community-list"></div>
     </section>
   </div>
 
-<script src="app.js?v=119"></script>
+<script src="app.js?v=120"></script>
 </body>
 </html>

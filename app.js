@@ -2846,10 +2846,10 @@
   function updatePushToggleLabel() {
     var el = $("acctPushLabel");
     if (!el) return;
-    if (!pushSupported) { el.textContent = "Notifications: Is browser mein nahi"; return; }
-    if (pushState === "on") el.textContent = "Notifications: On ✓";
-    else if (pushState === "denied") el.textContent = "Notifications: Blocked — browser settings se on karein";
-    else el.textContent = "Notifications On karein";
+    if (!pushSupported) { el.textContent = tr("Notifications: Is browser mein nahi"); return; }
+    if (pushState === "on") el.textContent = tr("Notifications: On ✓");
+    else if (pushState === "denied") el.textContent = tr("Notifications: Blocked — browser settings se on karein");
+    else el.textContent = tr("Notifications On karein");
   }
   function setPushMsg(text, ok) {
     var el = $("pushMsg");
@@ -4349,7 +4349,7 @@
     var label = btn.querySelectorAll("span")[1];
     if (!label) return;
     var r = myRating();
-    label.textContent = r ? "Rate Easy Khata " + "★".repeat(r.stars) + "☆".repeat(5 - r.stars) : "Rate Easy Khata";
+    label.textContent = r ? tr("Rate Easy Khata") + " " + "★".repeat(r.stars) + "☆".repeat(5 - r.stars) : tr("Rate Easy Khata");
   }
   var ratePicked = 0;
   function paintRateStars() {
@@ -4411,8 +4411,8 @@
     }
     if (!total) {
       $("peopleList").innerHTML = guestMode
-        ? '<p class="empty">Abhi koi dost nahi — neeche se pehla dost add karein.</p>'
-        : '<p class="empty">Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.</p>';
+        ? '<p class="empty">' + tr("Abhi koi dost nahi — neeche se pehla dost add karein.") + '</p>'
+        : '<p class="empty">' + tr("Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.") + '</p>';
       if (detailPersonId) renderPersonDetail(); // v86: aakhri dost gaya to khula detail bhi band ho (warna stale rehta)
       return;
     }
@@ -4437,7 +4437,7 @@
       }
       html += '<button class="person" type="button" data-person="' + esc(id) + '">' +
         '<span class="p-avatar">' + avatarHtml(p.avatar_url, initials(p.name)) + '</span>' +
-        '<span class="p-main"><span class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</span>' +
+        '<span class="p-main"><span class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">' + tr("Manual") + '</span>' : '') + '</span>' +
         '<span class="p-last">' + esc(last) + limitHtml + '</span></span>' +
         '<span class="p-net ' + cls + '">' + esc(netText) + '</span></button>';
     });
@@ -4471,7 +4471,7 @@
       // v24.2: profile card ka subtitle ab "Guest mode — bina login ke" NAHI
       // kehta — wohi jumla guest box ki heading mein bhi tha (do baar repeat).
       // Subtitle ab mukhtalif aur chhota hai; poora notice sirf guest box mein.
-      $("acctPhone").textContent = "Bina login ke — personal hisaab";
+      $("acctPhone").textContent = tr("Bina login ke — personal hisaab");
       var gn = $("guestNameInput");
       if (gn) gn.value = guestMeName || "";
     }
@@ -4491,8 +4491,8 @@
       var gg = loadGuestStore();
       var gn = gg ? (gg.txns || []).length : 0, gc = gg ? (gg.contacts || []).length : 0;
       $("acctGuestTransferLabel").textContent = (gn || gc)
-        ? ("Guest hisaab transfer karein — " + gn + " records · " + gc + " dost")
-        : "Guest hisaab transfer karein";
+        ? (tr("Guest hisaab transfer karein") + " — " + gn + " " + tr("records") + " · " + gc + " " + tr("dost"))
+        : tr("Guest hisaab transfer karein");
     }
     renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
     renderWorkspaceBar();
@@ -4859,8 +4859,8 @@
     var inp = $("pinLockInput");
     var pin = (inp.value || "").trim();
     var msg = $("pinLockMsg");
-    if (Date.now() < pinLockedUntil) { msg.textContent = "Bohot koshishen — thodi der ruk kar dobara try karein."; return; }
-    if (!/^\d{4}$/.test(pin)) { msg.textContent = "4-digit PIN likhein."; return; }
+    if (Date.now() < pinLockedUntil) { msg.textContent = tr("Bohot koshishen — thodi der ruk kar dobara try karein."); return; }
+    if (!/^\d{4}$/.test(pin)) { msg.textContent = tr("4-digit PIN likhein."); return; }
     if (pinCheck(pin)) { pinFails = 0; stopPinLockCountdown(); hidePinLock(); return; }
     pinFails++;
     inp.value = "";
@@ -4869,7 +4869,7 @@
       pinLockedUntil = Date.now() + 30000;
       $("pinLockUnlockBtn").disabled = true;
       var remain = 30; // v86: live countdown (30, 29, 28...)
-      msg.textContent = "5 dafa ghalat PIN — " + remain + " second ruk kar dobara try karein.";
+      msg.textContent = tr("5 dafa ghalat PIN — ") + remain + tr(" second ruk kar dobara try karein.");
       stopPinLockCountdown();
       pinLockCountdownId = setInterval(function () {
         remain--;
@@ -4881,10 +4881,10 @@
           if (inp2) { inp2.value = ""; try { inp2.focus(); } catch (e) {} }
           return;
         }
-        msg.textContent = "5 dafa ghalat PIN — " + remain + " second ruk kar dobara try karein.";
+        msg.textContent = tr("5 dafa ghalat PIN — ") + remain + tr(" second ruk kar dobara try karein.");
       }, 1000);
     } else {
-      msg.textContent = "Ghalat PIN hai (" + pinFails + "/5).";
+      msg.textContent = tr("Ghalat PIN hai (") + pinFails + "/5).";
     }
   }
   async function pinForgot() {
@@ -4999,7 +4999,7 @@
   }
   function renderPinLockMenu() {
     var label = $("acctPinLockLabel");
-    if (label) label.textContent = pinIsSet() ? "PIN Lock — change / band karein" : "PIN Lock set karein";
+    if (label) label.textContent = pinIsSet() ? tr("PIN Lock — change / band karein") : tr("PIN Lock set karein");
     var lockBtn = $("acctLockNowBtn");
     if (lockBtn) lockBtn.hidden = !pinIsSet();
   }
@@ -5112,7 +5112,7 @@
         ]);
       }
       peopleHead();
-      if (!peopleList.length) base.emptyBox("Abhi koi dost ya record nahi.");
+      if (!peopleList.length) base.emptyBox(tr("Abhi koi dost ya record nahi."));
       peopleList.forEach(function (p, i) {
         if (base.needPage(14)) peopleHead();
         base.tableRow([
@@ -5443,7 +5443,7 @@
         ]);
       }
       peopleHead();
-      if (!people.length) { base.emptyBox("Abhi koi dost ya record nahi."); }
+      if (!people.length) { base.emptyBox(tr("Abhi koi dost ya record nahi.")); }
       people.forEach(function (p, i) {
         if (base.needPage(14)) peopleHead();
         var b = p.net;
@@ -5474,7 +5474,7 @@
         ]);
       }
       histHeader();
-      if (!list.length) { base.emptyBox("Abhi koi record nahi."); }
+      if (!list.length) { base.emptyBox(tr("Abhi koi record nahi.")); }
       var histTotalMinor = 0;
       list.forEach(function (t, i) {
         if (base.needPage(14)) histHeader();
@@ -5702,7 +5702,7 @@
         ]);
       }
       histHeader();
-      if (!sorted.length) { base.emptyBox("Abhi koi record nahi."); }
+      if (!sorted.length) { base.emptyBox(tr("Abhi koi record nahi.")); }
       sorted.forEach(function (t, i) {
         if (base.needPage(14)) histHeader();
         var a = Number(t.amount) || 0;
@@ -5996,7 +5996,7 @@
       if (anyFilter) fc.textContent = list.length + " records shown";
     }
     if (!visibleTxns().length) {
-      $("txnList").innerHTML = '<p class="empty">Abhi koi record nahi — upar se pehla record add karein.</p>';
+      $("txnList").innerHTML = '<p class="empty">' + tr("Abhi koi record nahi — upar se pehla record add karein.") + '</p>';
       refreshScrollHints();
       return;
     }
@@ -6163,10 +6163,10 @@
       byCat[cat] = (byCat[cat] || 0) + a;
       byPerson[t.receiver_id] = (byPerson[t.receiver_id] || 0) + a;
     });
-    if (!totalMinor) { el.innerHTML = '<p class="empty">Is mahine abhi koi kharcha nahi.</p>'; return; }
+    if (!totalMinor) { el.innerHTML = '<p class="empty">' + tr("Is mahine abhi koi kharcha nahi.") + '</p>'; return; }
     var cats = Object.keys(byCat).sort(function (x, y) { return byCat[y] - byCat[x]; });
     var maxCat = byCat[cats[0]] || 1;
-    var html = '<div class="hh-total"><span>Is mahine kul kharcha</span><strong>' + esc(fmtRs(moneyFromMinor(totalMinor))) + "</strong></div>";
+    var html = '<div class="hh-total"><span>' + tr("Is mahine kul kharcha") + '</span><strong>' + esc(fmtRs(moneyFromMinor(totalMinor))) + "</strong></div>";
     html += '<p class="section-label">CATEGORY</p>';
     cats.forEach(function (cat) {
       var pct = Math.round((byCat[cat] / maxCat) * 100);
@@ -6298,6 +6298,10 @@
   var LANG_KEY = "easykhata_lang_v1";
   var lang = "ur";
   try { var savedLang = window.localStorage.getItem(LANG_KEY); if (savedLang === "en" || savedLang === "ur") lang = savedLang; } catch (e) {}
+  // v121: FULL-APP i18n — v118 ke 11 core labels + poora dictionary.
+  // Keys: v118 semantic keys (subtitle, nav_khata, ...) + har UI string ka
+  // Roman Urdu text (gettext-style). t(key) fallback = key khud, is liye
+  // Urdu mode ke liye en-only entries kaafi hain; ur dict mein sirf v118 keys.
   var I18N = {
     ur: {
       subtitle: "Aapka rozmarra ka hisaab", nav_khata: "Khata", nav_account: "Account",
@@ -6311,13 +6315,584 @@
       friends: "FRIENDS", customers: "CUSTOMERS", lenden: "TRANSACTIONS",
       diary: "\uD83D\uDCC5 Expense Diary", household: "\uD83C\uDFE0 Household Expenses",
       due: "\u23F0 Due Soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Savings Goal",
-      gave: "\u2191 I Gave", took: "\u2193 I Took"
+      gave: "\u2191 I Gave", took: "\u2193 I Took",
+
+  // ---- Header / nav ----
+  "Aapka rozmarra ka hisaab": "Your daily ledger",
+  "Khata": "Ledger",
+  "Account": "Account",
+  "Login": "Login",
+  "Logout": "Logout",
+  "Developed by Asad": "Developed by Asad",
+  "Easy Khata": "Easy Khata",
+  "Easy Khata — Rozmarra ka Hisaab": "Easy Khata — Daily Ledger",
+  "DOST": "FRIENDS",
+  "CUSTOMERS": "CUSTOMERS",
+  "LEN-DEN": "TRANSACTIONS",
+  // ---- Khata view ----
+  "Apna len-den asaani se darj karein": "Record your transactions easily",
+  "Naya record": "New record",
+  "Raqam (Rs)": "Amount (Rs)",
+  "Dost ka naam": "Friend's name",
+  "Kis ke saath?": "With whom?",
+  "Kisam": "Type",
+  "Maine dene hain": "I have to give",
+  "Maine lene hain": "I have to take",
+  "Note": "Note",
+  "Tareekh": "Date",
+  "Category": "Category",
+  "Khana": "Food",
+  "Udhaar": "Loan",
+  "Kiraya": "Rent",
+  "Bijli": "Electricity",
+  "Petrol": "Petrol",
+  "Shopping": "Shopping",
+  "Transport": "Transport",
+  "Health": "Health",
+  "Education": "Education",
+  "Other": "Other",
+  "All categories": "All categories",
+  "Wapsi ki tareekh": "Return date",
+  "Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.": "If it's a loan, when is it due back — for a reminder.",
+  "Bill ki photo": "Bill photo",
+  "Dost add karein": "Add friend",
+  "Dost save karein": "Save friend",
+  "Naya dost": "New friend",
+  "Dost chunein (baantne ke liye)": "Choose friends (to split)",
+  "Aik khana, kai dost — barabar baant lein": "One meal, many friends — split equally",
+  "Apna balance": "My balance",
+  "All Records": "All Records",
+  "All records — newest first.": "All records — newest first.",
+  "Is mahine ka hisaab": "This month's ledger",
+  "Is mahine ke Diye / Liye / Records": "This month's Given / Taken / Records",
+  "Hisaab barabar": "Settled",
+  "Diye / Liye / Net + aakhri record — sirf apne liye ya kisi khaas bande ko": "Given / Taken / Net + last record — just for you or one person",
+  "Dost ko remove karein": "Remove friend",
+  "Neeche scroll karein — purane len-den dekhne ke liye": "Scroll down — to see older transactions",
+  "Neeche scroll karein — purane records dekhne ke liye": "Scroll down — to see older records",
+  "Search name, food or amount...": "Search name, food or amount...",
+  "Dost dhoondhein — naam likhein...": "Find a friend — type a name...",
+  "Name A–Z": "Name A–Z",
+  "From": "From",
+  "To": "To",
+  "Clear filters": "Clear filters",
+  "Rs 0": "Rs 0",
+  // ---- Person detail ----
+  "Mainey Diye": "I Gave",
+  "Mainey Liye": "I Took",
+  "Settle karein — JazzCash / Easypaisa": "Settle — JazzCash / Easypaisa",
+  "Card Link Karein": "Link Card",
+  "NFC Card": "NFC Card",
+  "NFC Scan": "NFC Scan",
+  "Unlink": "Unlink",
+  "Credit limit (Rs) — is customer ko kitna udhaar de sakte hain": "Credit limit (Rs) — how much credit this customer can get",
+  "Detail / category": "Detail / category",
+  // ---- Diary / calendar ----
+  "Kharcha Diary": "Expense Diary",
+  "Har din ka hisaab — din par tap karein, us din ke records dekhein.": "Daily ledger — tap a day to see that day's records.",
+  "Mon": "Mon",
+  "Tue": "Tue",
+  "Wed": "Wed",
+  "Thu": "Thu",
+  "Fri": "Fri",
+  "Sat": "Sat",
+  "Sun": "Sun",
+  // ---- Household ----
+  "Ghar ka kharcha": "Household Expenses",
+  "Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.": "How much was spent at home this month — by category and member.",
+  // ---- Due / budget / goal ----
+  "Due-soon": "Due Soon",
+  "Aane wale 7 din mein due hone wale udhaar — aur overdue.": "Loans due in the next 7 days — and overdue ones.",
+  "Monthly Budget": "Monthly Budget",
+  "Is mahine kitna kharch kar sakte hain — 80% par alert milega.": "How much you can spend this month — alert at 80%.",
+  "Bachat Goal": "Savings Goal",
+  "Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.": "Save for something special — set a target and track progress.",
+  "Goal Save": "Save Goal",
+  "Yaad Dehani": "Reminder",
+  // ---- Account menu ----
+  "Backup": "Backup",
+  "Backup, restore aur transfer — apna hisaab mehfooz rakhein.": "Backup, restore and transfer — keep your ledger safe.",
+  "Backup — CSV download karein": "Backup — download CSV",
+  "JSON Backup — poora hisaab download karein": "JSON Backup — download full ledger",
+  "JSON Restore — backup se wapas layein": "JSON Restore — restore from backup",
+  "PIN Lock set karein": "Set PIN Lock",
+  "Abhi lock karein": "Lock now",
+  "PIN bhool gaye?": "Forgot PIN?",
+  "Apna 4-digit PIN likhein.": "Enter your 4-digit PIN.",
+  "Recurring records": "Recurring records",
+  "Recurring": "Recurring",
+  "Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.": "A record is created every month or week automatically — no need to write it again.",
+  "Har mahina": "Every month",
+  "Har hafta": "Every week",
+  "Kab repeat ho?": "When to repeat?",
+  "Kis din?": "Which day?",
+  "Agli tareekh par record khud ban jayega": "A record will be created automatically on the next date",
+  "Har dafa repeat karein": "Repeat every time",
+  "Monthly report": "Monthly report",
+  "Pichhle mahine ka hisaab — PDF mein, aik dafa mein.": "Last month's ledger — as a PDF, in one go.",
+  "PDF Report download karein": "Download PDF Report",
+  "Excel Report download karein": "Download Excel Report",
+  "Download PDF Report": "Download PDF Report",
+  "Download karein": "Download",
+  "Excel": "Excel",
+  "PDF Report": "PDF Report",
+  "Share Easy Khata": "Share Easy Khata",
+  "Rate Easy Khata": "Rate Easy Khata",
+  "Easy Khata ko rate karein": "Rate Easy Khata",
+  "App kaisi lagi? Sitare chun kar batayein — aap ki rai se app behtar hoti hai.": "How's the app? Pick stars to tell us — your feedback makes the app better.",
+  "Rate karein": "Rate",
+  "WhatsApp helpline": "WhatsApp helpline",
+  "WhatsApp": "WhatsApp",
+  "Privacy": "Privacy",
+  "Privacy Policy — Easy Khata": "Privacy Policy — Easy Khata",
+  "Full Privacy Policy parhein": "Read the Full Privacy Policy",
+  "Aap ka hisaab, aap ka data.": "Your ledger, your data.",
+  "Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.": "Your personal contacts stay private. Transactions added in a community can be seen by that community's authorized members. Without login, your ledger is saved only on this device; with an account, you can see your ledger on other devices too.",
+  "Kya save hota hai:": "What is saved:",
+  "aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.": "your name, phone number, contacts, transactions, profile photo and notification settings.",
+  "Kya share nahi hota:": "What is never shared:",
+  "aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.": "your data is never sold to any third party and never used for ads. Friends only see what you share yourself (WhatsApp/Share message) — not the full ledger.",
+  "Profile:": "Profile:",
+  "aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.": "your profile information may be visible to community members. You can update your profile details yourself.",
+  "Account band karna:": "Closing your account:",
+  "account band karwane ke liye WhatsApp helpline se rabta karein.": "to close your account, contact the WhatsApp helpline.",
+  "Hidden records": "Hidden records",
+  "Hidden records — Restore": "Hidden records — Restore",
+  "Yahan se record apni history mein restore karein.": "Restore a record to your history from here.",
+  "Guest hisaab transfer karein": "Transfer guest ledger",
+  "Notifications On karein": "Turn Notifications On",
+  "Admin Panel": "Admin Panel",
+  "Admin": "Admin",
+  "Admin Dashboard": "Admin Dashboard",
+  // ---- Guest box ----
+  "Guest mode — bina login ke": "Guest mode — without login",
+  "Ye hisaab sirf is phone/browser par save hai — account banane par cloud par save hoga.": "This ledger is saved only on this phone/browser — it will be saved to the cloud when you create an account.",
+  "hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.": "ledger is saved only on this phone/browser — no account needed.",
+  "Apna naam": "Your name",
+  "Aap ka naam": "Your name",
+  "Naam save karein": "Save name",
+  "Account Banayein": "Create Account",
+  "Account banane ke baad aap se poocha jayega ke guest hisaab cloud mein save karna hai ya nahi.": "After creating an account, you'll be asked whether to save the guest ledger to the cloud.",
+  "Guest mode se bahar niklein": "Exit guest mode",
+  "Bina Login Ke Istemal Karein": "Use Without Login",
+  "Bina login ke:": "Without login:",
+  "Doston aur family ke saath kharchon ka hisaab — asaan tareeqe se": "Track expenses with friends and family — the easy way",
+  "Doston ke saath khane ka hisaab": "Food ledger with friends",
+  "aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.": "your name appears in the ledger, friends can pick you for shared expenses; phone is for WhatsApp reminders — it can be added later too.",
+  // ---- Profile edit / password ----
+  "Profile edit karein": "Edit profile",
+  "Mera naam": "My name",
+  "Mera WhatsApp number": "My WhatsApp number",
+  "Username (optional — dosray aap ko is se pehchanenge)": "Username (optional — others will recognise you by this)",
+  "Email (badla nahi ja sakta)": "Email (cannot be changed)",
+  "Email": "Email",
+  "Email address": "Email address",
+  "Full name": "Full name",
+  "Phone / WhatsApp number": "Phone / WhatsApp number",
+  "WhatsApp number": "WhatsApp number",
+  "Profile save karein": "Save profile",
+  "Photo badlein": "Change photo",
+  "Photo hatayein": "Remove photo",
+  "Photo 512px tak chhoti kar ke save hogi.": "Photo will be shrunk to 512px and saved.",
+  "Password badlein": "Change password",
+  "Change password": "Change password",
+  "Naya password": "New password",
+  "Naya password dobara": "New password again",
+  "Naya password likhein.": "Write the new password.",
+  "Password save karein": "Save password",
+  "Save password": "Save password",
+  "Password": "Password",
+  "Password bhool gaye?": "Forgot password?",
+  "Reset link bhejein": "Send reset link",
+  "Leave blank to keep current": "Leave blank to keep current",
+  "Save karein": "Save",
+  "Save": "Save",
+  "Cancel karein": "Cancel",
+  "Cancel": "Cancel",
+  "Band karein": "Close",
+  "Continue": "Continue",
+  "Back": "Back",
+  "Wapas": "Back",
+  "Add": "Add",
+  "Edit": "Edit",
+  "Description": "Description",
+  "Short description (optional)": "Short description (optional)",
+  "(optional)": "(optional)",
+  "Optional": "Optional",
+  // ---- Auth ----
+  "Login karein": "Login",
+  "Login par wapas": "Back to login",
+  "Create account": "Create account",
+  "Naya Account": "New Account",
+  "Account banane par:": "When you create an account:",
+  "Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.": "After creating an account, you can make your own community and be its owner.",
+  "Barah-e-karam kuch dair baad dobara koshish karein ya support se rabta karein.": "Please try again after a while or contact support.",
+  // ---- Share sheet ----
+  "Kya share karein?": "What to share?",
+  "Jo share karna hai woh chunein — preview neeche dikhe ga, aur sirf wohi jayega jo aap chunein ge.": "Choose what to share — the preview below shows it, and only what you choose will be sent.",
+  "Sirf app link": "App link only",
+  "Safe — sirf Easy Khata ka link, koi raqam nahi": "Safe — only the Easy Khata link, no amounts",
+  "Apna balance share karein": "Share my balance",
+  "Share": "Share",
+  "Share karein": "Share",
+  "Barcode — camera se scan kar ke app kholein": "Barcode — scan with camera to open the app",
+  "Preview — yehi jayega": "Preview — this is what will be sent",
+  "Copy invite link": "Copy invite link",
+  // ---- Community ----
+  "Community": "Community",
+  "Community dhoondhein": "Find community",
+  "Find Community": "Find Community",
+  "Find & join": "Find & join",
+  "Join a community": "Join a community",
+  "Create Community": "Create Community",
+  "Create community": "Create community",
+  "Nayi Community": "New Community",
+  "Community name": "Community name",
+  "Community username": "Community username",
+  "Community password": "Community password",
+  "New community password": "New community password",
+  "Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.": "Make a private community for your company, office or group. Pick a unique username and a strong password.",
+  "Apni community dhoondhein ya account banane ke baad nayi community banayein.": "Find your community, or make a new one after creating an account.",
+  "Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.": "Find your community. To join, enter its username and password. After the owner's approval, you'll be added.",
+  "Community list load karne ke liye search karein.": "Search to load the community list.",
+  "Communities load ho rahi hain…": "Communities are loading…",
+  "Explore communities": "Explore communities",
+  "All communities": "All communities",
+  "All community members": "All community members",
+  "Community management": "Community management",
+  "COMMUNITY MANAGEMENT": "COMMUNITY MANAGEMENT",
+  "EASY KHATA COMMUNITIES": "EASY KHATA COMMUNITIES",
+  "Manage Members": "Manage Members",
+  "Members": "Members",
+  "Members & requests": "Members & requests",
+  "Pending join requests": "Pending join requests",
+  "Verify & request to join": "Verify & request to join",
+  "Join link ya email invite share karein — naya member password verify karke join karega.": "Share a join link or email invite — a new member joins after verifying the password.",
+  "Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.": "Set a password to make it easy for other members to find the Power House community.",
+  "Show in public community directory": "Show in public community directory",
+  "Edit community": "Edit community",
+  "Save community changes": "Save community changes",
+  "Invite Member": "Invite Member",
+  "Invite by email": "Invite by email",
+  "Copy community join link": "Copy community join link",
+  "Jab koi aap ke saath record save kare, to yahan message aayega.": "When someone saves a record with you, a message will appear here.",
+  "Jo abhi Easy Khata par nahi hain": "Who are not on Easy Khata yet",
+  "Contacts se chunein": "Choose from contacts",
+  "Number dene se baad mein unka account banne par dost automatically link ho sakta hai.": "Giving a number means the friend can be linked automatically later when their account is created.",
+  "Is user ka hisaab": "This user's ledger",
+  "Is user ke liye aik record banayein — opening balance ya correction. Record aap aur is user ke beech hoga, aur unhein notification bhi milegi.": "Make a record for this user — opening balance or correction. The record will be between you and this user, and they'll get a notification too.",
+  "Raqam set karein": "Set amount",
+  "Raqam set karein (admin)": "Set amount (admin)",
+  "User ko dene hain": "User has to give",
+  "User se lene hain": "User has to take",
+  "Temporary password": "Temporary password",
+  "User ID": "User ID",
+  "Deactivate user": "Deactivate user",
+  "Block": "Block",
+  "Active": "Active",
+  "Active only": "Active only",
+  "Blocked only": "Blocked only",
+  "Suspended": "Suspended",
+  "All users": "All users",
+  "All roles": "All roles",
+  "All statuses": "All statuses",
+  "All": "All",
+  "All business communities · edit, suspend, restore and safe delete": "All business communities · edit, suspend, restore and safe delete",
+  "EASY KHATA · CONTROL CENTER": "EASY KHATA · CONTROL CENTER",
+  "PLATFORM ADMIN": "PLATFORM ADMIN",
+  "Users aur account controls": "Users and account controls",
+  "Users, ledger activity aur platform health — sab aik jagah.": "Users, ledger activity and platform health — all in one place.",
+  "User management": "User management",
+  "Manage roles, access and community ownership. Ledger history remains intact.": "Manage roles, access and community ownership. Ledger history remains intact.",
+  "LIVE DATA": "LIVE DATA",
+  "Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.": "Analytics are based on the 500 recently loaded transactions.",
+  "Last 14 days · loaded ledger records": "Last 14 days · loaded ledger records",
+  "Last 6 months · total recorded amount": "Last 6 months · total recorded amount",
+  "Latest transactions available in this session": "Latest transactions available in this session",
+  "Transaction activity": "Transaction activity",
+  "Monthly volume": "Monthly volume",
+  "Most active users": "Most active users",
+  "Most records": "Most records",
+  "Ranked by user record count": "Ranked by user record count",
+  "Recent ledger activity": "Recent ledger activity",
+  "Newest joined": "Newest joined",
+  "Joined": "Joined",
+  "Naye (0)": "New (0)",
+  "Parhe hue (0)": "Read (0)",
+  "Sab (0)": "All (0)",
+  "Sab parha hua karein": "Mark all as read",
+  "Updating…": "Updating…",
+  "Offline": "Offline",
+  "Refresh": "Refresh",
+  "Refresh data": "Refresh data",
+  "Fori updates": "Instant updates",
+  "WhatsApp reminders": "WhatsApp reminders",
+  "Dukaan mode: Off": "Shop mode: Off",
+  "Dukaan mode: dukaan ke customers ke liye": "Shop mode: for shop customers",
+  "Accountant": "Accountant",
+  "Owner": "Owner",
+  "Staff": "Staff",
+  "Viewer": "Viewer",
+  "Add user": "Add user",
+  // ---- Placeholders (inputs) ----
+  "Apni rai likhein (optional)": "Write your feedback (optional)",
+  "At least 10 characters": "At least 10 characters",
+  "At least 8 characters": "At least 8 characters",
+  "Bachat add karein (Rs)": "Add savings (Rs)",
+  "Community name ya @username": "Community name or @username",
+  "Dobara likhein": "Write again",
+  "Exact username": "Exact username",
+  "Example: 0300 1234567": "Example: 0300 1234567",
+  "Example: 500": "Example: 500",
+  "Example: Ali Khan": "Example: Ali Khan",
+  "Example: Asad": "Example: Asad",
+  "Example: Asad Amanat Ali": "Example: Asad Amanat Ali",
+  "Example: Opening balance": "Example: Opening balance",
+  "Example: Power House": "Example: Power House",
+  "Example: asad_ali": "Example: asad_ali",
+  "Goal ka naam (e.g. Bike)": "Goal name (e.g. Bike)",
+  "Kam se kam 8 harf": "At least 8 characters",
+  "Khana, Cash, Other ya kuch bhi likhein": "Write Food, Cash, Other or anything",
+  "Member email address": "Member email address",
+  "Member search karein…": "Search members…",
+  "Misal: Yaseen": "Example: Yaseen",
+  "Search community name or username": "Search community name or username",
+  "Search community name or username…": "Search community name or username…",
+  "Search member, email or community…": "Search member, email or community…",
+  "Search name, email or phone…": "Search name, email or phone…",
+  "Target (Rs)": "Target (Rs)",
+  "What is this community for?": "What is this community for?",
+  "ali@example.com": "ali@example.com",
+  "e.g. 20000": "e.g. 20000",
+  "e.g. 5000": "e.g. 5000",
+  "example: powerhouse": "example: powerhouse",
+  "you@email.com": "you@email.com",
+  // ---- Titles / aria-labels ----
+  "Agla mahina": "Next month",
+  "Pichhla mahina": "Previous month",
+  "Balance chhupayein": "Hide balance",
+  "Balance chhupayein / dikhayein": "Hide / show balance",
+  "Category filter": "Category filter",
+  "From (date)": "From (date)",
+  "To (date)": "To (date)",
+  "Language badlein": "Change language",
+  "Login / Sign up": "Login / Sign up",
+  "NFC card tap kar ke us bande ka khata kholein": "Tap an NFC card to open that person's ledger",
+  "New record": "New record",
+  "Notifications": "Notifications",
+  "Show password": "Show password",
+  "Theme badlein": "Change theme",
+  "Close": "Close",
+  "1 star": "1 star",
+  "2 stars": "2 stars",
+  "3 stars": "3 stars",
+  "4 stars": "4 stars",
+  "5 stars": "5 stars",
+  "Community options": "Community options",
+  "Daily transaction activity chart": "Daily transaction activity chart",
+  "Easy Khata app link QR code": "Easy Khata app link QR code",
+  "Filter members by community": "Filter members by community",
+  "Filter members by role": "Filter members by role",
+  "Filter users": "Filter users",
+  "Hisaab ya community select karein": "Select a ledger or community",
+  "Invite role": "Invite role",
+  "Loading": "Loading",
+  "Monthly transaction volume chart": "Monthly transaction volume chart",
+  "Notifications filter": "Notifications filter",
+  "Rating": "Rating",
+  "Search communities": "Search communities",
+  "Search community members": "Search community members",
+  "Search members": "Search members",
+  "Search public communities": "Search public communities",
+  "Search users": "Search users",
+  "Share options": "Share options",
+  // ---- Misc UI ----
+  "Easy Khata abhi tayyar nahi": "Easy Khata is not ready yet",
+  "Easy Khata locked hai": "Easy Khata is locked",
+  "Unlock": "Unlock",
+  "Confirm action": "Confirm action",
+  "ya": "or",
+  "Poora hisaab": "Full ledger",
+  "@powerhouse": "@powerhouse",
+  // ---- JS dynamic strings (main render paths + messages) ----
+  "Aaj due": "Due today",
+  "din baaki": "days left",
+  "din overdue": "days overdue",
+  "Baqi": "Remaining",
+  "Kharch": "Spent",
+  "Budget": "Budget",
+  "Goal poora ho gaya — mubarak ho!": "Goal complete — congratulations!",
+  "Budget se zyada kharch ho gaya!": "You spent more than the budget!",
+  "80% budget istemal ho gaya — kharch par nazar rakhein.": "80% of the budget is used — watch your spending.",
+  "Limit se zyada": "Over the limit",
+  "NFC is device par available nahi hai — Android Chrome + NFC ON chahiye. (iPhone / desktop par NFC nahi chalta.)": "NFC is not available on this device — you need Android Chrome + NFC ON. (NFC doesn't work on iPhone / desktop.)",
+  "Ye card kisi se link nahi hai": "This card is not linked to anyone",
+  "Koi NFC card link nahi": "No NFC card linked",
+  "Record save ho gaya": "Record saved",
+  "Dost save ho gaya": "Friend saved",
+  "Naam save ho gaya": "Name saved",
+  "Profile save ho gayi": "Profile saved",
+  "Password badal gaya": "Password changed",
+  "PIN set ho gaya": "PIN set",
+  "PIN band ho gaya": "PIN turned off",
+  "Backup download ho gaya": "Backup downloaded",
+  "Report download ho rahi hai…": "Report is downloading…",
+  "Internet nahi hai — offline mode": "No internet — offline mode",
+  "Dobara koshish karein": "Try again",
+  "Kuch ghalat ho gaya": "Something went wrong",
+  "Raqam likhein": "Enter an amount",
+  "Dost chunein": "Choose a friend",
+  "Aaj": "Today",
+  "Kal": "Yesterday",
+  "Diye": "Given",
+  "Liye": "Taken",
+  "Net": "Net",
+  "Total": "Total",
+  "Records": "Records",
+  "Search": "Search",
+  "No records": "No records",
+  "Koi record nahi": "No records",
+  "Koi dost nahi": "No friends",
+  "Loading…": "Loading…",
+  "Naam": "Name",
+  "Naam aur number add karein": "Add name and number",
+  "QUICK ENTRY": "QUICK ENTRY",
+  "Record banayein": "Create record",
+  "TOTAL BALANCE": "TOTAL BALANCE",
+  "Sort users": "Sort users",
+  "“Har dafa repeat karein” tick karein": "Tick “Repeat every time”",
+  "← Account": "← Account",
+  "← Wapas": "← Back",
+  "↑ Mainey Diye": "↑ I Gave",
+  "↓ Export users": "↓ Export users",
+  "↓ Mainey Liye": "↓ I Took",
+  "↓ Neeche scroll karein — purane len-den dekhne ke liye": "↓ Scroll down — to see older transactions",
+  "↓ Neeche scroll karein — purane records dekhne ke liye": "↓ Scroll down — to see older records",
+  "↗ Share karein": "↗ Share",
+  "↻ Refresh data": "↻ Refresh data",
+  "⏰ Due-soon": "⏰ Due Soon",
+  "☁️ Account Banayein": "☁️ Create Account",
+  "⚡ Fori updates": "⚡ Instant updates",
+  "✉️ Invite Member": "✉️ Invite Member",
+  "✉️ Invite by email": "✉️ Invite by email",
+  "＋ Add user": "＋ Add user",
+  "＋ Create community": "＋ Create community",
+  "＋ Nayi Community": "＋ New Community",
+  "🌐 EN": "🌐 EN",
+  "🎯 Bachat Goal": "🎯 Savings Goal",
+  "🏠 Ghar ka kharcha": "🏠 Household Expenses",
+  "🏪 Dukaan mode: Off": "🏪 Shop mode: Off",
+  "👁 Preview — yehi jayega": "👁 Preview — this is what will be sent",
+  "👤 Guest": "👤 Guest",
+  "👥 Manage Members": "👥 Manage Members",
+  "💬 WhatsApp reminders": "💬 WhatsApp reminders",
+  "💰 Monthly Budget": "💰 Monthly Budget",
+  "💸 Settle karein — JazzCash / Easypaisa": "💸 Settle — JazzCash / Easypaisa",
+  "📄 Download PDF Report": "📄 Download PDF Report",
+  "📄 Download karein": "📄 Download",
+  "📄 PDF Report": "📄 PDF Report",
+  "📅 Kharcha Diary": "📅 Expense Diary",
+  "📊 Excel": "📊 Excel",
+  "📒 Poora hisaab": "📒 Full ledger",
+  "📤 Apna balance share karein": "📤 Share my balance",
+  "📶 Card Link Karein": "📶 Link Card",
+  "📶 NFC Card": "📶 NFC Card",
+  "📶 NFC Scan": "📶 NFC Scan",
+  "📷 Barcode — camera se scan kar ke app kholein": "📷 Barcode — scan with camera to open the app",
+  "📷 Photo badlein": "📷 Change photo",
+  "🔁 Har dafa repeat karein": "🔁 Repeat every time",
+  "🔁 Recurring records": "🔁 Recurring records",
+  "🔍 Find Community": "🔍 Find Community",
+  "🔑 Login": "🔑 Login",
+  "🔑 Password badlein": "🔑 Change password",
+  "🔒 Community Password": "🔒 Community Password",
+  "🔗 Copy community join link": "🔗 Copy community join link",
+  "🟡 Easypaisa": "🟡 Easypaisa",
+  "🟢 JazzCash": "🟢 JazzCash",
+  "Due: ": "Due: ",
+  "Manual": "Manual",
+  "Abhi koi dost nahi — neeche se pehla dost add karein.": "No friends yet — add your first friend below.",
+  "Abhi koi dost nahi — dost account banayenge to yahan nazar aayenge.": "No friends yet — friends will appear here when they create an account.",
+  "Abhi koi dost ya record nahi.": "No friends or records yet.",
+  "Abhi koi record nahi.": "No records yet.",
+  "Abhi koi record nahi — upar se pehla record add karein.": "No records yet — add your first record above.",
+  "Is mahine abhi koi kharcha nahi.": "No expenses this month yet.",
+  "Is mahine kul kharcha": "Total spent this month",
+  "Abhi koi dost nahi.": "No friends yet.",
+  "⚠️ Budget se zyada kharch ho gaya!": "⚠️ You spent more than the budget!",
+  "🎉 Goal poora ho gaya — mubarak ho!": "🎉 Goal complete — congratulations!",
+  "Record badlein": "Edit record",
+  "Pehle dost chunein, phir raqam likhein.": "Choose friends first, then enter the amount.",
+  "Bina login ke — personal hisaab": "Without login — personal ledger",
+  "Notifications: Is browser mein nahi": "Notifications: Not in this browser",
+  "Notifications: On ✓": "Notifications: On ✓",
+  "Notifications: Blocked — browser settings se on karein": "Notifications: Blocked — turn on from browser settings",
+  "Bohot koshishen — thodi der ruk kar dobara try karein.": "Too many attempts — wait a bit and try again.",
+  "4-digit PIN likhein.": "Enter a 4-digit PIN.",
+  "Ghalat PIN hai": "Wrong PIN",
+  "Download ho gaya": "Downloaded",
+  "Aaj tak": "So far",
+  "Aap ki PDF report download ho gayi (": "Your PDF report downloaded (",
+  "Aap ko mile": "You receive",
+  "Aap ne diye": "You gave",
+  "Offline · ": "Offline · ",
+  "Sync pending": "Sync pending",
+  "changes baqi": "changes left",
+  "changes baqi hain": "changes left",
+  "Dark mode": "Dark mode",
+  "5 dafa ghalat PIN — ": "Wrong PIN 5 times — ",
+  " second ruk kar dobara try karein.": " — wait seconds and try again.",
+  "Ghalat PIN hai (": "Wrong PIN (",
+  "Mahine ki ": "Day ",
+  " tareekh": "",
+  "Pehla repeat: ": "First repeat: ",
+  " — us ke baad ": " — after that ",
+  "har hafta usi din": "same day every week",
+  "har mahine ki ": "of every month",
+  "Har aik ka hissa: ": "Each person's share: ",
+  "dost": "friend",
+  "aap": "you",
+  "kull": "total",
+  "aap ka hissa": "your share",
+  "PIN Lock — change / band karein": "PIN Lock — change / turn off",
+  "records": "records",
     }
   };
-  function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.ur[key] || key; }
-  function peopleLabelText() { return t(dukaanMode ? "customers" : "friends"); }
+  // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
+  // variable hota hai (transaction, event target) aur shadow kar deta hai.
+  // undefined check (not ||) — kuch English translations khaali string
+  // hain (e.g. " tareekh" -> ""), aur "" falsy hota hai, is liye || galat
+  // fallback deta. Missing key par Urdu text (key khud) wapas milta hai.
+  function tr(key) {
+    var d = I18N[lang];
+    if (d && d[key] !== undefined) return d[key];
+    if (I18N.ur[key] !== undefined) return I18N.ur[key];
+    return key;
+  }
+  function peopleLabelText() { return tr(dukaanMode ? "customers" : "friends"); }
+  // v121: FULL-APP language switch — static text (data-i18n), placeholders,
+  // titles aur aria-labels bhi translate karo; phir dynamic content dobara
+  // render karo taake JS se bane labels/messages bhi badal jayen.
+  // v121: textContent = translation child elements (badges, counts, "Optional"
+  // spans) ko bhi mita deta hai — e.g. Pending-join-requests h3 ke andar
+  // communityRequestsCount span. Sirf direct text nodes badlo, children salamat.
+  function setI18nText(el, text) {
+    var nodes = [];
+    for (var i = 0; i < el.childNodes.length; i++) {
+      if (el.childNodes[i].nodeType === 3) nodes.push(el.childNodes[i]);
+    }
+    if (!nodes.length) { el.textContent = text; return; }
+    var tail = "";
+    var m = (nodes[0].nodeValue || "").match(/\s+$/);
+    if (m) tail = m[0];
+    nodes[0].nodeValue = text + tail;
+    for (var j = 1; j < nodes.length; j++) nodes[j].nodeValue = "";
+  }
   function applyLanguage() {
-    document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = t(el.getAttribute("data-i18n")); });
+    document.querySelectorAll("[data-i18n]").forEach(function (el) { setI18nText(el, tr(el.getAttribute("data-i18n"))); });
+    document.querySelectorAll("[data-i18n-ph]").forEach(function (el) { el.setAttribute("placeholder", tr(el.getAttribute("data-i18n-ph"))); });
+    document.querySelectorAll("[data-i18n-title]").forEach(function (el) { el.setAttribute("title", tr(el.getAttribute("data-i18n-title"))); });
+    document.querySelectorAll("[data-i18n-aria]").forEach(function (el) { el.setAttribute("aria-label", tr(el.getAttribute("data-i18n-aria"))); });
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText();
     var btn = $("langToggleBtn"); if (btn) btn.textContent = lang === "ur" ? "\uD83C\uDF10 EN" : "\uD83C\uDF10 \u0627\u0631\u062F\u0648";
   }
@@ -6325,6 +6900,9 @@
     lang = lang === "ur" ? "en" : "ur";
     try { window.localStorage.setItem(LANG_KEY, lang); } catch (e) {}
     applyLanguage();
+    // v121: dynamic content (JS renders) bhi dobara banao — warna sirf static
+    // labels badalte aur list/detail ke labels purani zaban mein rehte.
+    try { renderAll(); } catch (e) {}
   }
   var shortcutHandled = false;
   function handleShortcutAction() {
@@ -6390,7 +6968,7 @@
     var pct = Math.round((saved / goal.target) * 100);
     var remaining = goal.target - saved;
     var doneHtml = saved >= goal.target
-      ? '<p class="goal-done">\uD83C\uDF89 Goal poora ho gaya — mubarak ho!</p>'
+      ? '<p class="goal-done">' + tr("\uD83C\uDF89 Goal poora ho gaya — mubarak ho!") + '</p>'
       : '<p class="muted">Baqi: <strong>' + esc(fmtRs(remaining)) + '</strong> \u00B7 ' + goal.contributions.length + ' dafa bachat add ki</p>';
     body.innerHTML =
       '<div class="goal-head"><strong>' + esc(goal.name) + '</strong><span>' + pct + '%</span></div>' +
@@ -6473,9 +7051,9 @@
     var today = todayLocal();
     var d1 = new Date(today + "T00:00:00"), d2 = new Date(dueDate + "T00:00:00");
     var diff = Math.round((d2 - d1) / 86400000);
-    if (diff === 0) return { label: "Aaj due", cls: "due-today" };
-    if (diff > 0) return { label: diff + " din baaki", cls: "due-soon" };
-    return { label: (-diff) + " din overdue", cls: "due-over" };
+    if (diff === 0) return { label: tr("Aaj due"), cls: "due-today" };
+    if (diff > 0) return { label: diff + " " + tr("din baaki"), cls: "due-soon" };
+    return { label: (-diff) + " " + tr("din overdue"), cls: "due-over" };
   }
   function renderDueSoon() {
     var el = $("dueBody"); if (!el) return;
@@ -6530,7 +7108,7 @@
     var pct = budget > 0 ? Math.round((spent / budget) * 100) : (spent > 0 ? 100 : 0);
     var remaining = budget - spent;
     var alertHtml = "";
-    if (spent >= budget) alertHtml = '<p class="budget-alert over">\u26A0\uFE0F Budget se zyada kharch ho gaya!</p>';
+    if (spent >= budget) alertHtml = '<p class="budget-alert over">' + tr("\u26A0\uFE0F Budget se zyada kharch ho gaya!") + '</p>';
     else if (spent >= 0.8 * budget) alertHtml = '<p class="budget-alert warn">\u26A0\uFE0F Budget ka 80% kharch ho gaya — hoshiyar rahein.</p>';
     else alertHtml = '<p class="budget-alert ok">Budget ke andar hain.</p>';
     body.innerHTML =
@@ -6612,7 +7190,7 @@
   function txnExtraMarkup(t) {
     var out = "";
     if (t.category) out += ' <span class="txn-cat">' + esc(t.category) + '</span>';
-    if (t.due_date) out += ' <span class="txn-due">Due: ' + esc(fmtDate(t.due_date)) + '</span>';
+    if (t.due_date) out += ' <span class="txn-due">' + tr("Due: ") + esc(fmtDate(t.due_date)) + '</span>';
     if (t.photo) out += ' <img class="txn-photo-thumb" src="' + esc(t.photo) + '" alt="Bill ki photo" data-photo-txn="' + esc(t.id) + '">';
     return out;
   }
@@ -6630,8 +7208,8 @@
   function resetTxnForm() {
     setSplitMode(false);
     editingId = null;
-    $("txnFormTitle").textContent = "Naya record";
-    $("txnForm").querySelector('button[type="submit"]').textContent = "Save karein";
+    $("txnFormTitle").textContent = tr("Naya record");
+    $("txnForm").querySelector('button[type="submit"]').textContent = tr("Save karein");
     $("cancelEditBtn").hidden = true;
     $("txnAmount").value = "";
     $("txnNote").value = "";
@@ -6666,8 +7244,8 @@
     txnPhotoDataUrl = t.photo || null; // v113
     if (t.photo) { $("txnPhotoPreview").src = t.photo; $("txnPhotoPreview").hidden = false; $("txnPhotoRemoveBtn").hidden = false; }
     else { $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; }
-    $("txnFormTitle").textContent = "Record badlein";
-    $("txnForm").querySelector('button[type="submit"]').textContent = "Save karein";
+    $("txnFormTitle").textContent = tr("Record badlein");
+    $("txnForm").querySelector('button[type="submit"]').textContent = tr("Save karein");
     $("cancelEditBtn").hidden = false;
     $("txnForm").scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -6682,7 +7260,7 @@
     myContacts.forEach(function (c) {
       html += '<label><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</label>';
     });
-    $("splitList").innerHTML = html || '<p class="empty">Abhi koi dost nahi.</p>';
+    $("splitList").innerHTML = html || '<p class="empty">' + tr("Abhi koi dost nahi.") + '</p>';
     updateSplitHint();
   }
   function selectedSplitIds() {
@@ -6694,14 +7272,14 @@
   function updateSplitHint() {
     var total = parseFloat($("txnAmount").value) || 0;
     var ids = selectedSplitIds();
-    if (!ids.length) { $("splitHint").textContent = "Pehle dost chunein, phir raqam likhein."; return; }
+    if (!ids.length) { $("splitHint").textContent = tr("Pehle dost chunein, phir raqam likhein."); return; }
     if (!total || total <= 0) { $("splitHint").textContent = ids.length + " dost chune — ab kull raqam likhein."; return; }
     var people = ids.length + 1; // friends + you — your share counts too
     var share = Math.floor(total / people * 100) / 100;
     // Last friend gets the leftover paisa so the split adds up to the total exactly.
     var remainder = Math.round((total - share * people) * 100) / 100;
     var extra = remainder > 0 ? " · aakhri dost ko " + fmtRs(share + remainder) + " (baaqi paisay)" : "";
-    $("splitHint").textContent = "Har aik ka hissa: " + fmtRs(share) + " (" + ids.length + " dost + aap · kull " + fmtRs(total) + " · aap ka hissa " + fmtRs(share) + ")" + extra;
+    $("splitHint").textContent = tr("Har aik ka hissa: ") + fmtRs(share) + " (" + ids.length + " " + tr("dost") + " + " + tr("aap") + " · " + tr("kull") + " " + fmtRs(total) + " · " + tr("aap ka hissa") + " " + fmtRs(share) + ")" + extra;
   }
   function setSplitMode(on) {
     splitMode = on;
@@ -6797,7 +7375,7 @@
       for (var d = 1; d <= 28; d++) {
         var o2 = document.createElement("option");
         o2.value = String(d);
-        o2.textContent = "Mahine ki " + d + " tareekh";
+        o2.textContent = tr("Mahine ki ") + d + tr(" tareekh");
         sel.appendChild(o2);
       }
     }
@@ -6819,7 +7397,7 @@
     var freq = $("txnRepeatFreq").value;
     var day = parseInt($("txnRepeatDay").value || "1", 10);
     var next = nextRecurringDate(freq, day, date);
-    el.textContent = "Pehla repeat: " + next + " — us ke baad " + (freq === "weekly" ? "har hafta usi din" : "har mahine ki " + day + " tareekh") + ".";
+    el.textContent = tr("Pehla repeat: ") + next + tr(" — us ke baad ") + (freq === "weekly" ? tr("har hafta usi din") : tr("har mahine ki ") + day + tr(" tareekh")) + ".";
   }
   function clearRepeatBox() {
     var rep = $("txnRepeat");
