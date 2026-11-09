@@ -6676,6 +6676,14 @@
   "📄 PDF Report": "📄 PDF Report",
   "📅 Kharcha Diary": "📅 Expense Diary",
   "📅 Diary": "📅 Diary",
+  "🏠 Ghar": "🏠 Home",
+  "⏰ Due": "⏰ Due",
+  "💰 Budget": "💰 Budget",
+  "🎯 Goal": "🎯 Goal",
+  "Ghar ka kharcha dekhein": "View household expenses",
+  "Due-soon udhaar dekhein": "View due loans",
+  "Monthly Budget dekhein": "View monthly budget",
+  "Bachat Goal dekhein": "View savings goal",
   "Diary — calendar kholein": "Open the diary calendar",
   "📊 Excel": "📊 Excel",
   "📒 Poora hisaab": "📒 Full ledger",
@@ -6782,18 +6790,28 @@
   function renderAcctLang() {
     var v = $("acctLangValue"); if (v) v.textContent = lang === "ur" ? "Roman Urdu" : "English";
   }
-  // v124: Diary button → diary modal card kholein (inline card hata diya gaya).
-  // Modal app-dialog-overlay pattern use karta hai (body.dialog-open = background scroll band).
-  function jumpToDiary() {
-    var m = $("diaryModal"); if (!m) return;
-    renderDiary(); // taaza calendar
+  // v124/v125: tool modals (Diary + Household + Due + Budget + Goal) — aik waqt
+  // mein sirf aik khulta hai; app-dialog-overlay pattern (body.dialog-open =
+  // background scroll band). dialog-open sirf tab hat-ta hai jab koi overlay khula na ho.
+  var TOOL_MODALS = ["diaryModal", "householdModal", "dueModal", "budgetModal", "goalModal"];
+  function openToolModal(id) {
+    TOOL_MODALS.forEach(function (x) { var m = $(x); if (m && x !== id) m.hidden = true; });
+    var m = $(id); if (!m) return;
     m.hidden = false;
     document.body.classList.add("dialog-open");
   }
-  function closeDiaryModal() {
-    var m = $("diaryModal"); if (m) m.hidden = true;
-    document.body.classList.remove("dialog-open");
+  function closeToolModals() {
+    TOOL_MODALS.forEach(function (x) { var m = $(x); if (m) m.hidden = true; });
+    if (!document.querySelector(".app-dialog-overlay:not([hidden])")) document.body.classList.remove("dialog-open");
   }
+  // v124: Diary button → diary modal card kholein (inline card hata diya gaya).
+  function jumpToDiary() { renderDiary(); openToolModal("diaryModal"); } // taaza calendar
+  function closeDiaryModal() { closeToolModals(); }
+  // v125: baaki tools — kholne se pehle taaza render.
+  function jumpToHousehold() { renderHousehold(); openToolModal("householdModal"); }
+  function jumpToDue() { renderDueSoon(); openToolModal("dueModal"); }
+  function jumpToBudget() { renderBudget(); openToolModal("budgetModal"); }
+  function jumpToGoal() { renderSavingsGoal(); openToolModal("goalModal"); }
   function toggleLanguage() {
     lang = lang === "ur" ? "en" : "ur";
     try { window.localStorage.setItem(LANG_KEY, lang); } catch (e) {}
@@ -7797,6 +7815,15 @@
   $("diaryCloseBtn").addEventListener("click", closeDiaryModal); // v124: modal band karein
   $("diaryModal").addEventListener("click", function (e) { if (e.target === $("diaryModal")) closeDiaryModal(); }); // v124: backdrop tap = band
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDiaryModal(); }); // v124: Escape = band
+  // v125: tools toolbar + tool modals.
+  $("householdJumpBtn").addEventListener("click", jumpToHousehold);
+  $("dueJumpBtn").addEventListener("click", jumpToDue);
+  $("budgetJumpBtn").addEventListener("click", jumpToBudget);
+  $("goalJumpBtn").addEventListener("click", jumpToGoal);
+  ["household", "due", "budget", "goal"].forEach(function (k) {
+    $(k + "CloseBtn").addEventListener("click", closeToolModals);
+    $(k + "Modal").addEventListener("click", function (e) { if (e.target === $(k + "Modal")) closeToolModals(); });
+  });
   // v118: language switch.
   applyLanguage();
   $("acctLangBtn").addEventListener("click", toggleLanguage); // v123: Language ab Account list mein hai

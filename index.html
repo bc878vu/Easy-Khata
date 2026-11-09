@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=95">
+<link rel="stylesheet" href="styles.css?v=96">
 </head>
 <body>
 
@@ -238,7 +238,14 @@ window.addEventListener("error", function (e) {
       <div class="people-head-row">
         <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
         <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
-        <button id="diaryJumpBtn" class="btn btn-soft" type="button" title="Diary — calendar kholein" data-i18n="📅 Diary" data-i18n-title="Diary — calendar kholein">📅 Diary</button>
+      </div>
+      <!-- v125: tools toolbar — Diary + Household + Due + Budget + Goal, har aik modal card kholta hai. -->
+      <div class="tools-row" role="toolbar" aria-label="Tools">
+        <button id="diaryJumpBtn" class="btn btn-soft tool-btn" type="button" title="Diary — calendar kholein" data-i18n="📅 Diary" data-i18n-title="Diary — calendar kholein">📅 Diary</button>
+        <button id="householdJumpBtn" class="btn btn-soft tool-btn" type="button" title="Ghar ka kharcha dekhein" data-i18n="🏠 Ghar" data-i18n-title="Ghar ka kharcha dekhein">🏠 Ghar</button>
+        <button id="dueJumpBtn" class="btn btn-soft tool-btn" type="button" title="Due-soon udhaar dekhein" data-i18n="⏰ Due" data-i18n-title="Due-soon udhaar dekhein">⏰ Due</button>
+        <button id="budgetJumpBtn" class="btn btn-soft tool-btn" type="button" title="Monthly Budget dekhein" data-i18n="💰 Budget" data-i18n-title="Monthly Budget dekhein">💰 Budget</button>
+        <button id="goalJumpBtn" class="btn btn-soft tool-btn" type="button" title="Bachat Goal dekhein" data-i18n="🎯 Goal" data-i18n-title="Bachat Goal dekhein">🎯 Goal</button>
       </div>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
@@ -398,55 +405,6 @@ window.addEventListener("error", function (e) {
 
       <!-- v114: Kharcha Diary + Calendar -->
       <!-- v115: Ghar ka kharcha -->
-      <div class="card" id="householdCard">
-        <div class="list-head">
-          <h2 data-i18n="household">🏠 Ghar ka kharcha</h2>
-        </div>
-        <p class="muted" data-i18n="Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
-        <div id="householdBody"></div>
-      </div>
-
-      <!-- v116: Due-soon + Budget -->
-      <div class="card" id="dueCard">
-        <div class="list-head">
-          <h2 data-i18n="due">⏰ Due-soon</h2>
-        </div>
-        <p class="muted" data-i18n="Aane wale 7 din mein due hone wale udhaar — aur overdue.">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p>
-        <p id="dueMsg" class="msg" role="status"></p>
-        <div id="dueBody"></div>
-      </div>
-
-      <div class="card" id="budgetCard">
-        <div class="list-head">
-          <h2 data-i18n="budget">💰 Monthly Budget</h2>
-        </div>
-        <p class="muted" data-i18n="Is mahine kitna kharch kar sakte hain — 80% par alert milega.">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p>
-        <div class="budget-set-row">
-          <input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000" data-i18n-ph="e.g. 20000">
-          <button id="budgetSaveBtn" class="btn btn-primary" type="button" data-i18n="Save">Save</button>
-        </div>
-        <p id="budgetMsg" class="msg" role="status"></p>
-        <div id="budgetBody"></div>
-      </div>
-
-      <!-- v117: Bachat Goal -->
-      <div class="card" id="goalCard">
-        <div class="list-head">
-          <h2 data-i18n="goal">🎯 Bachat Goal</h2>
-        </div>
-        <p class="muted" data-i18n="Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p>
-        <div id="goalBody"></div>
-        <div class="goal-set-row">
-          <input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)" data-i18n-ph="Goal ka naam (e.g. Bike)">
-          <input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)" data-i18n-ph="Target (Rs)">
-          <button id="goalSaveBtn" class="btn btn-soft" type="button" data-i18n="Goal Save">Goal Save</button>
-        </div>
-        <div class="goal-set-row">
-          <input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)" data-i18n-ph="Bachat add karein (Rs)">
-          <button id="goalAddBtn" class="btn btn-primary" type="button" data-i18n="Add">Add</button>
-        </div>
-        <p id="goalMsg" class="msg" role="status"></p>
-      </div>
     </section>
 
     <!-- Person detail -->
@@ -826,6 +784,10 @@ window.addEventListener("error", function (e) {
   </section>
 </div>
 <div id="diaryModal" class="app-dialog-overlay" hidden><section class="app-dialog diary-dialog card" role="dialog" aria-modal="true" aria-labelledby="diaryModalTitle"><div class="diary-modal-head"><h2 id="diaryModalTitle" data-i18n="diary">📅 Kharcha Diary</h2><button id="diaryCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="diaryCard"><div class="diary-filter-row"><select id="diaryCategory" title="Category filter" data-i18n-title="Category filter"><option value="" data-i18n="All categories">All categories</option><option data-i18n="Khana">Khana</option><option data-i18n="Udhaar">Udhaar</option><option data-i18n="Kiraya">Kiraya</option><option data-i18n="Bijli">Bijli</option><option data-i18n="Petrol">Petrol</option><option data-i18n="Shopping">Shopping</option><option data-i18n="Transport">Transport</option><option data-i18n="Health">Health</option><option data-i18n="Education">Education</option><option data-i18n="Other">Other</option></select></div><p class="muted" data-i18n="Har din ka hisaab — din par tap karein, us din ke records dekhein.">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p><div class="cal-nav"><button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina" data-i18n-title="Pichhla mahina">‹</button><strong id="calMonthLabel">—</strong><button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina" data-i18n-title="Agla mahina">›</button></div><div class="cal-weekdays" aria-hidden="true"><span data-i18n="Mon">Mon</span><span data-i18n="Tue">Tue</span><span data-i18n="Wed">Wed</span><span data-i18n="Thu">Thu</span><span data-i18n="Fri">Fri</span><span data-i18n="Sat">Sat</span><span data-i18n="Sun">Sun</span></div><div id="calGrid" class="cal-grid"></div><div id="calDayDetail" class="cal-day-detail"></div></div></section></div>
+<div id="householdModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="householdModalTitle"><div class="tool-modal-head"><h2 id="householdModalTitle" data-i18n="household">🏠 Ghar ka kharcha</h2><button id="householdCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="householdCard"><p class="muted" data-i18n="Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p><div id="householdBody"></div></div></section></div>
+<div id="dueModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="dueModalTitle"><div class="tool-modal-head"><h2 id="dueModalTitle" data-i18n="due">⏰ Due-soon</h2><button id="dueCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="dueCard"><p class="muted" data-i18n="Aane wale 7 din mein due hone wale udhaar — aur overdue.">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p><p id="dueMsg" class="msg" role="status"></p><div id="dueBody"></div></div></section></div>
+<div id="budgetModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle"><div class="tool-modal-head"><h2 id="budgetModalTitle" data-i18n="budget">💰 Monthly Budget</h2><button id="budgetCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="budgetCard"><p class="muted" data-i18n="Is mahine kitna kharch kar sakte hain — 80% par alert milega.">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p><div class="budget-set-row"><input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000" data-i18n-ph="e.g. 20000"><button id="budgetSaveBtn" class="btn btn-primary" type="button" data-i18n="Save">Save</button></div><p id="budgetMsg" class="msg" role="status"></p><div id="budgetBody"></div></div></section></div>
+<div id="goalModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="goalModalTitle"><div class="tool-modal-head"><h2 id="goalModalTitle" data-i18n="goal">🎯 Bachat Goal</h2><button id="goalCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="goalCard"><p class="muted" data-i18n="Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p><div id="goalBody"></div><div class="goal-set-row"><input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)" data-i18n-ph="Goal ka naam (e.g. Bike)"><input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)" data-i18n-ph="Target (Rs)"><button id="goalSaveBtn" class="btn btn-soft" type="button" data-i18n="Goal Save">Goal Save</button></div><div class="goal-set-row"><input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)" data-i18n-ph="Bachat add karein (Rs)"><button id="goalAddBtn" class="btn btn-primary" type="button" data-i18n="Add">Add</button></div><p id="goalMsg" class="msg" role="status"></p></div></section></div>
 <button id="fabAdd" class="fab" type="button" title="New record" hidden data-i18n-title="New record">+</button>
 
 <script id="supabaseSdk" async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
@@ -905,6 +867,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=123"></script>
+<script src="app.js?v=124"></script>
 </body>
 </html>

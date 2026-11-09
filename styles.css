@@ -1794,3 +1794,14 @@ input,select,textarea,button{max-width:100%}
 .diary-modal-head h2{margin:0;font-size:1.15rem}
 .diary-filter-row{display:flex;justify-content:flex-end;margin-bottom:6px}
 @media(max-width:420px){.app-dialog.diary-dialog{padding:12px}.diary-modal-head h2{font-size:1.05rem}}
+
+/* v125: tools toolbar (Diary + Ghar + Due + Budget + Goal) + tool modals.
+   Toolbar upar hai (people-head-row ke neeche), compact chips — 360px par 2 rows
+   mein wrap hoti hai, desktop par aik line. Modals diary modal jaisay hain
+   (560px, 92dvh, andar scroll), har section ka apna modal card. */
+.tools-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.tool-btn{font-size:.82rem;padding:7px 10px;min-height:38px;white-space:nowrap}
+.app-dialog.tool-dialog{width:min(560px,100%);max-height:min(92dvh,780px);padding:16px}
+.tool-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.tool-modal-head h2{margin:0;font-size:1.15rem}
+@media(max-width:420px){.app-dialog.tool-dialog{padding:12px}.tool-modal-head h2{font-size:1.05rem}.tool-btn{font-size:.78rem;padding:6px 8px;min-height:36px}}
