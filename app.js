@@ -1310,7 +1310,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay"].forEach(function (id) {
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay", "txnCategory"].forEach(function (id) { // v113: category is a custom dropdown too
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -1715,6 +1715,7 @@
       id: body.id || newUuid(),
       payer_id: body.payer_id, receiver_id: body.receiver_id,
       amount: body.amount, note: body.note, txn_date: body.txn_date,
+      category: body.category || null, due_date: body.due_date || null, photo: body.photo || null, // v113
       created_by: body.created_by, workspace_id: body.workspace_id || currentWorkspaceId,
       created_at: body.created_at || new Date().toISOString()
     };
@@ -1732,6 +1733,9 @@
         txns[j].amount = body.amount;
         txns[j].note = body.note;
         txns[j].txn_date = body.txn_date;
+        txns[j].category = body.category || null; // v113
+        txns[j].due_date = body.due_date || null; // v113
+        txns[j].photo = body.photo || null; // v113
         break;
       }
     }
@@ -1748,6 +1752,9 @@
         ops[i].body.amount = body.amount;
         ops[i].body.note = body.note;
         ops[i].body.txn_date = body.txn_date;
+        ops[i].body.category = body.category || null; // v113
+        ops[i].body.due_date = body.due_date || null; // v113
+        ops[i].body.photo = body.photo || null; // v113
         ops[i].ts = Date.now();
         saveOutbox(ops);
         applyTxnUpdateLocal(id, body);
@@ -2026,6 +2033,7 @@
           payer_id: t.payer_id === guestMe ? me : t.payer_id,
           receiver_id: t.receiver_id === guestMe ? me : t.receiver_id,
           amount: t.amount, note: t.note, txn_date: t.txn_date,
+          category: t.category || null, due_date: t.due_date || null, photo: t.photo || null, // v113
           created_by: me, workspace_id: currentWorkspaceId, created_at: t.created_at || new Date().toISOString()
         } });
       });
@@ -3424,7 +3432,7 @@
       var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
       var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : (adminHiddenStatusLoaded ? '<div class="t-sub">Visible in both histories</div>' : '<div class="t-sub">Hidden status unavailable</div>');
       var controls = lock ? '<span class="t-lock">🔒 Settled</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
-      html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
+      html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + txnExtraMarkup(t) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
     });
     $("adminUserTxns").innerHTML = html;
   }
@@ -4552,7 +4560,7 @@
       html += '<div class="drow">' +
         '<div class="d-time"><span class="d-ico ' + (iGave ? "up" : "down") + '">' + (iGave ? "↑" : "↓") + '</span>' +
         '<div><div class="d-date">' + esc(fmtDateLong(t.txn_date)) + (timeStr ? " · " + esc(timeStr) : "") + '</div>' +
-        '<div class="d-note">' + esc(t.note || "Food") + '</div>' +
+        '<div class="d-note">' + esc(t.note || "Food") + txnExtraMarkup(t) + '</div>' +
         '<div class="d-bal ' + balCls + '">' + esc(balText) + '</div>' + btns + '</div></div>' +
         '<div class="d-amt ' + (iGave ? "diye" : "") + '">' + (iGave ? esc(fmtRs(a)) : "") + '</div>' +
         '<div class="d-amt ' + (!iGave ? "liye" : "") + '">' + (!iGave ? esc(fmtRs(a)) : "") + '</div>' +
@@ -5982,7 +5990,7 @@
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
       html += '<div class="txn"><div class="t-main">' + partyNameMarkup(t.payer_id) + ' → ' + partyNameMarkup(t.receiver_id) + '</div>' +
-        '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + '</div>' +
+        '<div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + txnExtraMarkup(t) + '</div>' +
         '<div class="t-foot"><span class="t-amt ' + amtCls + '">' + sign + esc(fmtRs(a)) + '</span>' + btns + '</div></div>';
     });
     $("txnList").innerHTML = html;
@@ -5990,6 +5998,70 @@
   }
 
   /* ---------- add / edit / delete ---------- */
+  // v113: record categories (Kharcha diary + Dukaan mode use these).
+  var TXN_CATEGORIES = ["Khana", "Udhaar", "Kiraya", "Bijli", "Petrol", "Shopping", "Transport", "Health", "Education", "Other"];
+  function cleanCategory(v) { return TXN_CATEGORIES.indexOf(v) !== -1 ? v : "Khana"; }
+  // v113: bill photo (downscaled JPEG data URL) — selected file ka state.
+  var txnPhotoDataUrl = null;
+  // v113: bill photo — max 800px JPEG (record halka rehta hai, offline-friendly).
+  // Returns a data URL, or null (galat file / canvas na ho / bohat bari ho).
+  function downscalePhoto(file) {
+    return new Promise(function (resolve) {
+      if (!file || !file.type || file.type.indexOf("image/") !== 0) { resolve(null); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var max = 800, w = img.width, h = img.height;
+            if (!w || !h) { resolve(null); return; }
+            var scale = Math.min(1, max / Math.max(w, h));
+            var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+            var canvas = document.createElement("canvas");
+            canvas.width = cw; canvas.height = ch;
+            var g = canvas.getContext("2d");
+            if (!g) { resolve(null); return; }
+            g.drawImage(img, 0, 0, cw, ch);
+            var url = canvas.toDataURL("image/jpeg", 0.7);
+            if (url.length > 270000) url = canvas.toDataURL("image/jpeg", 0.5);
+            resolve(url.length > 270000 ? null : url);
+          } catch (e) { resolve(null); }
+        };
+        img.onerror = function () { resolve(null); };
+        img.src = reader.result;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+  }
+  // v113: category/due-date/photo fields reset (naya record).
+  function clearTxnExtraFields() {
+    var cat = $("txnCategory"); if (cat) { cat.value = "Khana"; cdSync(cat); }
+    var dd = $("txnDueDate"); if (dd) dd.value = "";
+    txnPhotoDataUrl = null;
+    var ph = $("txnPhoto"); if (ph) ph.value = "";
+    var pv = $("txnPhotoPreview"); if (pv) { pv.hidden = true; pv.removeAttribute("src"); }
+    var rm = $("txnPhotoRemoveBtn"); if (rm) rm.hidden = true;
+  }
+  // v113: category badge + due-date chip + bill-photo thumb for a record row.
+  function txnExtraMarkup(t) {
+    var out = "";
+    if (t.category) out += ' <span class="txn-cat">' + esc(t.category) + '</span>';
+    if (t.due_date) out += ' <span class="txn-due">Due: ' + esc(fmtDate(t.due_date)) + '</span>';
+    if (t.photo) out += ' <img class="txn-photo-thumb" src="' + esc(t.photo) + '" alt="Bill ki photo" data-photo-txn="' + esc(t.id) + '">';
+    return out;
+  }
+  // v113: bill photo poori dikhayein (Blob URL — data URL seedha open nahi hota).
+  function openPhotoDataUrl(url) {
+    try {
+      var parts = String(url || "").split(",");
+      var mime = (parts[0].match(/:(.*?);/) || [])[1] || "image/jpeg";
+      var bin = atob(parts[1] || "");
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      window.open(URL.createObjectURL(new Blob([arr], { type: mime })), "_blank");
+    } catch (e) { /* ignore */ }
+  }
   function resetTxnForm() {
     setSplitMode(false);
     editingId = null;
@@ -5999,6 +6071,7 @@
     $("txnAmount").value = "";
     $("txnNote").value = "";
     $("txnDate").value = todayLocal();
+    clearTxnExtraFields(); // v113
     clearRepeatBox(); // v87: agle record par repeat dobara tick karna parega
     $("txnRepeatRow").hidden = false;
     setTxnMsg("");
@@ -6023,6 +6096,11 @@
     $("txnAmount").value = t.amount;
     $("txnNote").value = t.note || "";
     $("txnDate").value = String(t.txn_date || "").slice(0, 10);
+    $("txnCategory").value = cleanCategory(t.category); cdSync($("txnCategory")); // v113
+    $("txnDueDate").value = String(t.due_date || "").slice(0, 10); // v113
+    txnPhotoDataUrl = t.photo || null; // v113
+    if (t.photo) { $("txnPhotoPreview").src = t.photo; $("txnPhotoPreview").hidden = false; $("txnPhotoRemoveBtn").hidden = false; }
+    else { $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; }
     $("txnFormTitle").textContent = "Record badlein";
     $("txnForm").querySelector('button[type="submit"]').textContent = "Save karein";
     $("cancelEditBtn").hidden = false;
@@ -6073,7 +6151,7 @@
     if (on) renderSplitList();
   }
   // v24: guest split — wahi barabar baant, sirf local store mein.
-  function guestAddSplitTxns(amount, note, date, btn) {
+  function guestAddSplitTxns(amount, note, date, category, btn) { // v113: category flows in
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
     var me = myId();
@@ -6084,7 +6162,7 @@
       var amt = (idx === ids.length - 1) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
       txns.unshift({
         id: newUuid(), payer_id: me, receiver_id: id, amount: amt,
-        note: note, txn_date: date,
+        note: note, txn_date: date, category: category || null, // v113
         created_by: me, created_at: new Date().toISOString()
       });
     });
@@ -6093,7 +6171,7 @@
     resetTxnForm();
     setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true);
   }
-  function addSplitTxns(amount, note, date, btn) {
+  function addSplitTxns(amount, note, date, category, btn) { // v113: category flows in
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
     var me = myId();
@@ -6118,7 +6196,7 @@
       var recBody = {
         id: newUuid(), workspace_id: currentWorkspaceId,
         payer_id: me, receiver_id: id, amount: amt,
-        note: note, txn_date: date, created_by: me
+        note: note, txn_date: date, category: category || null, created_by: me // v113
       };
       sb("khata_transactions", { method: "POST", prefer: "return=representation", body: recBody }).then(function (res) {
         if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id), created.id); } }
@@ -6223,6 +6301,9 @@
     var amount = parseFloat($("txnAmount").value);
     var note = $("txnNote").value.trim();
     var date = $("txnDate").value;
+    var category = cleanCategory($("txnCategory").value); // v113
+    var dueDate = $("txnDueDate").value || null; // v113
+    var photo = txnPhotoDataUrl || null; // v113
     if (!splitMode && !person) { setTxnMsg("Pehle dost chunein.", false); return; }
     if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setTxnMsg("Raqam 0 se zyada aur maximum 2 decimal places mein likhein.", false); return; }
     if (amount > 10000000) { setTxnMsg("Raqam zyada se zyada Rs 10,000,000 ho sakti hai.", false); return; }
@@ -6230,8 +6311,8 @@
     amount = moneyFromMinor(moneyToMinor(amount));
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
     if (splitMode && !editingId) {
-      if (guestMode) { guestAddSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]')); return; }
-      addSplitTxns(amount, note, date, e.target.querySelector('button[type="submit"]'));
+      if (guestMode) { guestAddSplitTxns(amount, note, date, category, e.target.querySelector('button[type="submit"]')); return; }
+      addSplitTxns(amount, note, date, category, e.target.querySelector('button[type="submit"]'));
       return;
     }
     var me = myId();
@@ -6241,6 +6322,7 @@
       amount: amount,
       note: note,
       txn_date: date,
+      category: category, due_date: dueDate, photo: photo, // v113
       created_by: me,
       workspace_id: currentWorkspaceId
     };
@@ -6258,6 +6340,7 @@
         if (gt) {
           gt.payer_id = body.payer_id; gt.receiver_id = body.receiver_id;
           gt.amount = body.amount; gt.note = body.note; gt.txn_date = body.txn_date;
+          gt.category = body.category || null; gt.due_date = body.due_date || null; gt.photo = body.photo || null; // v113
         }
         saveGuestStore();
         renderAll();
@@ -6273,6 +6356,7 @@
       clearRepeatBox();
       $("txnAmount").value = "";
       $("txnNote").value = "";
+      clearTxnExtraFields(); // v113
       setTxnMsg("Record save ho gaya!", true);
       btn.disabled = false;
       return;
@@ -6301,13 +6385,14 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));maybeCreateRecurringRule(body);clearRepeatBox();$("txnAmount").value="";$("txnNote").value="";setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));maybeCreateRecurringRule(body);clearRepeatBox();$("txnAmount").value="";$("txnNote").value="";clearTxnExtraFields();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
           setTxnMsg("Record save nahi hua" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(person, "record", created); triggerPush(person, myName() + " ne record add kiya", notifBodyFor(created, person), created.id); }
         $("txnAmount").value = "";
         $("txnNote").value = "";
+        clearTxnExtraFields(); // v113
         maybeCreateRecurringRule(body); // v87: repeat tick ho to rule bane
         clearRepeatBox();
         loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
@@ -6484,6 +6569,27 @@
   });
   $("changePassBtn").addEventListener("click", function () { var b = $("changePassBox"); b.hidden = !b.hidden; });
   $("savePassBtn").addEventListener("click", doChangePass);
+  // v113: bill photo — chunein to downscale kar ke preview dikhayein.
+  $("txnPhoto").addEventListener("change", function () {
+    var f = ($("txnPhoto").files || [])[0];
+    if (!f) { txnPhotoDataUrl = null; $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; return; }
+    downscalePhoto(f).then(function (url) {
+      txnPhotoDataUrl = url;
+      if (url) { $("txnPhotoPreview").src = url; $("txnPhotoPreview").hidden = false; $("txnPhotoRemoveBtn").hidden = false; }
+      else { $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; setTxnMsg("Photo load nahi hui — dobara try karein.", false); }
+    });
+  });
+  $("txnPhotoRemoveBtn").addEventListener("click", function () {
+    txnPhotoDataUrl = null; $("txnPhoto").value = ""; $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true;
+  });
+  // v113: bill-photo thumbnail par click — poori photo kholein.
+  document.addEventListener("click", function (e) {
+    var img = e.target && e.target.closest ? e.target.closest(".txn-photo-thumb") : null;
+    if (!img) return;
+    var id = img.getAttribute("data-photo-txn");
+    var rec = null; txns.forEach(function (x) { if (x.id === id) rec = x; });
+    if (rec && rec.photo) openPhotoDataUrl(rec.photo);
+  });
   $("txnForm").addEventListener("submit", addTxn);
   // v87: repeat form — tick karte hi din ki options + hint banein.
   $("txnRepeat").addEventListener("change", function () {

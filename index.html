@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=83">
+<link rel="stylesheet" href="styles.css?v=84">
 </head>
 <body>
 
@@ -317,6 +317,32 @@ window.addEventListener("error", function (e) {
             <label for="txnNote">Detail / category <span class="optional-label">Optional</span></label>
             <input id="txnNote" type="text" placeholder="Khana, Cash, Other ya kuch bhi likhein" maxlength="120" autocomplete="off">
             
+          </div>
+          <div class="field">
+            <label for="txnCategory">Category</label>
+            <select id="txnCategory">
+              <option value="Khana" selected>Khana</option>
+              <option value="Udhaar">Udhaar</option>
+              <option value="Kiraya">Kiraya</option>
+              <option value="Bijli">Bijli</option>
+              <option value="Petrol">Petrol</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Transport">Transport</option>
+              <option value="Health">Health</option>
+              <option value="Education">Education</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="txnDueDate">Wapsi ki tareekh <span class="optional-label">Optional</span></label>
+            <input id="txnDueDate" type="date">
+            <p class="muted">Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.</p>
+          </div>
+          <div class="field">
+            <label for="txnPhoto">Bill ki photo <span class="optional-label">Optional</span></label>
+            <input id="txnPhoto" type="file" accept="image/*">
+            <img id="txnPhotoPreview" class="txn-photo-preview" hidden alt="Bill ki photo">
+            <button id="txnPhotoRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px">Photo hatayein</button>
           </div>
           <div class="field">
             <label for="txnDate">Tareekh</label>
@@ -804,6 +830,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=111"></script>
+<script src="app.js?v=112"></script>
 </body>
 </html>

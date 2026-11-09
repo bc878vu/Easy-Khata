@@ -1632,6 +1632,13 @@ input,select,textarea,button{max-width:100%}
 .share-sheet-qr-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .share-sheet-qr-box{display:inline-block;padding:8px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.07)}
 .share-sheet-qr-box svg{display:block;width:115px;height:auto;max-width:100%}
+
+/* v113: record category / due-date / bill-photo — compact, professional */
+.txn-cat{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--green-soft,#dcfce7);color:var(--green-dark,#15803d);font-size:.72rem;font-weight:700;letter-spacing:.02em;vertical-align:1px}
+.txn-due{display:inline-block;padding:1px 7px;border-radius:999px;background:#fff3e0;color:#8d4e00;font-size:.72rem;font-weight:700;vertical-align:1px}
+.txn-photo-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);vertical-align:middle;cursor:pointer}
+.txn-photo-preview{width:100%;max-width:280px;border-radius:10px;border:1px solid var(--line);margin-top:8px;display:block}
+#txnPhoto{width:100%}
 #shareSheetOverlay .app-dialog-mark{background:linear-gradient(135deg,var(--accent-btn),var(--credit-2));color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.35)}
 
 /* v87: recurring rules list — compact card rows, chhoti screen par stack */
