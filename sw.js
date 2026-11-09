@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v116-0";
+var CACHE = "easy-khata-v117-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=87",
+  "styles.css?v=88",
   "config.js?v=4",
-  "app.js?v=115",
+  "app.js?v=116",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",

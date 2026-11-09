@@ -1742,3 +1742,14 @@ input,select,textarea,button{max-width:100%}
 .budget-alert.ok{color:var(--green-dark)}
 .budget-alert.warn{color:#8d4e00}
 .budget-alert.over{color:var(--red)}
+
+/* v117: Bachat Goal + JazzCash/Easypaisa settle */
+.goal-set-row{display:flex;gap:8px;margin-top:8px}
+.goal-set-row input{flex:1;min-width:0}
+.goal-head{display:flex;justify-content:space-between;font-size:15px;margin-top:4px}
+.goal-done{font-weight:700;color:var(--green-dark);margin-top:8px}
+.detail-pay{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px}
+.detail-pay-row{display:flex;gap:8px;margin-top:6px}
+.detail-pay-row .btn{flex:1}
+.btn-jazz{background:#e11b22;color:#fff}
+.btn-easy{background:#f7b500;color:#222}

@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=87">
+<link rel="stylesheet" href="styles.css?v=88">
 </head>
 <body>
 
@@ -443,6 +443,25 @@ window.addEventListener("error", function (e) {
         <p id="budgetMsg" class="msg" role="status"></p>
         <div id="budgetBody"></div>
       </div>
+
+      <!-- v117: Bachat Goal -->
+      <div class="card" id="goalCard">
+        <div class="list-head">
+          <h2>🎯 Bachat Goal</h2>
+        </div>
+        <p class="muted">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p>
+        <div id="goalBody"></div>
+        <div class="goal-set-row">
+          <input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)">
+          <input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)">
+          <button id="goalSaveBtn" class="btn btn-soft" type="button">Goal Save</button>
+        </div>
+        <div class="goal-set-row">
+          <input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)">
+          <button id="goalAddBtn" class="btn btn-primary" type="button">Add</button>
+        </div>
+        <p id="goalMsg" class="msg" role="status"></p>
+      </div>
     </section>
 
     <!-- Person detail -->
@@ -472,6 +491,15 @@ window.addEventListener("error", function (e) {
           <button id="detailCreditSaveBtn" class="btn btn-primary" type="button">Save</button>
         </div>
         <p id="detailCreditMsg" class="msg" role="status"></p>
+      </div>
+      <div id="detailPayBox" class="detail-pay" hidden>
+        <p class="section-label">💸 Settle karein — JazzCash / Easypaisa</p>
+        <p id="detailPayText" class="muted"></p>
+        <div class="detail-pay-row">
+          <button id="detailJazzBtn" class="btn btn-jazz" type="button">🟢 JazzCash</button>
+          <button id="detailEasyBtn" class="btn btn-easy" type="button">🟡 Easypaisa</button>
+        </div>
+        <p id="detailPayMsg" class="msg" role="status"></p>
       </div>
       <div class="detail-len-head">
         <p class="section-label">LEN-DEN</p>
@@ -890,6 +918,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=115"></script>
+<script src="app.js?v=116"></script>
 </body>
 </html>

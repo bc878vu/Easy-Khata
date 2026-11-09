@@ -365,7 +365,7 @@
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
         contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now(),
-        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen, monthlyBudget: monthlyBudget // v116
+        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen, monthlyBudget: monthlyBudget, savingsGoal: savingsGoal // v116, v117
       }));
     } catch (e) {}
   }
@@ -406,6 +406,7 @@
     recurringRules = ((g && g.recurring) || []).filter(function (r) { return r.payer_id === guestMeId || r.receiver_id === guestMeId; });
     monthlyReportSeen = (g && g.monthlyReportSeen) || ""; // v88
     monthlyBudget = (g && g.monthlyBudget != null) ? Number(g.monthlyBudget) : null; // v116: guest monthly budget
+    savingsGoal = (g && g.savingsGoal) ? cleanSavingsGoal(g.savingsGoal) : null; // v117: guest bachat goal
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -1172,7 +1173,7 @@
     // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
     // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
     // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
-    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget" + (withPhone ? ",phone" : "") + "&order=name.asc"); // v116: monthly_budget bhi
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal" + (withPhone ? ",phone" : "") + "&order=name.asc"); // v116: monthly_budget bhi; v117: savings_goal bhi
   }
 
   function renderWorkspaceBar() {
@@ -2081,6 +2082,7 @@
     renderHousehold(); // v115: ghar ka kharcha taaza
     renderDueSoon(); // v116: due-soon list taaza
     renderBudget(); // v116: budget progress taaza
+    renderSavingsGoal(); // v117: bachat goal taaza
     fillMyPhone();
     renderAccount();
     renderAdmin();
@@ -4519,6 +4521,7 @@
       banner.innerHTML = '<span class="db-icon">✓</span><strong>Settled</strong><span>Koi balance nahi</span>';
     }
     $("detailSettleBtn").hidden = !s.net;
+    renderDetailPay(); // v117: JazzCash/Easypaisa settle box
     var isManual = false;
     myContacts.forEach(function (c) { if (c.id === id) isManual = true; });
     $("detailRemoveBtn").hidden = !isManual;
@@ -5522,6 +5525,7 @@
        reload par Download dobara banata hai. */
   var monthlyReportSeen = "";
   var monthlyBudget = null; // v116: guest mode ka monthly budget (account mode mein profile se)
+  var savingsGoal = null; // v117: guest mode ka bachat goal (account mode mein profile.savings_goal)
   var monthlyReport = null;
   function prevMonthKey(todayISO) {
     var p = String(todayISO || todayLocal()).slice(0, 7).split("-");
@@ -6168,6 +6172,120 @@
       });
     }
     el.innerHTML = html;
+  }
+
+  /* ---------- v117: Bachat Goal + JazzCash/Easypaisa settle ---------- */
+  function cleanSavingsGoal(g) {
+    if (!g || typeof g !== "object") return null;
+    var target = Number(g.target);
+    if (!g.name || !isFinite(target) || target <= 0) return null;
+    var contribs = Array.isArray(g.contributions) ? g.contributions.filter(function (c) {
+      return c && isFinite(Number(c.amount)) && Number(c.amount) > 0;
+    }).map(function (c) { return { id: String(c.id || newUuid()), amount: Math.round(Number(c.amount)), date: String(c.date || todayLocal()) }; }) : [];
+    return { name: String(g.name), target: Math.round(target), contributions: contribs };
+  }
+  function getSavingsGoal() {
+    if (guestMode) return savingsGoal;
+    var p = myProfile();
+    return cleanSavingsGoal(p && p.savings_goal);
+  }
+  function goalSavedTotal(goal) {
+    if (!goal) return 0;
+    var sum = 0;
+    goal.contributions.forEach(function (c) { sum += Number(c.amount) || 0; });
+    return sum;
+  }
+  function setGoalMsg(msg) { var el = $("goalMsg"); if (el) el.textContent = msg || ""; }
+  function persistSavingsGoal(goal) {
+    if (guestMode) {
+      savingsGoal = goal;
+      saveGuestStore();
+      return Promise.resolve(true);
+    }
+    var me = myProfile(); if (!me) return Promise.resolve(false);
+    var prev = me.savings_goal;
+    me.savings_goal = goal;
+    return sb("khata_profiles?id=eq." + encodeURIComponent(me.id), { method: "PATCH", prefer: "return=minimal", body: { savings_goal: goal } })
+      .then(function (res) { if (!res.ok) { me.savings_goal = prev; return false; } return true; })
+      .catch(function () { me.savings_goal = prev; return false; });
+  }
+  function renderSavingsGoal() {
+    var body = $("goalBody"); if (!body) return;
+    var goal = getSavingsGoal();
+    if (!goal) { body.innerHTML = '<p class="empty">Koi bachat goal set nahi hai — upar naam aur target likh kar Goal Save karein.</p>'; return; }
+    var saved = goalSavedTotal(goal);
+    var pct = Math.round((saved / goal.target) * 100);
+    var remaining = goal.target - saved;
+    var doneHtml = saved >= goal.target
+      ? '<p class="goal-done">\uD83C\uDF89 Goal poora ho gaya — mubarak ho!</p>'
+      : '<p class="muted">Baqi: <strong>' + esc(fmtRs(remaining)) + '</strong> \u00B7 ' + goal.contributions.length + ' dafa bachat add ki</p>';
+    body.innerHTML =
+      '<div class="goal-head"><strong>' + esc(goal.name) + '</strong><span>' + pct + '%</span></div>' +
+      '<div class="budget-bar"><i style="width:' + Math.min(pct, 100) + '%"></i></div>' +
+      '<div class="budget-nums"><span>Bachat: <strong>' + esc(fmtRs(saved)) + '</strong></span><span>Target: <strong>' + esc(fmtRs(goal.target)) + '</strong></span></div>' +
+      doneHtml;
+  }
+  function saveSavingsGoal() {
+    var name = ($("goalNameInput").value || "").trim();
+    var raw = ($("goalTargetInput").value || "").trim();
+    var target = raw === "" ? NaN : Number(raw);
+    if (!name) { setGoalMsg("Goal ka naam likhein."); return; }
+    if (!isFinite(target) || target <= 0) { setGoalMsg("Sahi target likhein (0 se zyada)."); return; }
+    var prev = getSavingsGoal();
+    var goal = { name: name, target: Math.round(target), contributions: prev ? prev.contributions : [] };
+    persistSavingsGoal(goal).then(function (ok) {
+      if (!ok) { setGoalMsg("Goal save nahi ho saka. Dobara try karein."); return; }
+      renderSavingsGoal();
+      setGoalMsg("Bachat goal save ho gaya: " + name + " — " + fmtRs(goal.target));
+    });
+  }
+  function addSavings() {
+    var goal = getSavingsGoal();
+    if (!goal) { setGoalMsg("Pehle bachat goal set karein (naam + target)."); return; }
+    var raw = ($("goalAddInput").value || "").trim();
+    var amount = raw === "" ? NaN : Number(raw);
+    if (!isFinite(amount) || amount <= 0) { setGoalMsg("Sahi amount likhein (0 se zyada)."); return; }
+    amount = Math.round(amount);
+    var updated = { name: goal.name, target: goal.target, contributions: goal.contributions.concat([{ id: newUuid(), amount: amount, date: todayLocal() }]) };
+    persistSavingsGoal(updated).then(function (ok) {
+      if (!ok) { setGoalMsg("Bachat add nahi ho saki. Dobara try karein."); return; }
+      $("goalAddInput").value = "";
+      renderSavingsGoal();
+      setGoalMsg("Rs " + amount.toLocaleString("en-PK") + " bachat add ho gayi — total " + fmtRs(goalSavedTotal(updated)) + " / " + fmtRs(updated.target));
+    });
+  }
+  function setDetailPayMsg(msg) { var el = $("detailPayMsg"); if (el) el.textContent = msg || ""; }
+  function renderDetailPay() {
+    var box = $("detailPayBox"); if (!box) return;
+    var s = personStats(detailPersonId); // personStats (renderPersonDetail bhi yehi use karta hai)
+    if (!s || !s.net) { box.hidden = true; return; }
+    box.hidden = false;
+    var name = "";
+    myContacts.forEach(function (c) { if (c.id === detailPersonId) name = c.name || ""; });
+    if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) name = p.name || ""; }); }
+    var amount = Math.abs(s.net);
+    $("detailPayText").textContent = s.net > 0
+      ? name + " se " + fmtRs(amount) + " lene hain — JazzCash ya Easypaisa se settle karein."
+      : name + " ko " + fmtRs(amount) + " dene hain — JazzCash ya Easypaisa se settle karein.";
+  }
+  function settleVia(app) {
+    var s = personStats(detailPersonId); // personStats (renderPersonDetail bhi yehi use karta hai)
+    if (!s || !s.net) { setDetailPayMsg("Hisaab barabar hai — kuch dene/lene nahi."); return; }
+    var name = "", phone = "";
+    myContacts.forEach(function (c) { if (c.id === detailPersonId) { name = c.name || ""; phone = c.phone || ""; } });
+    if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) { name = p.name || ""; phone = p.phone || ""; } }); }
+    if (!phone) { setDetailPayMsg("Is dost ka number nahi hai — pehle number add karein."); return; }
+    var amount = Math.abs(s.net);
+    var dir = s.net > 0 ? "lene hain" : "dene hain";
+    var appName = app === "jazzcash" ? "JazzCash" : "Easypaisa";
+    var text = fmtRs(amount) + " — " + (name || "") + " (" + phone + ") — Easy Khata settle (" + dir + ")";
+    var done = function () {
+      setDetailPayMsg(appName + " khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein).");
+      openWaLink((app === "jazzcash" ? "jazzcash://" : "easypaisa://"));
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else done();
   }
 
   /* ---------- v116: Due-soon list + reminders + Budget ---------- */
@@ -7011,6 +7129,11 @@
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});
   $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  // v117: bachat goal + settle.
+  $("goalSaveBtn").addEventListener("click", saveSavingsGoal);
+  $("goalAddBtn").addEventListener("click", addSavings);
+  $("detailJazzBtn").addEventListener("click", function () { settleVia("jazzcash"); });
+  $("detailEasyBtn").addEventListener("click", function () { settleVia("easypaisa"); });
   // v116: budget save + due remind (delegated).
   $("budgetSaveBtn").addEventListener("click", saveBudget);
   $("dueBody").addEventListener("click", function (e) {
