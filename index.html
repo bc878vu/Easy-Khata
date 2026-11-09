@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=93">
+<link rel="stylesheet" href="styles.css?v=94">
 </head>
 <body>
 
@@ -193,7 +193,6 @@ window.addEventListener("error", function (e) {
       <span id="liveUpdating" class="live-updating" hidden data-i18n="Updating…">Updating…</span>
       <span id="offlineBadge" class="offline-badge" hidden data-i18n="Offline">Offline</span>
       <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein" data-i18n-title="Theme badlein">🌙</button>
-      <button id="langToggleBtn" class="icon-btn" type="button" title="Language badlein" data-i18n="🌐 EN" data-i18n-title="Language badlein">🌐 EN</button>
       <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden data-i18n="🔑 Login" data-i18n-title="Login / Sign up">🔑 Login</button>
       <button id="notifBtn" class="icon-btn" type="button" title="Notifications" data-i18n-title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
     </div>
@@ -239,9 +238,8 @@ window.addEventListener("error", function (e) {
       <div class="people-head-row">
         <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
         <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
-        <button id="nfcScanBtn" class="btn btn-soft" type="button" title="NFC card tap kar ke us bande ka khata kholein" data-i18n="📶 NFC Scan" data-i18n-title="NFC card tap kar ke us bande ka khata kholein">📶 NFC Scan</button>
+        <button id="diaryJumpBtn" class="btn btn-soft" type="button" title="Diary — calendar kholein" data-i18n="📅 Diary" data-i18n-title="Diary — calendar kholein">📅 Diary</button>
       </div>
-      <p id="nfcMsg" class="msg" role="status"></p>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
       <div class="actions-row">
@@ -504,15 +502,6 @@ window.addEventListener("error", function (e) {
         </div>
         <p id="detailPayMsg" class="msg" role="status"></p>
       </div>
-      <div id="detailNfcBox" class="detail-nfc">
-        <p class="section-label" data-i18n="📶 NFC Card">📶 NFC Card</p>
-        <p id="detailNfcText" class="muted"></p>
-        <div class="detail-pay-row">
-          <button id="detailNfcLinkBtn" class="btn btn-soft" type="button" data-i18n="📶 Card Link Karein">📶 Card Link Karein</button>
-          <button id="detailNfcUnlinkBtn" class="btn btn-ghost" type="button" hidden data-i18n="Unlink">Unlink</button>
-        </div>
-        <p id="detailNfcMsg" class="msg" role="status"></p>
-      </div>
       <div class="detail-len-head">
         <p class="section-label" data-i18n="lenden">LEN-DEN</p>
         <span class="detail-report-btns">
@@ -617,6 +606,7 @@ window.addEventListener("error", function (e) {
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
+        <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
         <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
         <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span data-i18n="Abhi lock karein">Abhi lock karein</span><span class="menu-right">›</span></button>
@@ -930,6 +920,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=121"></script>
+<script src="app.js?v=122"></script>
 </body>
 </html>
