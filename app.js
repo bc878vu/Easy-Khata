@@ -6113,9 +6113,9 @@
   function loadDukaanMode() { try { dukaanMode = window.localStorage.getItem("easykhata_dukaan_mode_v1") === "1"; } catch (e) { dukaanMode = false; } }
   function applyDukaanMode() {
     var btn = $("dukaanToggleBtn"); if (!btn) return;
-    btn.textContent = dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off";
+    btn.textContent = tr(dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off"); // v122: tr() — warna English mode mein bhi Urdu text rehta tha
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText(); // v118: language ke hisaab se
-    var search = $("peopleSearch"); if (search) search.placeholder = dukaanMode ? "Customer dhoondhein — naam likhein..." : "Dost dhoondhein — naam likhein...";
+    var search = $("peopleSearch"); if (search) search.placeholder = tr(dukaanMode ? "Customer dhoondhein…" : "Dost dhoondhein…"); // v122: tr() + chhota placeholder (360px par kat-ta tha)
   }
   function toggleDukaanMode() {
     dukaanMode = !dukaanMode;
@@ -6371,7 +6371,8 @@
   "Neeche scroll karein — purane len-den dekhne ke liye": "Scroll down — to see older transactions",
   "Neeche scroll karein — purane records dekhne ke liye": "Scroll down — to see older records",
   "Search name, food or amount...": "Search name, food or amount...",
-  "Dost dhoondhein — naam likhein...": "Find a friend — type a name...",
+  "Dost dhoondhein…": "Find a friend…",
+  "Customer dhoondhein…": "Find a customer…",
   "Name A–Z": "Name A–Z",
   "From": "From",
   "To": "To",
@@ -6782,6 +6783,7 @@
   "🎯 Bachat Goal": "🎯 Savings Goal",
   "🏠 Ghar ka kharcha": "🏠 Household Expenses",
   "🏪 Dukaan mode: Off": "🏪 Shop mode: Off",
+  "🏪 Dukaan mode: On": "🏪 Shop mode: On",
   "👁 Preview — yehi jayega": "👁 Preview — this is what will be sent",
   "👤 Guest": "👤 Guest",
   "👥 Manage Members": "👥 Manage Members",
@@ -6900,6 +6902,10 @@
     lang = lang === "ur" ? "en" : "ur";
     try { window.localStorage.setItem(LANG_KEY, lang); } catch (e) {}
     applyLanguage();
+    // v122: Dukaan button/label/placeholder bhi nayi zaban mein — applyLanguage
+    // button ko us ke data-i18n key ("Off") par set karta hai, jo mode ON ho to
+    // ghalat hota hai; applyDukaanMode() (tr() wala) sahi state lagata hai.
+    try { applyDukaanMode(); } catch (e) {}
     // v121: dynamic content (JS renders) bhi dobara banao — warna sirf static
     // labels badalte aur list/detail ke labels purani zaban mein rehte.
     try { renderAll(); } catch (e) {}

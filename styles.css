@@ -1760,3 +1760,34 @@ input,select,textarea,button{max-width:100%}
 /* v119: NFC card box in the person detail — same card style as the pay box. */
 .detail-nfc{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .detail-nfc .section-label{margin:0 0 6px}
+
+/* ---------- v122: full dynamic / responsive / compact audit ---------- */
+/* (A) ≤400px header: subtitle chhupao (360px par 3 lines banti thi),
+   avatar/buttons chhote, naam ellipsis — warna naam cut jata hai. */
+@media(max-width:400px){
+  .app-header{padding:8px 10px;gap:8px}
+  .app-user{gap:8px}
+  .app-sub{display:none}
+  .avatar{width:36px;height:36px;flex-basis:36px;font-size:.85rem}
+  .header-name-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .icon-btn{width:34px;height:34px}
+  .login-btn{padding:5px 8px;font-size:.74rem}
+  /* (B) balance cards: labels aik line mein — padding/icon/font chhote. */
+  .total-card{padding:10px 8px;gap:6px}
+  .tc-icon{width:30px;height:30px;flex-basis:30px;font-size:.95rem}
+  .tc-text>span{font-size:.78rem}
+  .tc-text .tc-sub{font-size:.7rem}
+  /* (C) search: placeholder chhota font taake poora dikhe. */
+  .search-wrap input[type="search"]{font-size:.92rem}
+  /* (D) CUSTOMERS row: buttons chhote + nowrap — wrap nahi honge. */
+  .people-head-row .btn{font-size:.82rem;padding:7px 9px;white-space:nowrap;min-height:38px}
+  .people-head-row{gap:6px}
+}
+/* (F) Desktop ≥1024px: content thora chaura (640→760px) + bottom nav aur
+   FAB content column se aligned — warna nav buttons screen ke kinaron par
+   aur FAB khaali jagah mein tairta hai. */
+@media(min-width:1024px){
+  .wrap{max-width:760px}
+  .bottomnav{left:50%;right:auto;transform:translateX(-50%);width:100%;max-width:760px}
+  .fab{right:calc(50% - 380px + 16px)}
+}
