@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=96">
+<link rel="stylesheet" href="styles.css?v=97">
 </head>
 <body>
 
@@ -351,8 +351,11 @@ window.addEventListener("error", function (e) {
           </div>
           <div class="field">
             <label for="txnPhoto" data-i18n="Bill ki photo">Bill ki photo <span class="optional-label" data-i18n="Optional">Optional</span></label>
-            <input id="txnPhoto" type="file" accept="image/*">
+            <label for="txnPhoto" class="btn btn-soft photo-pick-btn" data-i18n="📷 Bill photo chunein">📷 Bill photo chunein</label>
+            <input id="txnPhoto" class="txn-photo-input" type="file" accept="image/*">
+            <span id="txnPhotoName" class="muted photo-file-name"></span>
             <img id="txnPhotoPreview" class="txn-photo-preview" hidden alt="Bill ki photo">
+            <p id="txnPhotoHint" class="muted photo-view-hint" hidden data-i18n="Poori photo dekhne ke liye photo par tap karein">Poori photo dekhne ke liye photo par tap karein</p>
             <button id="txnPhotoRemoveBtn" class="btn btn-ghost btn-block" type="button" hidden style="margin-top:8px" data-i18n="Photo hatayein">Photo hatayein</button>
           </div>
           <div class="field">
@@ -867,6 +870,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=124"></script>
+<script src="app.js?v=125"></script>
 </body>
 </html>

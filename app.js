@@ -6676,6 +6676,8 @@
   "📄 PDF Report": "📄 PDF Report",
   "📅 Kharcha Diary": "📅 Expense Diary",
   "📅 Diary": "📅 Diary",
+  "📷 Bill photo chunein": "📷 Choose bill photo",
+  "Poori photo dekhne ke liye photo par tap karein": "Tap the photo to view it in full",
   "🏠 Ghar": "🏠 Home",
   "⏰ Due": "⏰ Due",
   "💰 Budget": "💰 Budget",
@@ -7097,14 +7099,22 @@
       reader.readAsDataURL(file);
     });
   }
+  // v126: bill-photo preview — aik jagah se show/hide (preview + hint + remove + file name).
+  // Preview compact thumbnail hai (140px, object-fit cover); tap par poori photo khulti hai.
+  function setTxnPhotoPreview(url) {
+    var pv = $("txnPhotoPreview"); var rm = $("txnPhotoRemoveBtn"); var hint = $("txnPhotoHint");
+    if (url) { if (pv) { pv.src = url; pv.hidden = false; } if (rm) rm.hidden = false; if (hint) hint.hidden = false; }
+    else { if (pv) { pv.hidden = true; pv.removeAttribute("src"); } if (rm) rm.hidden = true; if (hint) hint.hidden = true; }
+  }
+  function setTxnPhotoName(name) { var n = $("txnPhotoName"); if (n) n.textContent = name || ""; }
   // v113: category/due-date/photo fields reset (naya record).
   function clearTxnExtraFields() {
     var cat = $("txnCategory"); if (cat) { cat.value = "Khana"; cdSync(cat); }
     var dd = $("txnDueDate"); if (dd) dd.value = "";
     txnPhotoDataUrl = null;
     var ph = $("txnPhoto"); if (ph) ph.value = "";
-    var pv = $("txnPhotoPreview"); if (pv) { pv.hidden = true; pv.removeAttribute("src"); }
-    var rm = $("txnPhotoRemoveBtn"); if (rm) rm.hidden = true;
+    setTxnPhotoPreview(null); // v126
+    setTxnPhotoName(""); // v126
   }
   // v113: category badge + due-date chip + bill-photo thumb for a record row.
   function txnExtraMarkup(t) {
@@ -7162,8 +7172,8 @@
     $("txnCategory").value = cleanCategory(t.category); cdSync($("txnCategory")); // v113
     $("txnDueDate").value = String(t.due_date || "").slice(0, 10); // v113
     txnPhotoDataUrl = t.photo || null; // v113
-    if (t.photo) { $("txnPhotoPreview").src = t.photo; $("txnPhotoPreview").hidden = false; $("txnPhotoRemoveBtn").hidden = false; }
-    else { $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; }
+    setTxnPhotoPreview(t.photo || null); // v126: preview + hint + remove button aik saath
+    setTxnPhotoName(""); // v126: edit par file ka naam nahi pata (file input khaali hota hai)
     $("txnFormTitle").textContent = tr("Record badlein");
     $("txnForm").querySelector('button[type="submit"]').textContent = tr("Save karein");
     $("cancelEditBtn").hidden = false;
@@ -7635,16 +7645,18 @@
   // v113: bill photo — chunein to downscale kar ke preview dikhayein.
   $("txnPhoto").addEventListener("change", function () {
     var f = ($("txnPhoto").files || [])[0];
-    if (!f) { txnPhotoDataUrl = null; $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; return; }
+    if (!f) { txnPhotoDataUrl = null; setTxnPhotoPreview(null); setTxnPhotoName(""); return; }
     downscalePhoto(f).then(function (url) {
       txnPhotoDataUrl = url;
-      if (url) { $("txnPhotoPreview").src = url; $("txnPhotoPreview").hidden = false; $("txnPhotoRemoveBtn").hidden = false; }
-      else { $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true; setTxnMsg("Photo load nahi hui — dobara try karein.", false); }
+      if (url) { setTxnPhotoPreview(url); setTxnPhotoName(f.name || ""); }
+      else { setTxnPhotoPreview(null); setTxnPhotoName(""); setTxnMsg("Photo load nahi hui — dobara try karein.", false); }
     });
   });
   $("txnPhotoRemoveBtn").addEventListener("click", function () {
-    txnPhotoDataUrl = null; $("txnPhoto").value = ""; $("txnPhotoPreview").hidden = true; $("txnPhotoRemoveBtn").hidden = true;
+    txnPhotoDataUrl = null; $("txnPhoto").value = ""; setTxnPhotoPreview(null); setTxnPhotoName("");
   });
+  // v126: form preview par tap — poori photo kholein (thumbnail compact hai).
+  $("txnPhotoPreview").addEventListener("click", function () { if (txnPhotoDataUrl) openPhotoDataUrl(txnPhotoDataUrl); });
   // v113: bill-photo thumbnail par click — poori photo kholein.
   document.addEventListener("click", function (e) {
     var img = e.target && e.target.closest ? e.target.closest(".txn-photo-thumb") : null;
