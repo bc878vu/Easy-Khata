@@ -670,20 +670,31 @@
     return a < b ? a + "|" + b : b + "|" + a;
   }
   function computeLockedIds() {
-    // Per unordered pair of people: latest settlement date; every record of that
-    // pair dated on/before it is locked history. Settlement rows are always locked.
+    // Per unordered pair: latest settlement DATE + latest created_at among settlements
+    // ON that date. A record is locked if dated BEFORE that date, or dated ON it but
+    // created at/before the latest settlement on it. A record created AFTER the
+    // settlement (same date, later created_at) is new balance, not settled history.
     var latestByPair = {};
     txns.forEach(function (t) {
       if (!isSettlementNote(t.note)) return;
       var d = String(t.txn_date || "");
       var k = pairKey(t.payer_id, t.receiver_id);
-      if (d && (!latestByPair[k] || d > latestByPair[k])) latestByPair[k] = d;
+      var ca = String(t.created_at || "");
+      if (!d) return;
+      if (!latestByPair[k] || d > latestByPair[k].date ||
+          (d === latestByPair[k].date && ca > latestByPair[k].createdAt))
+        latestByPair[k] = { date: d, createdAt: ca };
     });
     var locked = {};
     txns.forEach(function (t) {
       if (isSettlementNote(t.note)) { locked[t.id] = true; return; }
       var latest = latestByPair[pairKey(t.payer_id, t.receiver_id)];
-      if (latest && String(t.txn_date || "") <= latest) locked[t.id] = true;
+      if (!latest) return;
+      var d = String(t.txn_date || "");
+      if (d < latest.date) locked[t.id] = true;
+      else if (d === latest.date &&
+          (!t.created_at || !latest.createdAt || String(t.created_at) <= latest.createdAt))
+        locked[t.id] = true;
     });
     return locked;
   }
@@ -692,7 +703,7 @@
     if (!lockedCache) lockedCache = computeLockedIds();
     return !!lockedCache[t.id];
   }
-  var LOCK_MSG = "Settled hisaab ko edit/delete nahi kar sakte — ye history hai.";
+  var LOCK_MSG = "Ye record locked hai — settled history ko edit/delete nahi kar sakte.";
 
   /* ---------- auth UI ---------- */
   function setAuthMsg(text, ok) {
@@ -2620,8 +2631,8 @@
       html += '<div class="rec-rule"><span class="rec-dot ' + (r.is_active ? "on" : "off") + '" aria-hidden="true"></span><div class="rec-rule-main"><strong>' + esc(name) + " — " + esc(fmtRs(r.amount)) + " (" + dir + ")</strong>"
         + '<span class="muted">' + esc(freqTxt) + " · Agla: " + esc(r.next_due || "—") + (r.is_active ? "" : " · ⏸ Paused") + "</span>"
         + (r.note ? '<span class="muted">' + esc(r.note) + "</span>" : "")
-        + '</div><div class="rec-actions"><button class="btn btn-soft" type="button" data-rec-toggle="' + r.id + '">' + (r.is_active ? "Pause" : "Resume") + '</button>'
-        + '<button class="btn btn-ghost" type="button" data-rec-del="' + r.id + '">Delete</button></div></div>';
+        + '</div><div class="rec-actions"><button class="btn btn-soft" type="button" data-rec-toggle="' + esc(r.id) + '">' + (r.is_active ? "Pause" : "Resume") + '</button>'
+        + '<button class="btn btn-ghost" type="button" data-rec-del="' + esc(r.id) + '">Delete</button></div></div>';
     });
     box.innerHTML = html;
   }
@@ -2732,7 +2743,7 @@
     visibleTxns().forEach(function (t) {
       if ((t.payer_id === id || t.receiver_id === id) && (t.payer_id === myId() || t.receiver_id === myId())) { count++; if (isTxnLocked(t)) hasLocked = true; }
     });
-    if (hasLocked) { setPeopleMsg("Is dost ka settled hisaab history mein save hai — usay delete nahi kar sakte.", false); return; }
+    if (hasLocked) { setPeopleMsg("Is dost ka locked hisaab history mein save hai — usay delete nahi kar sakte.", false); return; }
     var text = count > 0
       ? "'" + (c.name || "") + "' — contacts se remove karein? Un ke " + count + " records sirf aapki history se hat jayenge — doosre dost ko koi fark nahi parega. Ye wapas nahi hoga."
       : "'" + (c.name || "") + "' ko contacts se remove karein?";
@@ -2942,6 +2953,20 @@
         if (!token) return { ok: false, reason: "fcm-token-failed" };
         return saveFcmToken(token).then(function () {
           pushState = "on"; updatePushToggleLabel();
+          // v131 M5: is device ki purani VAPID row hatao (doosra channel) taake
+          // aik hi record par do popup na aayen. Cleanup fail ho to bhi On hi rahe.
+          try {
+            swReady(4000).then(function (reg) {
+              if (!reg) return null;
+              return reg.pushManager.getSubscription();
+            }).then(function (sub) {
+              if (!sub || !sub.endpoint) return;
+              var ep = sub.endpoint;
+              return sub.unsubscribe().catch(function () {}).then(function () {
+                return sb("khata_push_subs?endpoint=eq." + encodeURIComponent(ep) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" }).catch(function () {});
+              });
+            }).catch(function () {});
+          } catch (e) {}
           return { ok: true };
         }, function (e) { return { ok: false, reason: saveReason(e) }; });
       }).catch(function (e) {
@@ -3440,7 +3465,7 @@
       var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
       var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
       var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : (adminHiddenStatusLoaded ? '<div class="t-sub">Visible in both histories</div>' : '<div class="t-sub">Hidden status unavailable</div>');
-      var controls = lock ? '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
+      var controls = lock ? '<span class="t-lock">🔒 ' + esc(tr("Locked")) + '</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
       html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + txnExtraMarkup(t) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
     });
     $("adminUserTxns").innerHTML = html;
@@ -3612,9 +3637,10 @@
     if (!isAdmin() || !adminCurrentUser) return;
     var amount = parseFloat($("adminSetAmount").value);
     if (!amount || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) { setAdminSetMsg("Raqam 0 se zyada aur maximum 2 decimal places mein honi chahiye.", false); return; }
+    if (amount > 10000000) { setAdminSetMsg("Raqam Rs 10,000,000 se zyada nahi ho sakti.", false); return; }
     amount = moneyFromMinor(moneyToMinor(amount));
     var dir = (document.querySelector('input[name="adminSetDir"]:checked') || {}).value || "take";
-    var note = $("adminSetNote").value.trim() || "Admin ne raqam set ki";
+    var note = ($("adminSetNote").value.trim() || "Admin ne raqam set ki").slice(0, 500);
     var me = myId();
     var u = adminCurrentUser;
     var body = {
@@ -3659,7 +3685,7 @@
   function renderInsights() {
     var el = $("insightStats");
     var me = myId();
-    var mine = visibleTxns().filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
+    var mine = balanceTxns().filter(function (t) { return t.payer_id === me || t.receiver_id === me; });
     if (!mine.length) { el.hidden = true; return; }
     var biggest = mine[0], totalMinor = 0;
     var counts = {};
@@ -3675,7 +3701,7 @@
     var avg = moneyFromMinor(Math.round(totalMinor / mine.length));
     el.hidden = false;
     el.innerHTML =
-      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📊</span><div><strong>Hisaab ki jhalak</strong><small>Aap ke tamam visible records</small></div></div>' +
+      '<div class="khata-stat-head"><span class="khata-stat-icon" aria-hidden="true">📊</span><div><strong>Hisaab ki jhalak</strong><small>Aap ke tamam records</small></div></div>' +
       '<div class="khata-insight-grid">' +
         '<div class="khata-insight-cell"><span>Sab se bara record</span><strong>' + esc(fmtRs(biggest.amount)) + '</strong><small>' + esc(biggest.note || "Detail nahi") + ' · ' + esc(fmtDate(biggest.txn_date)) + '</small></div>' +
         '<div class="khata-insight-cell"><span>Sab se zyada len-den</span><strong>' + esc(profileName(topId) || "—") + '</strong><small>' + topN + ' dafa</small></div>' +
@@ -3701,7 +3727,6 @@
   }
   // v24.4: tooti/khali pic par initials fallback — kabhi toota image icon na
   // dikhe (header, account card, person detail, DOST list — har jagah).
-  function jsq(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
   function avatarHtml(url, initial) {
     var ini = initial || "?";
     // v82: CSP — inline onerror attribute hata diya; fallback data-fallback
@@ -4149,6 +4174,9 @@
   // aur JazzCash/Easypaisa payment-confirm dono yahi use karte hain, taake
   // record hamesha ek hi tareeqe se (aur sirf kamyab payment par) bane.
   function saveSettleRecord(id, amount, note, iOwe) {
+    // v131 L8: defensive validation (settleVia pehle se validate karta hai,
+    // lekin helper ko seedha call karne par bhi ghalat amount na jaye).
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > 10000000 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-7) return;
     var me = myId();
     var body = {
       id: newUuid(),
@@ -4204,7 +4232,7 @@
     // net ka sum hain; yahan kul diye / kul liye chahiye, jaise purana
     // "My Food Balance" text karta tha).
     var givenMinor = 0, takenMinor = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       var a = moneyToMinor(t.amount);
       if (t.payer_id === myId()) givenMinor += a;
       if (t.receiver_id === myId()) takenMinor += a;
@@ -4226,7 +4254,7 @@
   function monthStats() {
     var now = todayLocal().slice(0, 7);
     var givenMinor = 0, takenMinor = 0, count = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== now) return;
       if (t.payer_id !== myId() && t.receiver_id !== myId()) return;
       var a = moneyToMinor(t.amount);
@@ -4595,7 +4623,7 @@
       var timeStr = fmtTime(t.created_at);
       var btns = "";
       if (isTxnLocked(t)) {
-        btns = '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>';
+        btns = '<span class="t-lock">🔒 ' + esc(tr("Locked")) + '</span>';
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
@@ -4743,7 +4771,7 @@
     d.txns.forEach(function (t) {
       if (t && typeof t.id === "string" && t.id && typeof t.payer_id === "string" && t.payer_id
         && typeof t.receiver_id === "string" && t.receiver_id && typeof t.amount === "number"
-        && t.amount > 0 && t.amount <= 10000000 && typeof t.txn_date === "string" && /^\d{4}-\d{2}-\d{2}/.test(t.txn_date)) {
+        && t.amount > 0 && t.amount <= 10000000 && Math.abs(t.amount * 100 - Math.round(t.amount * 100)) < 1e-7 && typeof t.txn_date === "string" && /^\d{4}-\d{2}-\d{2}/.test(t.txn_date)) {
         txns.push({ id: t.id, payer_id: t.payer_id, receiver_id: t.receiver_id, amount: t.amount, note: typeof t.note === "string" ? t.note.slice(0, 500) : "", txn_date: t.txn_date.slice(0, 10), created_by: typeof t.created_by === "string" ? t.created_by : null, workspace_id: typeof t.workspace_id === "string" ? t.workspace_id : null, created_at: typeof t.created_at === "string" ? t.created_at : null });
       }
     });
@@ -5251,7 +5279,6 @@
       zebra: [245, 247, 250], box: [245, 247, 250], line: [220, 226, 235],
       grey: [100, 116, 139], dark: [15, 23, 42]
     };
-    function trunc(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
     // v24.10: jsPDF Helvetica sirf WinAnsi (cp1252) glyphs render karta hai.
     // Unicode minus U+2212 "−" (app on-screen "− Rs 210" ke liye use karta hai)
     // WinAnsi mein NAHI hai — PDF mein woh toot kar `"` jaisa glyph banta tha
@@ -5426,7 +5453,7 @@
       var s = String(name || "dost").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       return s || "dost";
     }
-    return { doc: doc, st: st, W: W, M: M, R: R, C: C, trunc: trunc, hline: hline, needPage: needPage, section: section, headerBand: headerBand, metaLine: metaLine, summaryCards: summaryCards, tableHead: tableHead, tableRow: tableRow, totalsRow: totalsRow, emptyBox: emptyBox, addFooter: addFooter, fileName: fileName };
+    return { doc: doc, st: st, W: W, M: M, R: R, C: C, hline: hline, needPage: needPage, section: section, headerBand: headerBand, metaLine: metaLine, summaryCards: summaryCards, tableHead: tableHead, tableRow: tableRow, totalsRow: totalsRow, emptyBox: emptyBox, addFooter: addFooter, fileName: fileName };
   }
   // v88: shared report builder — exportPdf (poora hisaab) aur monthly report
   // (aik mahina) dono isi se page banate hain, taake layout kabhi alag na ho.
@@ -6029,7 +6056,7 @@
       var locked = isTxnLocked(t);
       var btns = "";
       if (locked) {
-        btns = '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>';
+        btns = '<span class="t-lock">🔒 ' + esc(tr("Locked")) + '</span>';
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
@@ -6169,7 +6196,7 @@
     var el = $("householdBody"); if (!el) return;
     var key = todayLocal().slice(0, 7), me = myId();
     var byCat = {}, byPerson = {}, totalMinor = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== key) return;
       if (t.payer_id !== me) return; // sirf diye hue = kharcha
       var a = moneyToMinor(t.amount);
@@ -6728,6 +6755,7 @@
   "dene hain": "to give",
   "settled": "settled",
   "Settled": "Settled",
+  "Locked": "Locked",
   "TIME": "TIME",
   "DIYE": "GAVE",
   "LIYE": "TOOK",
@@ -6745,6 +6773,12 @@
   "Is dost ka number nahi hai — pehle number add karein.": "This friend's number is missing — add the number first.",
   "JazzCash ya Easypaisa se settle karein.": "Settle with JazzCash or Easypaisa.",
   "Payment ho gaya?": "Payment done?",
+  "Kitni raqam bheji? (Rs)": "How much did you send? (Rs)",
+  "Raqam ghalat hai — 0 se zyada aur balance se zyada nahi honi chahiye.": "Invalid amount — it must be more than 0 and not more than the balance.",
+  "Ye juzvi payment hai.": "This is a partial payment.",
+  "Baaki": "Remaining",
+  "Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega.": "Only confirm if the payment succeeded — otherwise no record will be saved.",
+  "khul raha hai — copy nahi ho saka, amount aur number khud likh dein:": "is opening — could not copy, please type the amount and number yourself:",
   "✅ Ho gaya — record save karein": "✅ Done — save record",
   "Ye poora balance settle karega. Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega.": "This will settle the full balance. Only confirm if the payment succeeded — otherwise no record will be saved.",
   "khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein).": "is opening — amount and number copied. Paste them in the app (if the app does not open, open it yourself and paste).",
@@ -6998,26 +7032,43 @@
     myContacts.forEach(function (c) { if (c.id === detailPersonId) { name = c.name || ""; phone = c.phone || ""; } });
     if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) { name = p.name || ""; phone = p.phone || ""; } }); }
     if (!phone) { setDetailPayMsg(tr("Is dost ka number nahi hai — pehle number add karein.")); return; }
-    var amount = Math.abs(s.net);
+    var fullAmount = Math.abs(s.net);
     var iOwe = s.net < 0; // main dene wala hoon — payment ki direction (confirm par record ke liye)
     var dirWord = iOwe ? tr("diye") : tr("liye");
     var appName = app === "jazzcash" ? "JazzCash" : "Easypaisa";
-    var text = fmtRs(amount) + " — " + (name || "") + " (" + phone + ") — Easy Khata settle (" + (iOwe ? tr("dene hain") : tr("lene hain")) + ")";
-    var done = function () {
-      setDetailPayMsg(appName + " " + tr("khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein)."));
-      openAppLink((app === "jazzcash" ? "jazzcash://" : "easypaisa://"));
-      // v130: payment confirm — record SIRF tab bane jab payment kamyab hua ho.
-      // JazzCash/Easypaisa wapas koi jawab nahi dete, is liye user khud confirm
-      // karta hai; Cancel/fail par kuch save nahi hota (koi fake record nahi).
-      askConfirm(tr("Payment ho gaya?"),
-        appName + ": " + fmtRs(amount) + " — " + name + " (" + dirWord + "). " + tr("Ye poora balance settle karega. Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega."),
-        tr("✅ Ho gaya — record save karein"),
-        function () { saveSettleRecord(detailPersonId, amount, "Settled up — " + appName + " payment", iOwe); },
-        tr("Cancel karein"));
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(done);
-    } else done();
+    // v131 H3: partial payment — pehle pooch lo kitni raqam bheji. Poori raqam par
+    // "Settled up" note (lock lagta hai); juzvi par saada note (baaki balance rehta hai).
+    appPrompt(tr("Kitni raqam bheji? (Rs)"), String(fullAmount), { title: appName + " payment", inputType: "number" }).then(function (paid) {
+      if (paid === null || paid === undefined || paid === "") return;
+      var amount = Number(paid);
+      if (!(amount > 0) || amount > fullAmount || Math.round(amount * 100) !== amount * 100) {
+        setDetailPayMsg(tr("Raqam ghalat hai — 0 se zyada aur balance se zyada nahi honi chahiye."));
+        return;
+      }
+      var isFull = amount === fullAmount;
+      var text = fmtRs(amount) + " — " + (name || "") + " (" + phone + ") — Easy Khata settle (" + (iOwe ? tr("dene hain") : tr("lene hain")) + ")";
+      var done = function (copied) {
+        if (copied) setDetailPayMsg(appName + " " + tr("khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein)."));
+        else setDetailPayMsg(appName + " " + tr("khul raha hai — copy nahi ho saka, amount aur number khud likh dein:") + " " + text);
+        openAppLink((app === "jazzcash" ? "jazzcash://" : "easypaisa://"));
+        // v130: payment confirm — record SIRF tab bane jab payment kamyab hua ho.
+        // JazzCash/Easypaisa wapas koi jawab nahi dete, is liye user khud confirm
+        // karta hai; Cancel/fail par kuch save nahi hota (koi fake record nahi).
+        var body = appName + ": " + fmtRs(amount) + " — " + name + " (" + dirWord + "). " +
+          (isFull ? tr("Ye poora balance settle karega. Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega.")
+                  : tr("Ye juzvi payment hai.") + " " + tr("Baaki") + ": " + fmtRs(fullAmount - amount) + ". " + tr("Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega."));
+        askConfirm(tr("Payment ho gaya?"), body, tr("✅ Ho gaya — record save karein"),
+          function () { saveSettleRecord(detailPersonId, amount, (isFull ? "Settled up — " : "") + appName + " payment", iOwe); },
+          tr("Cancel karein"));
+      };
+      // v131 M2: copyText() use karo (execCommand fallback hai) — raw clipboard nahi.
+      // Copy fail ho to bhi aage barho, lekin jhootha "copy ho gaye" na kaho.
+      try {
+        var p = copyText(text);
+        if (p && p.then) p.then(function () { done(true); }, function () { done(false); });
+        else done(false);
+      } catch (e) { done(false); }
+    });
   }
 
   /* ---------- v116: Due-soon list + reminders + Budget ---------- */
@@ -7068,10 +7119,14 @@
     if (!name) { profiles.forEach(function (p) { if (p.id === otherId) { name = p.name || ""; phone = p.phone || ""; } }); }
     var text = "Assalam o Alaikum " + (name || "") + "! Easy Khata par aap ka Rs " + (Number(t.amount) || 0) + " ka udhaar " + fmtDate(t.due_date) + " ko due hai. Barah-e-karam jald ada kar dein. Shukriya!";
     if (phone) { openWaLink(waLink(phone, text)); return; }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { setDueMsg("Is dost ka WhatsApp number nahi hai — reminder text copy ho gaya, khud bhej dein."); })
-        .catch(function () { setDueMsg("Is dost ka WhatsApp number nahi hai."); });
-    } else setDueMsg("Is dost ka WhatsApp number nahi hai.");
+    // v131 M2: copyText() use karo (execCommand fallback hai) — copy fail ho to
+    // imaandari se batao, jhootha "copy ho gaya" na kaho.
+    try {
+      var cp = copyText(text);
+      if (cp && cp.then) cp.then(function () { setDueMsg("Is dost ka WhatsApp number nahi hai — reminder text copy ho gaya, khud bhej dein."); },
+        function () { setDueMsg("Is dost ka WhatsApp number nahi hai — copy nahi ho saka, text khud likh kar bhej dein: " + text); });
+      else setDueMsg("Is dost ka WhatsApp number nahi hai.");
+    } catch (e) { setDueMsg("Is dost ka WhatsApp number nahi hai."); }
   }
   function renderBudget() {
     var body = $("budgetBody"); if (!body) return;
@@ -7080,7 +7135,7 @@
     if (input && document.activeElement !== input) input.value = budget == null ? "" : String(budget);
     if (budget == null) { body.innerHTML = '<p class="empty">Monthly budget set nahi hai — upar amount likh kar Save karein.</p>'; return; }
     var key = todayLocal().slice(0, 7), me = myId(), spentMinor = 0;
-    visibleTxns().forEach(function (t) {
+    balanceTxns().forEach(function (t) {
       if (String(t.txn_date || "").slice(0, 7) !== key) return;
       if (t.payer_id !== me) return;
       spentMinor += moneyToMinor(t.amount);
@@ -7186,8 +7241,10 @@
   // v113: bill photo poori dikhayein (Blob URL — data URL seedha open nahi hota).
   function openPhotoDataUrl(url) {
     try {
+      // v131 L13: stored MIME par bharosa na karo — sirf image data URLs kholo.
+      if (!/^data:image\/(jpeg|png|webp|gif);base64,/.test(String(url || ""))) return;
       var parts = String(url || "").split(",");
-      var mime = (parts[0].match(/:(.*?);/) || [])[1] || "image/jpeg";
+      var mime = "image/jpeg";
       var bin = atob(parts[1] || "");
       var arr = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);

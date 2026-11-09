@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v130-0";
+var CACHE = "easy-khata-v131-0";
 var SHELL = [
   "./",
   "index.html",
   "styles.css?v=100",
   "config.js?v=4",
-  "app.js?v=129",
+  "app.js?v=130",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",
@@ -36,7 +36,13 @@ var CDN_LIBS = [
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
 
 self.addEventListener("install", function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
+  // v131 M6: per-entry cache — aik file 404 ho to bhi baaki 10 cache hon aur
+  // skipWaiting() chale (addAll aik fail par sab reject kar deta tha).
+  e.waitUntil(caches.open(CACHE).then(function (c) {
+    return Promise.all(SHELL.map(function (url) {
+      return c.add(url).catch(function () { /* log, keep going */ });
+    }));
+  }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener("activate", function (e) {
