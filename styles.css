@@ -1641,7 +1641,7 @@ input,select,textarea,button{max-width:100%}
 .txn-photo-preview{width:100%;max-width:280px;height:140px;object-fit:cover;object-position:center;border-radius:10px;border:1px solid var(--line);margin-top:8px;display:block;cursor:pointer}
 /* v126: bill-photo picker — native "Choose file" button ki jagah styled button;
    asal input visually hidden (DOM + handler wahi, id wahi). */
-.txn-photo-input{position:absolute;width:1px;height:1px;padding:0;margin:0;opacity:0;overflow:hidden}
+.txn-photo-input{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:0!important;opacity:0;overflow:hidden}
 .photo-pick-btn{display:inline-flex;align-items:center;gap:6px;margin-top:2px}
 .photo-file-name{display:block;margin-top:6px;font-size:.82rem;word-break:break-all}
 .photo-file-name:empty{display:none}
