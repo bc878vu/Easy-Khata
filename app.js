@@ -4479,6 +4479,10 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
+    // v120: Logout sirf logged-in mode mein — guest ka koi account hi nahi,
+    // is liye guest menu mein Logout dikhana ghalat tha. Guest ke liye
+    // "Guest mode se bahar niklein" guest box mein pehle se hai.
+    $("logoutBtn").hidden = guestMode;
     // v74: Settings mein guest hisaab transfer ka option — sirf logged-in
     // mode mein; label mein is device ke guest records/dost ki ginti.
     var gt = $("acctGuestTransferBtn");
@@ -7078,7 +7082,7 @@
   $("forgotSendBtn").addEventListener("click", doForgot);
   $("resetBtn").addEventListener("click", doReset);
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
-  $("logoutBtn").addEventListener("click", function () { if (!guestMode) saveSession(null); showAuth(); });
+  $("logoutBtn").addEventListener("click", function () { if (guestMode) return; saveSession(null); showAuth(); }); // v120: guest mein Logout ka koi matlab nahi
   $("navKhata").addEventListener("click", function () { showView("khata"); });
   $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
