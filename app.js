@@ -4225,6 +4225,28 @@
       o.setAttribute("aria-checked", active ? "true" : "false");
     });
     $("shareSheetPreview").textContent = shareSheetText(shareSheetKind);
+    renderShareQr();
+  }
+  // v108: share QR (barcode) — sirf "Sirf app link" par dikhta hai; app link ka QR,
+  // scan kar ke app khulta hai. Lib lazy-load hoti hai (vendor/, SW cached);
+  // load fail ho to QR chhup jata hai — text share phir bhi chalta hai.
+  var shareQrRendered = false;
+  function renderShareQr() {
+    var box = $("shareSheetQr");
+    if (!box) return;
+    if (shareSheetKind !== "link") { box.hidden = true; return; }
+    box.hidden = false;
+    if (shareQrRendered) return;
+    ensureReportLib("qrcode").then(function (qrLib) {
+      if (!qrLib) { box.hidden = true; return; }
+      try {
+        var qr = qrLib(0, "M");
+        qr.addData(APP_URL);
+        qr.make();
+        $("shareSheetQrBox").innerHTML = qr.createSvgTag({ cellSize: 5, margin: 8 });
+        shareQrRendered = true;
+      } catch (e) { box.hidden = true; }
+    });
   }
   function openShareSheet() {
     shareSheetKind = "link";
@@ -4899,7 +4921,9 @@
   // Bytes + SRI hash CDN wali files jese hi hain (curl se verify kiye).
   var REPORT_LIBS = {
     jspdf: { url: "vendor/jspdf.umd.min.js", integrity: "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk", global: function () { return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null; } },
-    xlsx: { url: "vendor/xlsx.bundle.js", integrity: "sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb", global: function () { return window.XLSX || null; } }
+    xlsx: { url: "vendor/xlsx.bundle.js", integrity: "sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb", global: function () { return window.XLSX || null; } },
+    // v108: share QR (barcode) — qrcode-generator 1.4.4 (MIT), self-hosted; sirf jab share sheet khole.
+    qrcode: { url: "vendor/qrcode.js", integrity: "sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k", global: function () { return window.qrcode || null; } }
   };
   var reportLibLoading = {};
   function ensureReportLib(kind) {

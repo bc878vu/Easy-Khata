@@ -3,20 +3,22 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v107-0";
+var CACHE = "easy-khata-v108-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=80",
+  "styles.css?v=81",
   "config.js?v=4",
-  "app.js?v=106",
+  "app.js?v=107",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",
   // v91: report libs self-hosted — install par cache ho jayein, offline
   // export pehli visit se hi chale (pehle CDN se pehli use par aati thiin).
   "vendor/jspdf.umd.min.js",
-  "vendor/xlsx.bundle.js"
+  "vendor/xlsx.bundle.js",
+  // v108: share QR (barcode) lib — share sheet kholne par lazy-load, offline bhi chale.
+  "vendor/qrcode.js"
 ];
 // v24.8: boot + PDF ke liye zaroori CDN libs (index.html mein pinned versions).
 // Ye cross-origin hain — pehle SW inhein bilkul intercept nahi karta tha,
