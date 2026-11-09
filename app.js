@@ -4156,8 +4156,8 @@
     // Per-person Share (personShareText) aur WhatsApp Remind (personShortText)
     // waisi hi hain — dost se hisaab barabar karne ke liye un mein rakam zaroori hai.
     var text = "Easy Khata — apna rozmarra ka hisaab aasani se rakhein!\n\nEasy Khata: " + APP_SHORT_URL;
-    if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
-    copyText(text).then(function () { setTxnMsg("Link copy ho gaya — kisi bhi app mein paste karein.", true); });
+    // v111: barcode PNG goes with the link share too (user order 2026-11-09).
+    shareAppLink(text, function () { setTxnMsg("Link copy ho gaya — kisi bhi app mein paste karein.", true); });
   }
 
   /* ---------- Share sheet (v69) ---------- */
@@ -4246,6 +4246,53 @@
         $("shareSheetQrBox").innerHTML = qr.createSvgTag({ cellSize: 3, margin: 8 });
         shareQrRendered = true;
       } catch (e) { box.hidden = true; }
+    });
+  }
+  // v111: QR PNG file for sharing — the barcode image goes WITH the app-link share
+  // (user order 2026-11-09: "barcode send ho sharing pr b"). Draws the app-link QR
+  // on a canvas (PNG, 4-module quiet zone) and returns a File, or null when the
+  // lib/canvas is unavailable — then the share falls back to text-only.
+  function makeQrPngFile() {
+    return ensureReportLib("qrcode").then(function (qrLib) {
+      if (!qrLib) return null;
+      try {
+        var qr = qrLib(0, "M");
+        qr.addData(APP_URL);
+        qr.make();
+        var n = qr.getModuleCount();
+        var cell = 8, quiet = 4;
+        var size = (n + quiet * 2) * cell;
+        var canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        var g = canvas.getContext("2d");
+        if (!g) return null;
+        g.fillStyle = "#ffffff"; g.fillRect(0, 0, size, size);
+        g.fillStyle = "#000000";
+        for (var r = 0; r < n; r++) {
+          for (var c = 0; c < n; c++) {
+            if (qr.isDark(r, c)) g.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+          }
+        }
+        return new Promise(function (resolve) {
+          if (canvas.toBlob) {
+            canvas.toBlob(function (blob) {
+              resolve(blob ? new File([blob], "easy-khata-qr.png", { type: "image/png" }) : null);
+            }, "image/png");
+          } else { resolve(null); }
+        });
+      } catch (e) { return null; }
+    });
+  }
+  // v111: app-link share — text + barcode PNG. Falls back to text-only when the
+  // browser can't share files, and to clipboard when there's no share sheet.
+  function shareAppLink(text, onCopied) {
+    makeQrPngFile().then(function (file) {
+      if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ text: text, files: [file] }).catch(function () {});
+        return;
+      }
+      if (navigator.share) { navigator.share({ text: text }).catch(function () {}); return; }
+      copyText(text).then(function () { if (onCopied) onCopied(); });
     });
   }
   function openShareSheet() {
@@ -6443,7 +6490,16 @@
     btn.addEventListener("click", function () { shareSheetKind = btn.getAttribute("data-share-kind"); renderShareSheet(); });
   });
   $("shareSheetCancelBtn").addEventListener("click", closeShareSheet);
-  $("shareSheetSendBtn").addEventListener("click", function () { closeShareSheet(); shareText(shareSheetText(shareSheetKind)); });
+  $("shareSheetSendBtn").addEventListener("click", function () {
+    var text = shareSheetText(shareSheetKind);
+    closeShareSheet();
+    // v111: "Sirf app link" shares the text + barcode PNG; balance/month stay text-only.
+    if (shareSheetKind === "link") {
+      shareAppLink(text, function () { setPeopleMsg("Text copy ho gaya — WhatsApp ya kisi bhi app mein paste karein.", true); });
+    } else {
+      shareText(text);
+    }
+  });
   $("shareSheetOverlay").addEventListener("click", function (e) { if (e.target === $("shareSheetOverlay")) closeShareSheet(); });
   $("balanceEyeBtn").addEventListener("click", toggleBalanceEye); // v66: balance chhupayein/dikhayein
   $("savePhoneBtn").addEventListener("click", saveProfile);
