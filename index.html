@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=85">
+<link rel="stylesheet" href="styles.css?v=86">
 </head>
 <body>
 
@@ -235,7 +235,10 @@ window.addEventListener("error", function (e) {
         <input id="peopleSearch" type="search" placeholder="Dost dhoondhein — naam likhein...">
       </div>
 
-      <p class="section-label">DOST</p>
+      <div class="people-head-row">
+        <p class="section-label" id="peopleSectionLabel">DOST</p>
+        <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
+      </div>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
       <div class="actions-row">
@@ -408,6 +411,15 @@ window.addEventListener("error", function (e) {
         <div id="calGrid" class="cal-grid"></div>
         <div id="calDayDetail" class="cal-day-detail"></div>
       </div>
+
+      <!-- v115: Ghar ka kharcha -->
+      <div class="card" id="householdCard">
+        <div class="list-head">
+          <h2>🏠 Ghar ka kharcha</h2>
+        </div>
+        <p class="muted">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
+        <div id="householdBody"></div>
+      </div>
     </section>
 
     <!-- Person detail -->
@@ -429,6 +441,14 @@ window.addEventListener("error", function (e) {
         <button id="detailShareBtn" class="detail-action" type="button"><span class="da-ico">📤</span><span>Share</span></button>
         <button id="detailWaBtn" class="detail-action" type="button"><span class="da-ico">💬</span><span>WhatsApp</span></button>
         <button id="detailSettleBtn" class="detail-action" type="button"><span class="da-ico">✓</span><span>Hisaab barabar</span></button>
+      </div>
+      <div id="detailCreditBox" class="detail-credit" hidden>
+        <label for="detailCreditLimit">Credit limit (Rs) — is customer ko kitna udhaar de sakte hain</label>
+        <div class="detail-credit-row">
+          <input id="detailCreditLimit" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 5000">
+          <button id="detailCreditSaveBtn" class="btn btn-primary" type="button">Save</button>
+        </div>
+        <p id="detailCreditMsg" class="msg" role="status"></p>
       </div>
       <div class="detail-len-head">
         <p class="section-label">LEN-DEN</p>
@@ -847,6 +867,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=113"></script>
+<script src="app.js?v=114"></script>
 </body>
 </html>

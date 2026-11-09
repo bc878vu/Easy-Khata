@@ -629,7 +629,7 @@
       if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, first: null, last: null };
     });
     myContacts.forEach(function (c) {
-      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, manual: true, first: null, last: null };
+      map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, manual: true, first: null, last: null, credit_limit: (c.credit_limit == null ? null : Number(c.credit_limit)) }; // v115: dukaan credit limit
     });
     function bump(p, d) {
       if (!d) return;
@@ -2077,6 +2077,7 @@
     renderTxnFilterOptions();
     renderTxns();
     renderDiary(); // v114: calendar + diary taaza
+    renderHousehold(); // v115: ghar ka kharcha taaza
     fillMyPhone();
     renderAccount();
     renderAdmin();
@@ -4420,10 +4421,16 @@
       var netText = net > 0 ? "+ " + fmtRs(net) : net < 0 ? "− " + fmtRs(-net) : "Settled";
       if (hideAmounts && net !== 0) netText = "Rs ••••••";
       var last = p.last ? "Aakhri len-den: " + fmtDateLong(p.last) : "Abhi koi len-den nahi";
+      // v115: dukaan credit limit — limit se zyada udhaar ho to warning; Dukaan mode mein limit bhi dikhao.
+      var limitHtml = "";
+      if (p.credit_limit != null && !isNaN(p.credit_limit)) {
+        if (dukaanMode) limitHtml += '<span class="p-limit">Limit: ' + esc(fmtRs(p.credit_limit)) + "</span>";
+        if (net > p.credit_limit) limitHtml += '<span class="p-limit-warn">\u26A0\uFE0F Limit se zyada</span>';
+      }
       html += '<button class="person" type="button" data-person="' + esc(id) + '">' +
         '<span class="p-avatar">' + avatarHtml(p.avatar_url, initials(p.name)) + '</span>' +
         '<span class="p-main"><span class="p-name">' + esc(p.name) + (p.manual ? ' <span class="tag-manual">Manual</span>' : '') + '</span>' +
-        '<span class="p-last">' + esc(last) + '</span></span>' +
+        '<span class="p-last">' + esc(last) + limitHtml + '</span></span>' +
         '<span class="p-net ' + cls + '">' + esc(netText) + '</span></button>';
     });
     $("peopleList").innerHTML = html;
@@ -4512,6 +4519,17 @@
     var isManual = false;
     myContacts.forEach(function (c) { if (c.id === id) isManual = true; });
     $("detailRemoveBtn").hidden = !isManual;
+    // v115: credit limit editor — sirf manual contacts (dukaan ke customers) ke liye.
+    var creditBox = $("detailCreditBox");
+    if (creditBox) {
+      creditBox.hidden = !isManual;
+      if (isManual) {
+        var cc = null;
+        myContacts.forEach(function (x) { if (x.id === id) cc = x; });
+        $("detailCreditLimit").value = (cc && cc.credit_limit != null && cc.credit_limit !== "") ? String(cc.credit_limit) : "";
+        setDetailCreditMsg("");
+      }
+    }
     renderDetailTxns(list);
   }
   function renderDetailTxns(list) {
@@ -6074,6 +6092,80 @@
     el.innerHTML = head + body;
   }
 
+  /* ---------- v115: Dukaan mode (shopkeeper ledger) ---------- */
+  var dukaanMode = false;
+  function loadDukaanMode() { try { dukaanMode = window.localStorage.getItem("easykhata_dukaan_mode_v1") === "1"; } catch (e) { dukaanMode = false; } }
+  function applyDukaanMode() {
+    var btn = $("dukaanToggleBtn"); if (!btn) return;
+    btn.textContent = dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off";
+    var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = dukaanMode ? "CUSTOMERS" : "DOST";
+    var search = $("peopleSearch"); if (search) search.placeholder = dukaanMode ? "Customer dhoondhein — naam likhein..." : "Dost dhoondhein — naam likhein...";
+  }
+  function toggleDukaanMode() {
+    dukaanMode = !dukaanMode;
+    try { window.localStorage.setItem("easykhata_dukaan_mode_v1", dukaanMode ? "1" : "0"); } catch (e) {}
+    applyDukaanMode(); renderPeople();
+  }
+  function setDetailCreditMsg(msg) { var el = $("detailCreditMsg"); if (el) el.textContent = msg || ""; }
+  function saveDetailCreditLimit() {
+    var id = detailPersonId; if (!id) return;
+    var raw = ($("detailCreditLimit").value || "").trim();
+    var limit = raw === "" ? null : Number(raw);
+    if (limit != null && (!isFinite(limit) || limit < 0)) { setDetailCreditMsg("Sahi limit likhein (0 ya zyada)."); return; }
+    if (limit != null) limit = Math.round(limit);
+    var c = null;
+    myContacts.forEach(function (x) { if (x.id === id) c = x; });
+    if (!c) return;
+    var prev = (c.credit_limit == null ? null : c.credit_limit);
+    c.credit_limit = limit;
+    if (guestMode) {
+      saveGuestStore();
+      renderPeople(); renderPersonDetail();
+      setDetailCreditMsg(limit == null ? "Credit limit hata diya." : "Credit limit save ho gayi: " + fmtRs(limit)); // v115: message render ke BAAD (renderPersonDetail use saaf kar deta hai)
+      return;
+    }
+    sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { credit_limit: limit } })
+      .then(function (res) {
+        if (!res.ok) { c.credit_limit = prev; setDetailCreditMsg("Limit save nahi ho saki. Dobara try karein."); return; }
+        renderPeople(); renderPersonDetail();
+        setDetailCreditMsg(limit == null ? "Credit limit hata diya." : "Credit limit save ho gayi: " + fmtRs(limit));
+      })
+      .catch(function () { c.credit_limit = prev; setDetailCreditMsg("Limit save nahi ho saki. Dobara try karein."); });
+  }
+
+  /* ---------- v115: Ghar ka kharcha (household) ---------- */
+  function renderHousehold() {
+    var el = $("householdBody"); if (!el) return;
+    var key = todayLocal().slice(0, 7), me = myId();
+    var byCat = {}, byPerson = {}, totalMinor = 0;
+    visibleTxns().forEach(function (t) {
+      if (String(t.txn_date || "").slice(0, 7) !== key) return;
+      if (t.payer_id !== me) return; // sirf diye hue = kharcha
+      var a = moneyToMinor(t.amount);
+      totalMinor += a;
+      var cat = cleanCategory(t.category);
+      byCat[cat] = (byCat[cat] || 0) + a;
+      byPerson[t.receiver_id] = (byPerson[t.receiver_id] || 0) + a;
+    });
+    if (!totalMinor) { el.innerHTML = '<p class="empty">Is mahine abhi koi kharcha nahi.</p>'; return; }
+    var cats = Object.keys(byCat).sort(function (x, y) { return byCat[y] - byCat[x]; });
+    var maxCat = byCat[cats[0]] || 1;
+    var html = '<div class="hh-total"><span>Is mahine kul kharcha</span><strong>' + esc(fmtRs(moneyFromMinor(totalMinor))) + "</strong></div>";
+    html += '<p class="section-label">CATEGORY</p>';
+    cats.forEach(function (cat) {
+      var pct = Math.round((byCat[cat] / maxCat) * 100);
+      html += '<div class="hh-row"><span>' + esc(cat) + '</span><div class="hh-bar"><i style="width:' + pct + '%"></i></div><strong>' + esc(fmtRs(moneyFromMinor(byCat[cat]))) + "</strong></div>";
+    });
+    var persons = Object.keys(byPerson).sort(function (x, y) { return byPerson[y] - byPerson[x]; });
+    if (persons.length) {
+      html += '<p class="section-label">MEMBER</p>';
+      persons.forEach(function (pid) {
+        html += '<div class="hh-row"><span>' + partyNameMarkup(pid) + '</span><strong>' + esc(fmtRs(moneyFromMinor(byPerson[pid]))) + "</strong></div>";
+      });
+    }
+    el.innerHTML = html;
+  }
+
   /* ---------- add / edit / delete ---------- */
   // v113: record categories (Kharcha diary + Dukaan mode use these).
   var TXN_CATEGORIES = ["Khana", "Udhaar", "Kiraya", "Bijli", "Petrol", "Shopping", "Transport", "Health", "Education", "Other"];
@@ -6814,6 +6906,10 @@
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});
   $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  // v115: dukaan mode + credit limit save.
+  loadDukaanMode(); applyDukaanMode();
+  $("dukaanToggleBtn").addEventListener("click", toggleDukaanMode);
+  $("detailCreditSaveBtn").addEventListener("click", saveDetailCreditLimit);
   // v114: diary — month nav + category filter + din par tap.
   $("calPrevBtn").addEventListener("click", function () { diaryShiftMonth(-1); renderDiary(); });
   $("calNextBtn").addEventListener("click", function () { diaryShiftMonth(1); renderDiary(); });
