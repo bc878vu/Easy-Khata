@@ -4262,17 +4262,28 @@
         var n = qr.getModuleCount();
         var cell = 8, quiet = 4;
         var size = (n + quiet * 2) * cell;
+        // v112: app name + tagline under the QR (user order 2026-11-09) — so anyone
+        // who sees the shared barcode knows it's Easy Khata's. Brand green, small.
+        var nameGap = 16, nameSize = 30, tagGap = 8, tagSize = 16, bottomPad = 18;
+        var height = size + nameGap + nameSize + tagGap + tagSize + bottomPad;
         var canvas = document.createElement("canvas");
-        canvas.width = size; canvas.height = size;
+        canvas.width = size; canvas.height = height;
         var g = canvas.getContext("2d");
         if (!g) return null;
-        g.fillStyle = "#ffffff"; g.fillRect(0, 0, size, size);
+        g.fillStyle = "#ffffff"; g.fillRect(0, 0, size, height);
         g.fillStyle = "#000000";
         for (var r = 0; r < n; r++) {
           for (var c = 0; c < n; c++) {
             if (qr.isDark(r, c)) g.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
           }
         }
+        g.textAlign = "center";
+        g.fillStyle = "#005b4b"; // brand green
+        g.font = "bold " + nameSize + "px system-ui, -apple-system, 'Segoe UI', sans-serif";
+        g.fillText("Easy Khata", size / 2, size + nameGap + nameSize);
+        g.fillStyle = "#5b6b66";
+        g.font = tagSize + "px system-ui, -apple-system, 'Segoe UI', sans-serif";
+        g.fillText("Rozmarra ka Hisaab", size / 2, size + nameGap + nameSize + tagGap + tagSize);
         return new Promise(function (resolve) {
           if (canvas.toBlob) {
             canvas.toBlob(function (blob) {
