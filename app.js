@@ -3440,7 +3440,7 @@
       var dir = t.payer_id === u.id ? "→ " + other + " (diye)" : "← " + other + " (liye)";
       var lock = isTxnLocked(t), hidden = adminHiddenByTxn[t.id] || [];
       var hiddenText = hidden.length ? '<div class="t-sub">Hidden by: ' + esc(hidden.join(", ")) + '</div>' : (adminHiddenStatusLoaded ? '<div class="t-sub">Visible in both histories</div>' : '<div class="t-sub">Hidden status unavailable</div>');
-      var controls = lock ? '<span class="t-lock">🔒 Settled</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
+      var controls = lock ? '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>' : '<span class="t-btns"><button class="btn-danger" type="button" data-admin-txn-edit="' + esc(t.id) + '">Edit</button><button class="btn-danger" type="button" data-admin-txn-del="' + esc(t.id) + '">Delete permanently</button></span>';
       html += '<div class="txn"><div class="t-main">' + esc(dir) + '</div><div class="t-sub">' + esc(t.note || "Food") + ' · ' + esc(fmtDate(t.txn_date)) + txnExtraMarkup(t) + ' · By: ' + esc(profileName(t.created_by)) + '</div>' + hiddenText + '<div class="t-foot"><span class="t-amt">' + esc(fmtRs(t.amount)) + '</span>' + controls + '</div></div>';
     });
     $("adminUserTxns").innerHTML = html;
@@ -4079,8 +4079,8 @@
   }
   // v84: aik hi alert-box design — legacy confirmOverlay hata diya; sab
   // confirmations appDialog (app-styled, z-3000, blur backdrop) se hote hain.
-  function askConfirm(title, text, okLabel, cb) {
-    appDialog(text, { mode: "confirm", title: title, okText: okLabel || "Confirm" }).then(function (v) { if (v && cb) cb(); });
+  function askConfirm(title, text, okLabel, cb, cancelLabel) {
+    appDialog(text, { mode: "confirm", title: title, okText: okLabel || "Confirm", cancelText: cancelLabel || "Cancel" }).then(function (v) { if (v && cb) cb(); });
   }
   function openWaLink(url) {
     // window.open often does nothing in a PWA — clicking a real link is more reliable.
@@ -4091,6 +4091,16 @@
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { a.remove(); }, 500);
+  }
+  function openAppLink(scheme) {
+    // v130: custom-scheme deep links (jazzcash://, easypaisa://) — naye tab mein
+    // kholne se browser kaala khaali page dikhata hai (user ke screenshots).
+    // Chhupa iframe sirf app kholne ki koshish karta hai; ye page wahin rehta hai.
+    var f = document.createElement("iframe");
+    f.style.display = "none";
+    f.src = scheme;
+    document.body.appendChild(f);
+    setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 2000);
   }
   function sendRemindNotif(id, text) {
     // If an unread reminder already exists, don't send another (to stop spam).
@@ -4130,15 +4140,22 @@
     var s = personStats(id);
     if (!s.net) return;
     var amt = Math.abs(s.net);
-    var who = s.net > 0 ? (p.name || p.email) + " mujhe " + fmtRs(amt) + " denge" : "Main " + (p.name || p.email) + " ko " + fmtRs(amt) + " dunga";
-    askConfirm("Hisaab barabar karein?", who + " — " + fmtRs(amt) + " ka settlement record ban jayega.", "Confirm karein", function () {
+    var who = (p.name || p.email) + ": " + fmtRs(amt) + " — " + (s.net > 0 ? tr("mujhe denge") : tr("main dunga"));
+    askConfirm(tr("Hisaab barabar karein?"), who + ". " + tr("Settlement record ban jayega."), tr("Confirm karein"), function () {
+      saveSettleRecord(id, amt, "Settled up — settlement", s.net < 0);
+    }, tr("Cancel karein"));
+  }
+  // v130: settlement record banane ka shared helper — manual "Hisaab barabar"
+  // aur JazzCash/Easypaisa payment-confirm dono yahi use karte hain, taake
+  // record hamesha ek hi tareeqe se (aur sirf kamyab payment par) bane.
+  function saveSettleRecord(id, amount, note, iOwe) {
     var me = myId();
     var body = {
       id: newUuid(),
-      payer_id: s.net > 0 ? id : me,
-      receiver_id: s.net > 0 ? me : id,
-      amount: amt,
-      note: "Settled up — settlement",
+      payer_id: iOwe ? me : id,
+      receiver_id: iOwe ? id : me,
+      amount: amount,
+      note: note,
       txn_date: todayLocal(),
       created_by: me,
       workspace_id: currentWorkspaceId
@@ -4148,24 +4165,23 @@
       txns.unshift(Object.assign({ created_at: new Date().toISOString() }, body));
       saveGuestStore();
       renderAll();
-      setPeopleMsg("Hisaab barabar ho gaya!", true);
+      setPeopleMsg(tr("Hisaab barabar ho gaya!"), true);
       return;
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega.",true);return;}
-          setPeopleMsg("Hisaab barabar nahi ho saka" + saveErrDetail(res) + " — dobara try karein.", false); return;
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg(tr("Server se rabta nahi ho saka") + saveErrDetail(res) + ". " + tr("Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega."),true);return;}
+          setPeopleMsg(tr("Hisaab barabar nahi ho saka") + saveErrDetail(res) + " — " + tr("dobara try karein."), false); return;
         }
         var created = res.body && res.body[0];
-        if (created) { sendNotif(id, "settle", created); triggerPush(id, "Hisaab barabar ho gaya", notifBodyFor(created, id), created.id); }
-        setPeopleMsg("Hisaab barabar ho gaya!", true);
+        if (created) { sendNotif(id, "settle", created); triggerPush(id, tr("Hisaab barabar ho gaya"), notifBodyFor(created, id), created.id); }
+        setPeopleMsg(tr("Hisaab barabar ho gaya!"), true);
         loadAll();
       }).catch(function () {
         offlineTxnInsert(body);
-        setPeopleMsg("Hisaab save ho gaya. Internet aate hi update ho jayega.", true);
+        setPeopleMsg(tr("Hisaab save ho gaya. Internet aate hi update ho jayega."), true);
       });
-    });
   }
   function shareAll() {
     // v62.1 (user order 2026-11-08): "Share Easy Khata" mein SIRF link + chhota
@@ -4514,17 +4530,17 @@
     list.forEach(function (t) { var d = String(t.txn_date || ""); if (d && (!first || d < first)) first = d; });
     setAvatarEl($("detailAvatar"), p.avatar_url, initials(p.name || p.email));
     $("detailName").textContent = p.name || p.email;
-    $("detailSince").textContent = first ? "Pehla len-den: " + fmtDateLong(first) : "Abhi koi len-den nahi";
+    $("detailSince").textContent = first ? tr("Pehla len-den") + ": " + fmtDateLong(first) : tr("Abhi koi len-den nahi");
     var banner = $("detailBanner");
     if (s.net > 0) {
       banner.className = "detail-banner receive";
-      banner.innerHTML = '<span class="db-icon">↓</span><strong>' + esc(fmtRs(s.net)) + '</strong><span>Maine lene hain</span>';
+      banner.innerHTML = '<span class="db-icon">↓</span><strong>' + esc(fmtRs(s.net)) + '</strong><span>' + esc(tr("Maine lene hain")) + '</span>';
     } else if (s.net < 0) {
       banner.className = "detail-banner give";
-      banner.innerHTML = '<span class="db-icon">↑</span><strong>' + esc(fmtRs(-s.net)) + '</strong><span>Maine dene hain</span>';
+      banner.innerHTML = '<span class="db-icon">↑</span><strong>' + esc(fmtRs(-s.net)) + '</strong><span>' + esc(tr("Maine dene hain")) + '</span>';
     } else {
       banner.className = "detail-banner settled";
-      banner.innerHTML = '<span class="db-icon">✓</span><strong>Settled</strong><span>Koi balance nahi</span>';
+      banner.innerHTML = '<span class="db-icon">✓</span><strong>' + esc(tr("Settled")) + '</strong><span>' + esc(tr("Koi balance nahi")) + '</span>';
     }
     $("detailSettleBtn").hidden = !s.net;
     renderDetailPay(); // v117: JazzCash/Easypaisa settle box
@@ -4547,7 +4563,7 @@
   function renderDetailTxns(list) {
     var me = myId();
     if (!list.length) {
-      $("detailTxns").innerHTML = '<p class="empty">Abhi koi len-den nahi — neeche se pehla record add karein.</p>';
+      $("detailTxns").innerHTML = '<p class="empty">' + esc(tr("Abhi koi len-den nahi — neeche se pehla record add karein.")) + '</p>';
       refreshScrollHints();
       return;
     }
@@ -4568,18 +4584,18 @@
       else if (t.receiver_id === me) runMinor -= a;
       balById[t.id] = moneyFromMinor(runMinor);
     });
-    var html = '<div class="dtable-head"><span>TIME</span><span>DIYE</span><span>LIYE</span></div>';
+    var html = '<div class="dtable-head"><span>' + esc(tr("TIME")) + '</span><span>' + esc(tr("DIYE")) + '</span><span>' + esc(tr("LIYE")) + '</span></div>';
     sorted.forEach(function (t) {
       var a = Number(t.amount) || 0;
       var iGave = t.payer_id === me;
       var bal = balById[t.id];
       var balCls = bal > 0 ? "pos" : bal < 0 ? "neg" : "zero";
-      var balText = bal > 0 ? "Bal: " + fmtRs(bal) + " · lene hain"
-        : bal < 0 ? "Bal: " + fmtRs(-bal) + " · dene hain" : "Bal: Rs 0 · settled";
+      var balText = bal > 0 ? "Bal: " + fmtRs(bal) + " · " + tr("lene hain")
+        : bal < 0 ? "Bal: " + fmtRs(-bal) + " · " + tr("dene hain") : "Bal: Rs 0 · " + tr("settled");
       var timeStr = fmtTime(t.created_at);
       var btns = "";
       if (isTxnLocked(t)) {
-        btns = '<span class="t-lock">🔒 Settled</span>';
+        btns = '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>';
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
@@ -4591,7 +4607,7 @@
       html += '<div class="drow">' +
         '<div class="d-time"><span class="d-ico ' + (iGave ? "up" : "down") + '">' + (iGave ? "↑" : "↓") + '</span>' +
         '<div><div class="d-date">' + esc(fmtDateLong(t.txn_date)) + (timeStr ? " · " + esc(timeStr) : "") + '</div>' +
-        '<div class="d-note">' + esc(t.note || "Food") + txnExtraMarkup(t) + '</div>' +
+        '<div class="d-note">' + esc(t.note || tr("Food")) + txnExtraMarkup(t) + '</div>' +
         '<div class="d-bal ' + balCls + '">' + esc(balText) + '</div>' + btns + '</div></div>' +
         '<div class="d-amt ' + (iGave ? "diye" : "") + '">' + (iGave ? esc(fmtRs(a)) : "") + '</div>' +
         '<div class="d-amt ' + (!iGave ? "liye" : "") + '">' + (!iGave ? esc(fmtRs(a)) : "") + '</div>' +
@@ -6013,7 +6029,7 @@
       var locked = isTxnLocked(t);
       var btns = "";
       if (locked) {
-        btns = '<span class="t-lock">🔒 Settled</span>';
+        btns = '<span class="t-lock">🔒 ' + esc(tr("Settled")) + '</span>';
       } else if (t.created_by === me) {
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-edit="' + esc(t.id) + '">Edit</button>' +
           '<button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
@@ -6195,7 +6211,8 @@
       friends: "DOST", customers: "CUSTOMERS", lenden: "LEN-DEN",
       diary: "\uD83D\uDCC5 Kharcha Diary", household: "\uD83C\uDFE0 Ghar ka kharcha",
       due: "\u23F0 Due-soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Bachat Goal",
-      gave: "\u2191 Mainey Diye", took: "\u2193 Mainey Liye"
+      gave: "\u2191 Mainey Diye", took: "\u2193 Mainey Liye",
+      TIME: "WAQT", DIYE: "DIYE", LIYE: "LIYE", Food: "Khana"
     },
     en: {
       subtitle: "Your daily ledger", nav_khata: "Ledger", nav_account: "Account",
@@ -6702,6 +6719,40 @@
   "🔗 Copy community join link": "🔗 Copy community join link",
   "🟡 Easypaisa": "🟡 Easypaisa",
   "🟢 JazzCash": "🟢 JazzCash",
+  // ---- v130: detail page + JazzCash/Easypaisa settle ----
+  "Pehla len-den": "First transaction",
+  "Abhi koi len-den nahi": "No transactions yet",
+  "Koi balance nahi": "No balance",
+  "Abhi koi len-den nahi — neeche se pehla record add karein.": "No transactions yet — add the first record below.",
+  "lene hain": "to take",
+  "dene hain": "to give",
+  "settled": "settled",
+  "Settled": "Settled",
+  "TIME": "TIME",
+  "DIYE": "GAVE",
+  "LIYE": "TOOK",
+  "Food": "Food",
+  "Hisaab barabar karein?": "Settle the balance?",
+  "Confirm karein": "Confirm",
+  "Hisaab barabar ho gaya!": "Balance settled!",
+  "Hisaab barabar ho gaya": "Balance settled",
+  "Hisaab barabar nahi ho saka": "Could not settle the balance",
+  "dobara try karein.": "Please try again.",
+  "mujhe denge": "will give me",
+  "main dunga": "I will give",
+  "Settlement record ban jayega.": "A settlement record will be created.",
+  "Hisaab barabar hai — kuch dene/lene nahi.": "Balance is settled — nothing to give or take.",
+  "Is dost ka number nahi hai — pehle number add karein.": "This friend's number is missing — add the number first.",
+  "JazzCash ya Easypaisa se settle karein.": "Settle with JazzCash or Easypaisa.",
+  "Payment ho gaya?": "Payment done?",
+  "✅ Ho gaya — record save karein": "✅ Done — save record",
+  "Ye poora balance settle karega. Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega.": "This will settle the full balance. Only confirm if the payment succeeded — otherwise no record will be saved.",
+  "khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein).": "is opening — amount and number copied. Paste them in the app (if the app does not open, open it yourself and paste).",
+  "liye": "received",
+  "diye": "given",
+  "Server se rabta nahi ho saka": "Could not reach the server",
+  "Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega.": "Saved on your phone; it will update by itself shortly.",
+  "Hisaab save ho gaya. Internet aate hi update ho jayega.": "Saved. It will update once the internet is back.",
   "Due: ": "Due: ",
   "Manual": "Manual",
   "Abhi koi dost nahi — neeche se pehla dost add karein.": "No friends yet — add your first friend below.",
@@ -6938,24 +6989,31 @@
     myContacts.forEach(function (c) { if (c.id === detailPersonId) name = c.name || ""; });
     if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) name = p.name || ""; }); }
     var amount = Math.abs(s.net);
-    $("detailPayText").textContent = s.net > 0
-      ? name + " se " + fmtRs(amount) + " lene hain — JazzCash ya Easypaisa se settle karein."
-      : name + " ko " + fmtRs(amount) + " dene hain — JazzCash ya Easypaisa se settle karein.";
+    $("detailPayText").textContent = name + ": " + fmtRs(amount) + " " + (s.net > 0 ? tr("lene hain") : tr("dene hain")) + " — " + tr("JazzCash ya Easypaisa se settle karein.");
   }
   function settleVia(app) {
     var s = personStats(detailPersonId); // personStats (renderPersonDetail bhi yehi use karta hai)
-    if (!s || !s.net) { setDetailPayMsg("Hisaab barabar hai — kuch dene/lene nahi."); return; }
+    if (!s || !s.net) { setDetailPayMsg(tr("Hisaab barabar hai — kuch dene/lene nahi.")); return; }
     var name = "", phone = "";
     myContacts.forEach(function (c) { if (c.id === detailPersonId) { name = c.name || ""; phone = c.phone || ""; } });
     if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) { name = p.name || ""; phone = p.phone || ""; } }); }
-    if (!phone) { setDetailPayMsg("Is dost ka number nahi hai — pehle number add karein."); return; }
+    if (!phone) { setDetailPayMsg(tr("Is dost ka number nahi hai — pehle number add karein.")); return; }
     var amount = Math.abs(s.net);
-    var dir = s.net > 0 ? "lene hain" : "dene hain";
+    var iOwe = s.net < 0; // main dene wala hoon — payment ki direction (confirm par record ke liye)
+    var dirWord = iOwe ? tr("diye") : tr("liye");
     var appName = app === "jazzcash" ? "JazzCash" : "Easypaisa";
-    var text = fmtRs(amount) + " — " + (name || "") + " (" + phone + ") — Easy Khata settle (" + dir + ")";
+    var text = fmtRs(amount) + " — " + (name || "") + " (" + phone + ") — Easy Khata settle (" + (iOwe ? tr("dene hain") : tr("lene hain")) + ")";
     var done = function () {
-      setDetailPayMsg(appName + " khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein).");
-      openWaLink((app === "jazzcash" ? "jazzcash://" : "easypaisa://"));
+      setDetailPayMsg(appName + " " + tr("khul raha hai — amount aur number copy ho gaye. App mein paste kar dein (agar app na khule to khud khol kar paste karein)."));
+      openAppLink((app === "jazzcash" ? "jazzcash://" : "easypaisa://"));
+      // v130: payment confirm — record SIRF tab bane jab payment kamyab hua ho.
+      // JazzCash/Easypaisa wapas koi jawab nahi dete, is liye user khud confirm
+      // karta hai; Cancel/fail par kuch save nahi hota (koi fake record nahi).
+      askConfirm(tr("Payment ho gaya?"),
+        appName + ": " + fmtRs(amount) + " — " + name + " (" + dirWord + "). " + tr("Ye poora balance settle karega. Sirf tab Confirm karein jab payment kamyab hua ho — warna record nahi banega."),
+        tr("✅ Ho gaya — record save karein"),
+        function () { saveSettleRecord(detailPersonId, amount, "Settled up — " + appName + " payment", iOwe); },
+        tr("Cancel karein"));
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(done);
