@@ -4243,7 +4243,7 @@
         var qr = qrLib(0, "M");
         qr.addData(APP_URL);
         qr.make();
-        $("shareSheetQrBox").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 6 });
+        $("shareSheetQrBox").innerHTML = qr.createSvgTag({ cellSize: 3, margin: 8 });
         shareQrRendered = true;
       } catch (e) { box.hidden = true; }
     });

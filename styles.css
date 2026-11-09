@@ -1612,7 +1612,7 @@ input,select,textarea,button{max-width:100%}
 /* v69: Share sheet — "Apna balance share karein" options + live preview. */
 /* v72: Share sheet style refresh — modern option cards + visible selected state. */
 .share-sheet-options{display:flex;flex-direction:column;gap:12px;margin-top:16px}
-.share-sheet-opt{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:16px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease,transform .12s ease}
+.share-sheet-opt{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:16px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease,transform .12s ease}
 .share-sheet-opt:hover{border-color:color-mix(in srgb,var(--primary) 45%,var(--line))}
 .share-sheet-opt:active{transform:scale(.985)}
 .share-opt-ic{flex:none;width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:var(--accent-soft);font-size:20px}
@@ -1628,10 +1628,10 @@ input,select,textarea,button{max-width:100%}
 .share-sheet-preview-label{margin:18px 0 8px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .share-sheet-preview{margin:0;padding:13px 14px;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;background:color-mix(in srgb,var(--primary) 5%,var(--bg));color:var(--text);font:inherit;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
 /* v108: share QR (barcode) — sirf "Sirf app link" par dikhta hai; white box + padding = scan ke liye quiet zone (dark mode mein bhi). */
-.share-sheet-qr{margin-top:16px;text-align:center}
-.share-sheet-qr-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.share-sheet-qr-box{display:inline-block;padding:10px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.07)}
-.share-sheet-qr-box svg{display:block;width:144px;height:auto;max-width:100%}
+.share-sheet-qr{margin-top:8px;text-align:center}
+.share-sheet-qr-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.share-sheet-qr-box{display:inline-block;padding:8px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.07)}
+.share-sheet-qr-box svg{display:block;width:115px;height:auto;max-width:100%}
 #shareSheetOverlay .app-dialog-mark{background:linear-gradient(135deg,var(--accent-btn),var(--credit-2));color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.35)}
 
 /* v87: recurring rules list — compact card rows, chhoti screen par stack */
