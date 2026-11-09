@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=84">
+<link rel="stylesheet" href="styles.css?v=85">
 </head>
 <body>
 
@@ -390,6 +390,23 @@ window.addEventListener("error", function (e) {
         </div>
         <div id="txnList" class="txns scroll-box"></div>
         <p id="txnScrollHint" class="scroll-hint" hidden>↓ Neeche scroll karein — purane records dekhne ke liye</p>
+      </div>
+
+      <!-- v114: Kharcha Diary + Calendar -->
+      <div class="card" id="diaryCard">
+        <div class="list-head">
+          <h2>📅 Kharcha Diary</h2>
+          <select id="diaryCategory" title="Category filter"><option value="">All categories</option><option>Khana</option><option>Udhaar</option><option>Kiraya</option><option>Bijli</option><option>Petrol</option><option>Shopping</option><option>Transport</option><option>Health</option><option>Education</option><option>Other</option></select>
+        </div>
+        <p class="muted">Har din ka hisaab — din par tap karein, us din ke records dekhein.</p>
+        <div class="cal-nav">
+          <button id="calPrevBtn" class="btn btn-ghost" type="button" title="Pichhla mahina">‹</button>
+          <strong id="calMonthLabel">—</strong>
+          <button id="calNextBtn" class="btn btn-ghost" type="button" title="Agla mahina">›</button>
+        </div>
+        <div class="cal-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div id="calGrid" class="cal-grid"></div>
+        <div id="calDayDetail" class="cal-day-detail"></div>
       </div>
     </section>
 
@@ -830,6 +847,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=112"></script>
+<script src="app.js?v=113"></script>
 </body>
 </html>

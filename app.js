@@ -1310,7 +1310,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay", "txnCategory"].forEach(function (id) { // v113: category is a custom dropdown too
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay", "txnCategory", "diaryCategory"].forEach(function (id) { // v113: category is a custom dropdown too
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -2076,6 +2076,7 @@
     renderPersonSelect();
     renderTxnFilterOptions();
     renderTxns();
+    renderDiary(); // v114: calendar + diary taaza
     fillMyPhone();
     renderAccount();
     renderAdmin();
@@ -5997,6 +5998,82 @@
     refreshScrollHints();
   }
 
+  /* ---------- v114: Kharcha Diary + Calendar ---------- */
+  var diaryMonth = null; // "YYYY-MM" (null = is mahina); diaryDay = selected "YYYY-MM-DD" (null = koi nahi)
+  var diaryDay = null;
+  function diaryMonthKey() { return diaryMonth || todayLocal().slice(0, 7); }
+  function diaryShiftMonth(delta) {
+    var k = diaryMonthKey(), y = +k.slice(0, 4), m = +k.slice(5, 7) - 1 + delta;
+    var d = new Date(y, m, 1);
+    diaryMonth = d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    diaryDay = null;
+  }
+  function diaryTxns() {
+    // Visible txns, diary category filter ke saath (khali = sab).
+    var cat = ($("diaryCategory") && $("diaryCategory").value) || "";
+    return visibleTxns().filter(function (t) { return !cat || cleanCategory(t.category) === cat; });
+  }
+  function diaryDayTotals() {
+    // Is mahine ke har din ka {givenMinor, takenMinor, count} (sirf mere records).
+    var key = diaryMonthKey(), me = myId(), map = {};
+    diaryTxns().forEach(function (t) {
+      var d = String(t.txn_date || "");
+      if (d.slice(0, 7) !== key) return;
+      if (t.payer_id !== me && t.receiver_id !== me) return;
+      var e = map[d] || (map[d] = { givenMinor: 0, takenMinor: 0, count: 0 });
+      var a = moneyToMinor(t.amount);
+      e.count++;
+      if (t.payer_id === me) e.givenMinor += a;
+      if (t.receiver_id === me) e.takenMinor += a;
+    });
+    return map;
+  }
+  function fmtCalAmt(netMinor) {
+    // Calendar cell ke liye compact amount: sign + number (Rs nahi, jagah kam hai).
+    var v = moneyFromMinor(Math.abs(netMinor));
+    return (netMinor > 0 ? "+" : netMinor < 0 ? "\u2212" : "") + v.toLocaleString("en-US");
+  }
+  function renderDiary() {
+    var grid = $("calGrid"); if (!grid) return;
+    var key = diaryMonthKey();
+    $("calMonthLabel").textContent = monthName(key + "-01");
+    var totals = diaryDayTotals();
+    var y = +key.slice(0, 4), mo = +key.slice(5, 7) - 1;
+    var startDow = (new Date(y, mo, 1).getDay() + 6) % 7; // Mon=0..Sun=6
+    var daysInMonth = new Date(y, mo + 1, 0).getDate();
+    var daysInPrev = new Date(y, mo, 0).getDate();
+    var today = todayLocal();
+    var html = "";
+    for (var i = 0; i < 42; i++) {
+      var dayNum, dateStr, other = false;
+      if (i < startDow) { dayNum = daysInPrev - startDow + 1 + i; dateStr = dateToISO(new Date(y, mo - 1, dayNum)); other = true; }
+      else if (i < startDow + daysInMonth) { dayNum = i - startDow + 1; dateStr = key + "-" + pad(dayNum); }
+      else { dayNum = i - startDow - daysInMonth + 1; dateStr = dateToISO(new Date(y, mo + 1, dayNum)); other = true; }
+      var t = totals[dateStr];
+      var net = t ? (t.takenMinor - t.givenMinor) : 0;
+      var cls = "cal-day" + (other ? " other" : "") + (dateStr === today ? " today" : "") + (dateStr === diaryDay ? " selected" : "");
+      var amt = t ? '<span class="cal-amt ' + (net > 0 ? "pos" : net < 0 ? "neg" : "") + '">' + esc(fmtCalAmt(net)) + "</span>" : "";
+      html += '<button type="button" class="' + cls + '" data-day="' + dateStr + '"><span class="cal-num">' + dayNum + "</span>" + amt + "</button>";
+    }
+    grid.innerHTML = html;
+    renderDiaryDay();
+  }
+  function renderDiaryDay() {
+    var el = $("calDayDetail"); if (!el) return;
+    if (!diaryDay) { el.innerHTML = '<p class="muted">Kisi din par tap karein — us din ke records yahan dikhenge.</p>'; return; }
+    var rows = diaryTxns().filter(function (t) { return String(t.txn_date || "") === diaryDay; });
+    var me = myId();
+    var head = '<div class="cal-day-head"><strong>' + esc(fmtDateLong(diaryDay)) + "</strong><span>" + rows.length + " record" + (rows.length === 1 ? "" : "s") + "</span></div>";
+    if (!rows.length) { el.innerHTML = head + '<p class="muted">Is din koi record nahi.</p>'; return; }
+    var body = rows.map(function (t) {
+      var given = t.payer_id === me;
+      return '<div class="diary-row"><div class="diary-row-main">' + partyNameMarkup(t.payer_id) + " \u2192 " + partyNameMarkup(t.receiver_id) + '</div>' +
+        '<div class="diary-row-sub">' + esc(t.note || "Food") + txnExtraMarkup(t) + '</div>' +
+        '<strong class="diary-row-amt ' + (given ? "neg" : "pos") + '">' + (given ? "\u2212 " : "+ ") + esc(fmtRs(t.amount)) + "</strong></div>";
+    }).join("");
+    el.innerHTML = head + body;
+  }
+
   /* ---------- add / edit / delete ---------- */
   // v113: record categories (Kharcha diary + Dukaan mode use these).
   var TXN_CATEGORIES = ["Khana", "Udhaar", "Kiraya", "Bijli", "Petrol", "Shopping", "Transport", "Health", "Education", "Other"];
@@ -6737,6 +6814,16 @@
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});
   $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  // v114: diary — month nav + category filter + din par tap.
+  $("calPrevBtn").addEventListener("click", function () { diaryShiftMonth(-1); renderDiary(); });
+  $("calNextBtn").addEventListener("click", function () { diaryShiftMonth(1); renderDiary(); });
+  $("diaryCategory").addEventListener("change", function () { renderDiary(); });
+  $("calGrid").addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest(".cal-day") : null;
+    if (!b || !b.getAttribute("data-day")) return;
+    diaryDay = b.getAttribute("data-day");
+    renderDiary();
+  });
   // v73: sab static selects ko custom dropdown banao; bahar click / Escape se band karo.
   cdAttachStatic();
   document.addEventListener("click", function(e){ if(!e.target.closest || !e.target.closest(".cd-wrap")) cdCloseAll(); });
