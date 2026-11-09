@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=89">
+<link rel="stylesheet" href="styles.css?v=90">
 </head>
 <body>
 
@@ -239,7 +239,9 @@ window.addEventListener("error", function (e) {
       <div class="people-head-row">
         <p class="section-label" id="peopleSectionLabel">DOST</p>
         <button id="dukaanToggleBtn" class="btn btn-ghost" type="button" title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
+        <button id="nfcScanBtn" class="btn btn-soft" type="button" title="NFC card tap kar ke us bande ka khata kholein">📶 NFC Scan</button>
       </div>
+      <p id="nfcMsg" class="msg" role="status"></p>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
       <div class="actions-row">
@@ -501,6 +503,15 @@ window.addEventListener("error", function (e) {
           <button id="detailEasyBtn" class="btn btn-easy" type="button">🟡 Easypaisa</button>
         </div>
         <p id="detailPayMsg" class="msg" role="status"></p>
+      </div>
+      <div id="detailNfcBox" class="detail-nfc">
+        <p class="section-label">📶 NFC Card</p>
+        <p id="detailNfcText" class="muted"></p>
+        <div class="detail-pay-row">
+          <button id="detailNfcLinkBtn" class="btn btn-soft" type="button">📶 Card Link Karein</button>
+          <button id="detailNfcUnlinkBtn" class="btn btn-ghost" type="button" hidden>Unlink</button>
+        </div>
+        <p id="detailNfcMsg" class="msg" role="status"></p>
       </div>
       <div class="detail-len-head">
         <p class="section-label" data-i18n="lenden">LEN-DEN</p>
@@ -919,6 +930,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=117"></script>
+<script src="app.js?v=118"></script>
 </body>
 </html>

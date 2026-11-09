@@ -1756,3 +1756,7 @@ input,select,textarea,button{max-width:100%}
 
 /* v118: lang toggle needs room for "🌐 EN" / "🌐 اردو" — a pill, not a 38px circle. */
 #langToggleBtn{width:auto;min-width:38px;height:38px;border-radius:19px;padding:0 10px;white-space:nowrap;font-size:.95rem}
+
+/* v119: NFC card box in the person detail — same card style as the pay box. */
+.detail-nfc{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.detail-nfc .section-label{margin:0 0 6px}

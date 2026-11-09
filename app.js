@@ -365,7 +365,7 @@
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
         contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now(),
-        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen, monthlyBudget: monthlyBudget, savingsGoal: savingsGoal // v116, v117
+        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen, monthlyBudget: monthlyBudget, savingsGoal: savingsGoal, nfcLinks: nfcLinks // v116, v117, v119
       }));
     } catch (e) {}
   }
@@ -407,6 +407,7 @@
     monthlyReportSeen = (g && g.monthlyReportSeen) || ""; // v88
     monthlyBudget = (g && g.monthlyBudget != null) ? Number(g.monthlyBudget) : null; // v116: guest monthly budget
     savingsGoal = (g && g.savingsGoal) ? cleanSavingsGoal(g.savingsGoal) : null; // v117: guest bachat goal
+    nfcLinks = (g && g.nfcLinks) ? cleanNfcLinks(g.nfcLinks) : []; // v119: guest NFC links
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -1944,6 +1945,7 @@
         setupRealtime();
         loadNotifs();
         loadContacts();
+        loadNfcLinks(); // v119: account NFC links
         loadRecurringRules().then(function () { runRecurringDue(); }); // v87: due rules ke record banein
         // v88: online path par bhi marker cache se wapas lao — warna har boot
         // par banner dobara aata (cache sirf offline branch mein restore hota tha).
@@ -4523,6 +4525,7 @@
     }
     $("detailSettleBtn").hidden = !s.net;
     renderDetailPay(); // v117: JazzCash/Easypaisa settle box
+    renderDetailNfc(); // v119: NFC card box
     var isManual = false;
     myContacts.forEach(function (c) { if (c.id === id) isManual = true; });
     $("detailRemoveBtn").hidden = !isManual;
@@ -6175,6 +6178,118 @@
     el.innerHTML = html;
   }
 
+  /* ---------- v119: NFC card detection (Web NFC API, real) ---------- */
+  // Android Chrome only — iPhone/Safari/desktop par NDEFReader nahi hota.
+  // Card ka factory serial number (UID) link hota hai; card par kuch likha
+  // nahi jata (blank NTAG213 bhi chalta hai). Guest: localStorage; account:
+  // khata_nfc_links (owner-only RLS).
+  var nfcLinks = []; // [{personId, serial}]
+  var nfcLoaded = false;
+  function nfcSupported() { return ("NDEFReader" in window); }
+  function cleanNfcLinks(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (l) { return l && typeof l.personId === "string" && l.personId && typeof l.serial === "string" && l.serial; });
+  }
+  function nfcLinkForPerson(personId) { return nfcLinks.find(function (l) { return l.personId === personId; }) || null; }
+  function nfcLinkForSerial(serial) { return nfcLinks.find(function (l) { return l.serial === serial; }) || null; }
+  function personDisplayName(personId) { var p = findPerson(personId); return (p && (p.name || p.email)) || "ye banda"; }
+  function setNfcMsg(msg) { var el = $("nfcMsg"); if (el) el.textContent = msg || ""; }
+  function setDetailNfcMsg(msg) { var el = $("detailNfcMsg"); if (el) el.textContent = msg || ""; }
+  function renderDetailNfc() {
+    var box = $("detailNfcBox"); if (!box) return;
+    if (!detailPersonId) { box.hidden = true; return; }
+    box.hidden = false;
+    var link = nfcLinkForPerson(detailPersonId);
+    var name = personDisplayName(detailPersonId);
+    $("detailNfcText").textContent = link
+      ? ("NFC card link hai — card tap kar ke " + name + " ka khata khul jayega.")
+      : ("Koi NFC card link nahi — card link karein taake tap kar ke " + name + " ka khata khul jaye.");
+    $("detailNfcUnlinkBtn").hidden = !link;
+    setDetailNfcMsg("");
+  }
+  function loadNfcLinks() {
+    if (guestMode) { nfcLoaded = true; return Promise.resolve(nfcLinks); }
+    return sb("khata_nfc_links?select=person_id,nfc_serial&order=created_at.asc").then(function (res) {
+      nfcLinks = res.ok && Array.isArray(res.body) ? cleanNfcLinks(res.body.map(function (r) { return { personId: r.person_id, serial: r.nfc_serial }; })) : [];
+      nfcLoaded = true;
+      renderDetailNfc();
+      return nfcLinks;
+    }).catch(function () { nfcLinks = []; nfcLoaded = true; return nfcLinks; });
+  }
+  function persistNfcLink(personId, serial) {
+    if (guestMode) {
+      nfcLinks = cleanNfcLinks(nfcLinks.filter(function (l) { return l.personId !== personId && l.serial !== serial; }));
+      nfcLinks.push({ personId: personId, serial: serial });
+      saveGuestStore();
+      return Promise.resolve(true);
+    }
+    return sb("khata_nfc_links", { method: "POST", body: { owner_id: myId(), person_id: personId, nfc_serial: serial } }).then(function (res) {
+      if (!res.ok) return false;
+      nfcLinks = cleanNfcLinks(nfcLinks.filter(function (l) { return l.personId !== personId && l.serial !== serial; }));
+      nfcLinks.push({ personId: personId, serial: serial });
+      return true;
+    }).catch(function () { return false; });
+  }
+  function removeNfcLink(personId) {
+    if (!nfcLinkForPerson(personId)) return Promise.resolve(true);
+    if (guestMode) {
+      nfcLinks = nfcLinks.filter(function (l) { return l.personId !== personId; });
+      saveGuestStore();
+      return Promise.resolve(true);
+    }
+    return sb("khata_nfc_links?person_id=eq." + encodeURIComponent(personId), { method: "DELETE" }).then(function (res) {
+      if (!res.ok) return false;
+      nfcLinks = nfcLinks.filter(function (l) { return l.personId !== personId; });
+      return true;
+    }).catch(function () { return false; });
+  }
+  function startNfcScan(mode, personId) {
+    var setMsg = mode === "link" ? setDetailNfcMsg : setNfcMsg;
+    if (!nfcSupported()) {
+      setMsg("NFC is device par available nahi hai — Android Chrome + NFC ON chahiye. (iPhone / desktop par NFC nahi chalta.)");
+      return;
+    }
+    setMsg("Card tap karein — phone ke peeche lagayein...");
+    var reader = null;
+    try { reader = new NDEFReader(); } catch (e) { setMsg("NFC reader nahi ban saka — browser support nahi karta."); return; }
+    reader.scan().then(function () {
+      reader.onreading = function (event) {
+        var serial = (event && event.serialNumber) || "";
+        if (!serial) { setMsg("Card ka serial number nahi mila — dobara tap karein."); return; }
+        if (mode === "link") linkNfcCard(personId, serial);
+        else openNfcPerson(serial);
+      };
+      reader.onreadingerror = function () { setMsg("Card parhne mein masla — dobara try karein."); };
+    }).catch(function (err) {
+      setMsg("NFC scan shuru nahi ho saka — " + (err && err.message ? err.message : "permission chahiye") + ". NFC ON karein aur dobara try karein.");
+    });
+  }
+  function linkNfcCard(personId, serial) {
+    var other = nfcLinkForSerial(serial);
+    if (other && other.personId !== personId) {
+      setDetailNfcMsg("Ye card pehle se " + personDisplayName(other.personId) + " se link hai — pehle us ka link hatayein.");
+      return;
+    }
+    persistNfcLink(personId, serial).then(function (ok) {
+      if (!ok) { setDetailNfcMsg("Card link nahi ho saka — dobara try karein."); return; }
+      setDetailNfcMsg("\u2705 NFC card link ho gaya — ab card tap kar ke " + personDisplayName(personId) + " ka khata khul jayega.");
+      renderDetailNfc();
+    });
+  }
+  function unlinkNfcCard(personId) {
+    removeNfcLink(personId).then(function (ok) {
+      if (!ok) { setDetailNfcMsg("Unlink nahi ho saka — dobara try karein."); return; }
+      setDetailNfcMsg("NFC card unlink ho gaya.");
+      renderDetailNfc();
+    });
+  }
+  function openNfcPerson(serial) {
+    var link = nfcLinkForSerial(serial);
+    if (!link) { setNfcMsg("Ye card kisi se link nahi hai — pehle kisi bande ke khate mein ja kar 'Card Link Karein' dabayein."); return; }
+    setNfcMsg("\u2705 " + personDisplayName(link.personId) + " ka khata khul raha hai...");
+    openPersonDetail(link.personId);
+  }
+
   /* ---------- v118: English/Urdu switch (core labels) + Home shortcuts ---------- */
   var LANG_KEY = "easykhata_lang_v1";
   var lang = "ur";
@@ -7194,6 +7309,10 @@
     var b = e.target && e.target.closest ? e.target.closest("[data-remind]") : null;
     if (b) remindDue(b.getAttribute("data-remind"));
   });
+  // v119: NFC card detection.
+  $("nfcScanBtn").addEventListener("click", function () { startNfcScan("open"); });
+  $("detailNfcLinkBtn").addEventListener("click", function () { if (detailPersonId) startNfcScan("link", detailPersonId); });
+  $("detailNfcUnlinkBtn").addEventListener("click", function () { if (detailPersonId) unlinkNfcCard(detailPersonId); });
   // v118: language switch.
   applyLanguage();
   $("langToggleBtn").addEventListener("click", toggleLanguage);
