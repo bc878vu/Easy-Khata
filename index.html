@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=86">
+<link rel="stylesheet" href="styles.css?v=87">
 </head>
 <body>
 
@@ -419,6 +419,29 @@ window.addEventListener("error", function (e) {
         </div>
         <p class="muted">Is mahine ghar par kitna kharcha hua — category aur member ke hisaab se.</p>
         <div id="householdBody"></div>
+      </div>
+
+      <!-- v116: Due-soon + Budget -->
+      <div class="card" id="dueCard">
+        <div class="list-head">
+          <h2>⏰ Due-soon</h2>
+        </div>
+        <p class="muted">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p>
+        <p id="dueMsg" class="msg" role="status"></p>
+        <div id="dueBody"></div>
+      </div>
+
+      <div class="card" id="budgetCard">
+        <div class="list-head">
+          <h2>💰 Monthly Budget</h2>
+        </div>
+        <p class="muted">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p>
+        <div class="budget-set-row">
+          <input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000">
+          <button id="budgetSaveBtn" class="btn btn-primary" type="button">Save</button>
+        </div>
+        <p id="budgetMsg" class="msg" role="status"></p>
+        <div id="budgetBody"></div>
       </div>
     </section>
 
@@ -867,6 +890,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=114"></script>
+<script src="app.js?v=115"></script>
 </body>
 </html>

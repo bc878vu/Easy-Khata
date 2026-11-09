@@ -365,7 +365,7 @@
       window.localStorage.setItem(GUEST_KEY, JSON.stringify({
         me: { id: guestMeId, name: guestMeName },
         contacts: myContacts, txns: txns, hidden: Object.keys(hiddenTxnIds), savedAt: Date.now(),
-        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen
+        recurring: recurringRules, monthlyReportSeen: monthlyReportSeen, monthlyBudget: monthlyBudget // v116
       }));
     } catch (e) {}
   }
@@ -405,6 +405,7 @@
     // (dono taraf se bahar wala rule purani leak hai, txns ki tarah hatao).
     recurringRules = ((g && g.recurring) || []).filter(function (r) { return r.payer_id === guestMeId || r.receiver_id === guestMeId; });
     monthlyReportSeen = (g && g.monthlyReportSeen) || ""; // v88
+    monthlyBudget = (g && g.monthlyBudget != null) ? Number(g.monthlyBudget) : null; // v116: guest monthly budget
     notifs = [];
     dbReady = true;
     offlineMode = false;
@@ -1171,7 +1172,7 @@
     // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
     // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
     // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
-    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id" + (withPhone ? ",phone" : "") + "&order=name.asc");
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget" + (withPhone ? ",phone" : "") + "&order=name.asc"); // v116: monthly_budget bhi
   }
 
   function renderWorkspaceBar() {
@@ -2078,6 +2079,8 @@
     renderTxns();
     renderDiary(); // v114: calendar + diary taaza
     renderHousehold(); // v115: ghar ka kharcha taaza
+    renderDueSoon(); // v116: due-soon list taaza
+    renderBudget(); // v116: budget progress taaza
     fillMyPhone();
     renderAccount();
     renderAdmin();
@@ -5518,6 +5521,7 @@
        dabane par dobara try hota hai. Blob sirf memory mein (session-scoped);
        reload par Download dobara banata hai. */
   var monthlyReportSeen = "";
+  var monthlyBudget = null; // v116: guest mode ka monthly budget (account mode mein profile se)
   var monthlyReport = null;
   function prevMonthKey(todayISO) {
     var p = String(todayISO || todayLocal()).slice(0, 7).split("-");
@@ -6164,6 +6168,107 @@
       });
     }
     el.innerHTML = html;
+  }
+
+  /* ---------- v116: Due-soon list + reminders + Budget ---------- */
+  function getMonthlyBudget() {
+    if (guestMode) return monthlyBudget;
+    var p = myProfile();
+    return (p && p.monthly_budget != null) ? Number(p.monthly_budget) : null;
+  }
+  function setDueMsg(msg) { var el = $("dueMsg"); if (el) el.textContent = msg || ""; }
+  function setBudgetMsg(msg) { var el = $("budgetMsg"); if (el) el.textContent = msg || ""; }
+  function dueStatus(dueDate) {
+    var today = todayLocal();
+    var d1 = new Date(today + "T00:00:00"), d2 = new Date(dueDate + "T00:00:00");
+    var diff = Math.round((d2 - d1) / 86400000);
+    if (diff === 0) return { label: "Aaj due", cls: "due-today" };
+    if (diff > 0) return { label: diff + " din baaki", cls: "due-soon" };
+    return { label: (-diff) + " din overdue", cls: "due-over" };
+  }
+  function renderDueSoon() {
+    var el = $("dueBody"); if (!el) return;
+    var me = myId();
+    var horizon = dateToISO(new Date(Date.now() + 7 * 86400000));
+    var rows = visibleTxns().filter(function (t) {
+      var d = String(t.due_date || "");
+      if (!d) return false;
+      if (t.payer_id !== me && t.receiver_id !== me) return false;
+      return d <= horizon; // overdue ya agle 7 din mein due
+    }).sort(function (a, b) { return String(a.due_date).localeCompare(String(b.due_date)); });
+    if (!rows.length) { el.innerHTML = '<p class="empty">Koi due udhaar nahi — agle 7 din mein kuch due nahi hai.</p>'; return; }
+    el.innerHTML = rows.map(function (t) {
+      var iGave = t.payer_id === me;
+      var st = dueStatus(String(t.due_date));
+      var remindBtn = iGave ? '<button class="btn btn-ghost" type="button" data-remind="' + esc(t.id) + '">\uD83D\uDCAC Remind</button>' : "";
+      return '<div class="due-row"><div class="due-row-main">' + partyNameMarkup(t.payer_id) + " \u2192 " + partyNameMarkup(t.receiver_id) + '</div>' +
+        '<div class="due-row-sub">' + esc(t.note || "Food") + " \u00B7 " + esc(fmtDate(t.due_date)) + " \u00B7 " + (iGave ? "Lene hain" : "Dene hain") + txnExtraMarkup(t) + '</div>' +
+        '<div class="due-row-foot"><strong class="' + (iGave ? "pos" : "neg") + '">' + (iGave ? "+ " : "\u2212 ") + esc(fmtRs(t.amount)) + '</strong>' +
+        '<span class="due-status ' + st.cls + '">' + esc(st.label) + "</span>" + remindBtn + "</div></div>";
+    }).join("");
+  }
+  function remindDue(txnId) {
+    var t = null;
+    visibleTxns().forEach(function (x) { if (x.id === txnId) t = x; });
+    if (!t) return;
+    var me = myId();
+    var otherId = t.payer_id === me ? t.receiver_id : t.payer_id;
+    var name = "", phone = "";
+    myContacts.forEach(function (c) { if (c.id === otherId) { name = c.name || ""; phone = c.phone || ""; } });
+    if (!name) { profiles.forEach(function (p) { if (p.id === otherId) { name = p.name || ""; phone = p.phone || ""; } }); }
+    var text = "Assalam o Alaikum " + (name || "") + "! Easy Khata par aap ka Rs " + (Number(t.amount) || 0) + " ka udhaar " + fmtDate(t.due_date) + " ko due hai. Barah-e-karam jald ada kar dein. Shukriya!";
+    if (phone) { openWaLink(waLink(phone, text)); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { setDueMsg("Is dost ka WhatsApp number nahi hai — reminder text copy ho gaya, khud bhej dein."); })
+        .catch(function () { setDueMsg("Is dost ka WhatsApp number nahi hai."); });
+    } else setDueMsg("Is dost ka WhatsApp number nahi hai.");
+  }
+  function renderBudget() {
+    var body = $("budgetBody"); if (!body) return;
+    var budget = getMonthlyBudget();
+    var input = $("budgetInput");
+    if (input && document.activeElement !== input) input.value = budget == null ? "" : String(budget);
+    if (budget == null) { body.innerHTML = '<p class="empty">Monthly budget set nahi hai — upar amount likh kar Save karein.</p>'; return; }
+    var key = todayLocal().slice(0, 7), me = myId(), spentMinor = 0;
+    visibleTxns().forEach(function (t) {
+      if (String(t.txn_date || "").slice(0, 7) !== key) return;
+      if (t.payer_id !== me) return;
+      spentMinor += moneyToMinor(t.amount);
+    });
+    var spent = moneyFromMinor(spentMinor);
+    var pct = budget > 0 ? Math.round((spent / budget) * 100) : (spent > 0 ? 100 : 0);
+    var remaining = budget - spent;
+    var alertHtml = "";
+    if (spent >= budget) alertHtml = '<p class="budget-alert over">\u26A0\uFE0F Budget se zyada kharch ho gaya!</p>';
+    else if (spent >= 0.8 * budget) alertHtml = '<p class="budget-alert warn">\u26A0\uFE0F Budget ka 80% kharch ho gaya — hoshiyar rahein.</p>';
+    else alertHtml = '<p class="budget-alert ok">Budget ke andar hain.</p>';
+    body.innerHTML =
+      '<div class="budget-bar"><i style="width:' + Math.min(pct, 100) + '%" class="' + (spent >= budget ? "over" : pct >= 80 ? "warn" : "") + '"></i></div>' +
+      '<div class="budget-nums"><span>Kharch: <strong>' + esc(fmtRs(spent)) + '</strong></span><span>Budget: <strong>' + esc(fmtRs(budget)) + '</strong></span><span>Baqi: <strong>' + esc(fmtRs(remaining)) + '</strong></span></div>' +
+      '<p class="muted">' + pct + '% budget use hua (' + esc(monthName(key + "-01")) + ')</p>' + alertHtml;
+  }
+  function saveBudget() {
+    var raw = ($("budgetInput").value || "").trim();
+    var budget = raw === "" ? null : Number(raw);
+    if (budget != null && (!isFinite(budget) || budget < 0)) { setBudgetMsg("Sahi budget likhein (0 ya zyada)."); return; }
+    if (budget != null) budget = Math.round(budget);
+    if (guestMode) {
+      monthlyBudget = budget;
+      saveGuestStore();
+      renderBudget();
+      setBudgetMsg(budget == null ? "Budget hata diya." : "Budget save ho gaya: " + fmtRs(budget) + " / mahina");
+      return;
+    }
+    var me = myProfile(); if (!me) { setBudgetMsg("Budget save nahi ho saka — pehle login karein."); return; }
+    var prev = (me.monthly_budget == null ? null : me.monthly_budget);
+    me.monthly_budget = budget;
+    sb("khata_profiles?id=eq." + encodeURIComponent(me.id), { method: "PATCH", prefer: "return=minimal", body: { monthly_budget: budget } })
+      .then(function (res) {
+        if (!res.ok) { me.monthly_budget = prev; setBudgetMsg("Budget save nahi ho saka. Dobara try karein."); return; }
+        renderBudget();
+        setBudgetMsg(budget == null ? "Budget hata diya." : "Budget save ho gaya: " + fmtRs(budget) + " / mahina");
+      })
+      .catch(function () { me.monthly_budget = prev; setBudgetMsg("Budget save nahi ho saka. Dobara try karein."); });
   }
 
   /* ---------- add / edit / delete ---------- */
@@ -6906,6 +7011,12 @@
   $("workspaceSelect").addEventListener("change", function(e){switchWorkspace(e.target.value);});
   $("workspaceMenuBtn").addEventListener("click", function(e){e.stopPropagation();cdCloseAll();toggleWorkspaceMenu();});
   $("workspaceMenu").addEventListener("click", function(){closeWorkspaceMenu();});
+  // v116: budget save + due remind (delegated).
+  $("budgetSaveBtn").addEventListener("click", saveBudget);
+  $("dueBody").addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-remind]") : null;
+    if (b) remindDue(b.getAttribute("data-remind"));
+  });
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   $("dukaanToggleBtn").addEventListener("click", toggleDukaanMode);

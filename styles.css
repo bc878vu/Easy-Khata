@@ -1719,3 +1719,26 @@ input,select,textarea,button{max-width:100%}
 .hh-row>strong{flex:0 0 auto;white-space:nowrap}
 .hh-bar{flex:1;height:10px;border-radius:6px;background:var(--line);overflow:hidden}
 .hh-bar i{display:block;height:100%;background:var(--green);border-radius:6px}
+
+/* v116: Due-soon + Budget */
+.due-row{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.due-row-main{font-weight:700}
+.due-row-sub{font-size:13px;color:var(--muted);margin-top:2px}
+.due-row-foot{display:flex;align-items:center;gap:10px;margin-top:6px}
+.due-row-foot strong{font-size:15px}
+.due-row-foot strong.pos{color:var(--green-dark)}
+.due-row-foot strong.neg{color:var(--red)}
+.due-status{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--green-soft);color:var(--green-dark)}
+.due-status.due-today{background:#fff3e0;color:#8d4e00}
+.due-status.due-over{background:#fdecea;color:var(--red)}
+.budget-set-row{display:flex;gap:8px;margin-bottom:8px}
+.budget-set-row input{flex:1;min-width:0}
+.budget-bar{height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0}
+.budget-bar i{display:block;height:100%;background:var(--green);border-radius:6px}
+.budget-bar i.warn{background:#e6a817}
+.budget-bar i.over{background:var(--red)}
+.budget-nums{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}
+.budget-alert{font-weight:700;margin-top:8px}
+.budget-alert.ok{color:var(--green-dark)}
+.budget-alert.warn{color:#8d4e00}
+.budget-alert.over{color:var(--red)}
