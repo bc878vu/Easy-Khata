@@ -597,8 +597,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .notif-main{flex:1;min-width:0}
 .notif-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92rem}
 .notif-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--primary)}
-.notif-body{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:.85rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:anywhere}
-.notif.expanded .notif-body{display:block;-webkit-line-clamp:unset}
+.notif-body{display:block;font-size:.85rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:anywhere}
+.notif-go{flex:none;align-self:center;font-size:1.4rem;line-height:1;color:var(--muted)}
 .notif-body a{color:var(--primary)}
 .notif-time{display:block;font-size:.72rem;color:var(--muted);margin-top:6px}
 .notif-read{margin-top:8px}

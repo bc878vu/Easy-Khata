@@ -2344,9 +2344,10 @@
     } catch (e) {}
   }
   // v79: Yaad Dehani redesign — kind icon, relative time, tappable links,
-  // 3-line clamp + tap to expand, filter chips (Sab/Naye/Parhe hue) + counts.
+  // filter chips (Sab/Naye/Parhe hue) + counts.
+  // v132: tap = us user ka profile kholo (expand khatam — body poori dikhti
+  // hai, taake lamba text bina tap kiye parha ja sake) + chevron affordance.
   var notifFilter = "all";
-  var expandedNotifIds = {};
   function fmtRelTime(ts) {
     try {
       var d = new Date(ts).getTime();
@@ -2369,6 +2370,23 @@
     if (kind === "admin") return { ic: "🛡️", cls: "kind-admin" };
     if (kind === "record") return { ic: "➕", cls: "kind-record" };
     return { ic: "💬", cls: "kind-other" };
+  }
+  // v132: notification se us user ka profile — pehle txn ka doosra fareeq
+  // (admin ki taraf se add kiye gaye record mein actor admin hota hai, banda
+  // txn mein hota hai), phir actor (remind mein txn_id nahi hota). Dono na
+  // milen to null — tap par "Profile nahi mila" dikhega.
+  function notifPersonId(x) {
+    if (x.txn_id) {
+      for (var i = 0; i < txns.length; i++) {
+        if (txns[i].id === x.txn_id) {
+          var other = txns[i].payer_id === myId() ? txns[i].receiver_id : txns[i].payer_id;
+          if (other && other !== myId()) return other;
+          break;
+        }
+      }
+    }
+    if (x.actor_id && x.actor_id !== myId()) return x.actor_id;
+    return null;
   }
   function linkifyNotifBody(text) {
     // Pehle escape (XSS safe), phir http(s) links ko tappable banao.
@@ -2402,12 +2420,12 @@
     var html = "";
     list.forEach(function (x) {
       var meta = notifKindMeta(x.kind);
-      var expanded = !!expandedNotifIds[x.id];
-      html += '<div class="notif' + (x.is_read ? "" : " unread") + (expanded ? " expanded" : "") + '" data-notif="' + esc(x.id) + '">' +
+      html += '<div class="notif' + (x.is_read ? "" : " unread") + '" data-notif="' + esc(x.id) + '">' +
         '<span class="notif-ic ' + meta.cls + '" aria-hidden="true">' + meta.ic + "</span>" +
         '<span class="notif-main"><span class="notif-title">' + esc(x.title || "") + (x.is_read ? "" : '<span class="notif-dot" aria-hidden="true"></span>') + "</span>" +
         '<span class="notif-body">' + linkifyNotifBody(x.body || "") + "</span>" +
-        '<span class="notif-time">' + esc(fmtRelTime(x.created_at)) + " · " + esc(fmtNotifTime(x.created_at)) + "</span></span></div>";
+        '<span class="notif-time">' + esc(fmtRelTime(x.created_at)) + " · " + esc(fmtNotifTime(x.created_at)) + "</span></span>" +
+        '<span class="notif-go" aria-hidden="true">›</span></div>';
     });
     $("notifList").innerHTML = html;
   }
@@ -8041,14 +8059,19 @@
   $("notifBackBtn").addEventListener("click", showAppView);
   $("markAllReadBtn").addEventListener("click", markAllNotifRead);
   $("notifList").addEventListener("click", function (e) {
-    // Link par tap — link khule, na read ho na expand.
+    // Link par tap — link khule, profile na khule.
     if (e.target.closest && e.target.closest("a")) return;
     var row = e.target.closest ? e.target.closest("[data-notif]") : null;
     if (!row) return;
     var id = row.getAttribute("data-notif");
-    expandedNotifIds[id] = !expandedNotifIds[id]; // tap = poora text kholo/band karo
-    if (row.classList.contains("unread")) markNotifRead(id); // reload par expand state rehti hai
-    else renderNotifList();
+    var n = null;
+    notifs.forEach(function (x) { if (String(x.id) === String(id)) n = x; });
+    if (row.classList.contains("unread")) markNotifRead(id); // parha hua mark karo
+    if (!n) return;
+    // v132: notification par tap = us user ka profile kholo.
+    var pid = notifPersonId(n);
+    if (!pid || !findPerson(pid)) { appDialog("Is notification se mutaliq user ka profile nahi mila.", { mode: "notice", title: "Profile nahi mila" }); return; }
+    openPersonDetail(pid);
   });
   // v79: filter chips — Sab / Naye / Parhe hue.
   document.querySelectorAll("[data-notif-filter]").forEach(function (b) {
