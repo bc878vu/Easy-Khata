@@ -785,7 +785,7 @@
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
     notifFirstLoad = true;
     loadNotifs();
-    refreshPushState().then(function () { maybeAskPushPermission(); });
+    refreshPushState().then(function () { maybeAskPushPermission(); autoEnablePush(); armPushGestureRetry(); });
     setupRealtime();
     try {
       var view = new URLSearchParams(window.location.search).get("view");
@@ -2952,6 +2952,23 @@
       });
     }).catch(function () { return "off"; });
   }
+  // v133: FCM fail ho to VAPID rasta try karo (plain pushManager.subscribe —
+  // Firebase ki zaroorat nahi). Yasir case: getToken us ke phone par fail
+  // hota hai, lekin VAPID subscribe usi device par chal sakta hai. VAPID
+  // bhi fail ho to FCM ki ASAL wajah (detail ke saath) dikhao — generic
+  // "internet check" message kabhi nahi.
+  function fcmFallback(fcmReason, fcmDetail) {
+    return enablePushVapid().then(function (r) {
+      if (r.ok) return { ok: true };
+      if (fcmReason === "fcm-token-failed") {
+        var d = fcmDetail || "";
+        if (r.detail) d = d ? d + " | VAPID: " + r.detail : "VAPID: " + r.detail;
+        else if (r.reason) d = d ? d + " | VAPID: " + r.reason : "VAPID: " + r.reason;
+        return { ok: false, reason: "fcm-token-failed", detail: d || null };
+      }
+      return { ok: false, reason: fcmReason };
+    });
+  }
   function enablePushFcm() {
     var p = (window.Notification && Notification.permission === "granted")
       ? Promise.resolve("granted")
@@ -2968,7 +2985,7 @@
       return fcmServiceWorker().then(function (reg) {
         return messaging.getToken({ vapidKey: cfg.FCM_VAPID_KEY, serviceWorkerRegistration: reg });
       }).then(function (token) {
-        if (!token) return { ok: false, reason: "fcm-token-failed" };
+        if (!token) return fcmFallback("fcm-token-failed", null);
         return saveFcmToken(token).then(function () {
           pushState = "on"; updatePushToggleLabel();
           // v131 M5: is device ki purani VAPID row hatao (doosra channel) taake
@@ -2986,9 +3003,9 @@
             }).catch(function () {});
           } catch (e) {}
           return { ok: true };
-        }, function (e) { return { ok: false, reason: saveReason(e) }; });
+        }, function (e) { return fcmFallback(saveReason(e), null); });
       }).catch(function (e) {
-        return { ok: false, reason: "fcm-token-failed", detail: String((e && e.message) || e) };
+        return fcmFallback("fcm-token-failed", String((e && e.message) || e));
       });
     }).catch(function () { return { ok: false, reason: "permission-default" }; });
   }
@@ -3008,7 +3025,7 @@
     if (reason === "sw-not-ready") return "Service worker ready nahi hua — app band kar ke dobara kholein, phir try karein.";
     if (reason === "subscribe-failed") return "Subscription nahi bani" + (detail ? " (" + detail + ")" : "") + " — Chrome mein kholein (WhatsApp/Facebook ke andar wale browser se nahi), internet check karein, phir try karein.";
     if (reason === "fcm-init-failed") return "Firebase start nahi hua" + (detail ? " (" + detail + ")" : "") + " — app refresh kar ke dobara try karein.";
-    if (reason === "fcm-token-failed") return "Notifications tayyar nahi ho sakin. Internet check karke dobara try karein.";
+    if (reason === "fcm-token-failed") return "FCM token nahi mila" + (detail ? " (" + detail + ")" : "") + " — internet check karein aur app refresh kar ke dobara try karein.";
     if (reason === "save-failed") return "Internet se rabta nahi ho raha. Dobara try karein.";
     if (reason === "save-denied") return "Notifications on nahi ho sakin. App dobara khol kar try karein.";
     return "Notifications on nahi hui — dobara try karein.";
@@ -3064,9 +3081,10 @@
   }
   // v23: enablePush ab {ok, reason, detail} batata hai — kaunsa step fail
   // hua, ye chhupaya nahi jata. FCM configured ho to FCM path, warna VAPID.
-  function enablePush() {
-    if (!pushSupported) return Promise.resolve({ ok: false, reason: "unsupported" });
-    if (fcmSupported()) return enablePushFcm();
+  // v133: VAPID enable flow — FCM se alag rasta (plain pushManager.subscribe,
+  // Firebase ki zaroorat nahi). enablePush ka VAPID branch aur enablePushFcm
+  // ka fallback (fcmFallback) dono isi ko use karte hain.
+  function enablePushVapid() {
     var p = (window.Notification && Notification.permission === "granted")
       ? Promise.resolve("granted")
       : Notification.requestPermission();
@@ -3089,6 +3107,11 @@
       return { ok: false, reason: "permission-default" };
     });
   }
+  function enablePush() {
+    if (!pushSupported) return Promise.resolve({ ok: false, reason: "unsupported" });
+    if (fcmSupported()) return enablePushFcm();
+    return enablePushVapid();
+  }
   // v22: Account menu ka "Notifications On karein" button — user gesture se
   // chalti hai, is liye Chrome prompt dikhata hai. v23: asal wajah dikhata hai.
   // v23.1: "on" par early return HATA DIYA — button dabane se enablePush()
@@ -3097,6 +3120,33 @@
   // DB mein zero rows). "pehle se on hain" sirf tab jab save pehle se
   // confirm ho (pushState "on" = save confirm, fcmTokenState/vapidPushState
   // ke baad) — aur phir bhi dobara save karke confirm kiya jata hai.
+  // v133: "default on" — permission granted hai lekin koi subscription save
+  // nahi (Yasir case: getToken pehle fail hua tha) to app khud enable karne
+  // ki koshish kare (FCM → VAPID fallback). Prompt nahi chahiye (permission
+  // pehle se granted hai), is liye gesture ka intezar nahi. Har app open par
+  // dobara koshish hoti hai; pehle tap par bhi aik retry. No setTimeout
+  // retry chain (timer pollution + battery) — retry sirf app open aur pehle
+  // tap par. Guest mode mein kabhi nahi (push wahan band hai).
+  var pushAutoTries = 0;
+  var pushAutoBusy = false;
+  function autoEnablePush() {
+    if (!pushSupported || guestMode) return;
+    if (!window.Notification || Notification.permission !== "granted") return;
+    if (pushState === "on" || pushState === "denied" || pushState === "unsupported") return;
+    if (pushAutoBusy || pushAutoTries >= 2) return;
+    pushAutoTries++;
+    pushAutoBusy = true;
+    enablePush().then(function () { pushAutoBusy = false; }, function () { pushAutoBusy = false; });
+  }
+  var pushGestureHookDone = false;
+  function armPushGestureRetry() {
+    if (pushGestureHookDone) return;
+    pushGestureHookDone = true;
+    document.addEventListener("click", function onFirstPushGesture() {
+      document.removeEventListener("click", onFirstPushGesture);
+      autoEnablePush();
+    });
+  }
   function enablePushFromButton() {
     if (!pushSupported) { setPushMsg(pushReasonText("unsupported"), false); return; }
     if (window.Notification && Notification.permission === "denied") {
