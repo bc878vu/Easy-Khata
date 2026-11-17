@@ -3452,13 +3452,16 @@
       setAdminMsg("Community member update ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);scrollAdminMsgIntoView();});
   }
+  // v135: multiple owners — "Make owner" ab naya owner ADD karta hai,
+  // baaki owners owner hi rehte hain (SQL 20261117173000 live). Is liye
+  // confirm/success text mein "transfer" wali baat khatam.
   async function adminMakeCommunityOwner(key) {
     var parts=key.split("|");
-    if(!(await appConfirm("Is member ko community owner banayein? Current active owner admin ban jayega.")))return;
+    if(!(await appConfirm("Is member ko community owner banayein? Baaki owners owner hi rahenge — ek community mein kayi owner ho sakte hain.")))return;
     sb("rpc/admin_transfer_workspace_owner",{method:"POST",body:{p_workspace_id:parts[0],p_new_owner:parts[1]}}).then(function(res){
-      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Ownership transfer nahi hui.",false);scrollAdminMsgIntoView();return;}
-      setAdminMsg("Community ownership transfer ho gayi.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
-    }).catch(function(){setAdminMsg("Connection issue — ownership transfer nahi hui.",false);scrollAdminMsgIntoView();});
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Owner add nahi hua.",false);scrollAdminMsgIntoView();return;}
+      setAdminMsg("Naya owner add ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — owner add nahi hua.",false);scrollAdminMsgIntoView();});
   }
 
   async function deleteUser(id) {
