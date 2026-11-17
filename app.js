@@ -3182,6 +3182,13 @@
     el.textContent = text || "";
     el.className = "msg" + (ok ? " ok" : text ? " err" : "");
   }
+  // v134: adminMsg panel ke top par hai — phone par member list se Save
+  // dabane par message screen se bahar rehta tha, is liye user ko lagta tha
+  // Save ne kuch kiya hi nahi. Message dikhane ke liye us tak scroll karo.
+  function scrollAdminMsgIntoView() {
+    var el = $("adminMsg");
+    if (el && el.scrollIntoView) el.scrollIntoView();
+  }
   function adminDateKey(value) { return String(value || "").slice(0, 10); }
   function adminChartBars(items, formatter, showValues) {
     if (!items.length) return '<p class="empty">Abhi chart ke liye data nahi.</p>';
@@ -3437,17 +3444,21 @@
     var role=$("adminCommunityMemberList").querySelector('[data-admin-member-role="'+key+'"]').value;
     var status=$("adminCommunityMemberList").querySelector('[data-admin-member-status="'+key+'"]').value;
     sb("rpc/admin_update_workspace_member",{method:"POST",body:{p_workspace_id:id,p_user_id:user,p_role:role,p_status:status}}).then(function(res){
-      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Member update nahi hua. Last owner ko transfer kiye baghair remove nahi kar sakte.",false);return;}
-      setAdminMsg("Community member update ho gaya.",true);loadAdminWorkspaceManagement();
-    }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);});
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Member update nahi hua. Last owner ko transfer kiye baghair remove nahi kar sakte.",false);scrollAdminMsgIntoView();return;}
+      // v134: badge foran update karo — server reload ka intezar na karo,
+      // warna phone par Save kaam karta hua nazar nahi aata tha.
+      adminWorkspaceMembers.forEach(function(m){if(m.workspace_id===id&&m.user_id===user){m.role=role;m.member_status=status;}});
+      renderAdminCommunityMembers();
+      setAdminMsg("Community member update ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);scrollAdminMsgIntoView();});
   }
   async function adminMakeCommunityOwner(key) {
     var parts=key.split("|");
     if(!(await appConfirm("Is member ko community owner banayein? Current active owner admin ban jayega.")))return;
     sb("rpc/admin_transfer_workspace_owner",{method:"POST",body:{p_workspace_id:parts[0],p_new_owner:parts[1]}}).then(function(res){
-      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Ownership transfer nahi hui.",false);return;}
-      setAdminMsg("Community ownership transfer ho gayi.",true);loadAdminWorkspaceManagement();
-    }).catch(function(){setAdminMsg("Connection issue — ownership transfer nahi hui.",false);});
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Ownership transfer nahi hui.",false);scrollAdminMsgIntoView();return;}
+      setAdminMsg("Community ownership transfer ho gayi.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — ownership transfer nahi hui.",false);scrollAdminMsgIntoView();});
   }
 
   async function deleteUser(id) {
