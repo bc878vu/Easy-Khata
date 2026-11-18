@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=101">
+<link rel="stylesheet" href="styles.css?v=102">
 </head>
 <body>
 
@@ -87,6 +87,9 @@ window.addEventListener("error", function (e) {
     <div class="auth-chips">
       <span data-i18n="📒 Poora hisaab">📒 Poora hisaab</span><span data-i18n="💬 WhatsApp reminders">💬 WhatsApp reminders</span><span data-i18n="⚡ Fori updates">⚡ Fori updates</span>
     </div>
+    <!-- v139: version stamp — login screen par kaun sa version hai, yahi
+         se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
+    <p id="authVersion" class="auth-version">v139</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -143,6 +146,16 @@ window.addEventListener("error", function (e) {
     <div class="auth-info">
       <p>👤 <b data-i18n="Bina login ke:">Bina login ke:</b> <span data-i18n="hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.">hisaab sirf is phone/browser par save hota hai — koi account nahi chahiye.</span></p>
       <p>☁️ <b data-i18n="Account banane par:">Account banane par:</b> <span data-i18n="aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.">aap ka naam hisaab mein aa jata hai, dost shared kharchon ke liye chun sakte hain; phone WhatsApp reminder ke liye hai — baad mein bhi add ho sakta hai.</span></p>
+    </div>
+    <!-- v139: internet check — login fail ho to user khud dekh sake ke app
+         server mil raha hai ya Supabase server. Sirf tap par chalta hai
+         (auto-run nahi), login flow ko kabhi block nahi karta. -->
+    <div class="net-check">
+      <button id="netCheckBtn" class="btn btn-ghost btn-block" type="button">Internet check karein</button>
+      <div id="netCheckResults" hidden>
+        <p id="netCheckApp" class="net-check-line"></p>
+        <p id="netCheckSb" class="net-check-line"></p>
+      </div>
     </div>
     </div>
     <div id="forgotBox" hidden>
@@ -870,6 +883,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=135"></script>
+<script src="app.js?v=136"></script>
 </body>
 </html>

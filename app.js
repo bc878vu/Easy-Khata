@@ -193,6 +193,9 @@
   // (sb retry/flush/probe) 25s par hi rehta hai — sirf auth 60s par hai.
   var SLOW_TIMEOUT_MS = 25000;
   var AUTH_TIMEOUT_MS = 60000;
+  // v139: login screen par version stamp — yahi aik source of truth hai;
+  // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
+  var APP_VERSION = "v139";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -772,6 +775,14 @@
     clearAppBadgeNow();
     var vf0 = $("versionFooter");
     if (vf0) vf0.hidden = true;
+    // v139: login screen par version stamp dikhao + purane net-check
+    // nateeje saaf karo (logout ke baad stale results na dikhein).
+    var av139 = $("authVersion");
+    if (av139) av139.textContent = APP_VERSION;
+    var nc139 = $("netCheckResults");
+    if (nc139) nc139.hidden = true;
+    setNetCheckLine("netCheckApp", "", null);
+    setNetCheckLine("netCheckSb", "", null);
     $("authWrap").hidden = false;
     $("appShell").hidden = true;
     $("authBox").hidden = false;
@@ -870,6 +881,49 @@
   function authNetErrText(err) {
     if (err && err.message === "request-timeout") return "Internet slow hai — dobara koshish karein.";
     return "Internet connection nahi mil raha. Dobara koshish karein.";
+  }
+
+  // v139: login screen par "Internet check karein" — do ALAG checks, har
+  // aik ka nateeja alag line mein. Koi bhi HTTP jawab (401 bhi) = server mil
+  // raha hai; sirf network error/timeout = nahi mil raha. Sirf button tap
+  // par chalta hai (auto-run nahi), taake login flow kabhi block na ho.
+  // Supabase health check mein koi API key nahi bhejte — /auth/v1/health
+  // bina key ke 401 deta hai, aur woh 401 hi "reachable" ka saboot hai.
+  var NET_CHECK_TIMEOUT_MS = 10000;
+  function setNetCheckLine(id, text, ok) {
+    var el = $(id);
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "net-check-line" + (ok === true ? " ok" : ok === false ? " err" : "");
+  }
+  function netCheckOne(url, label) {
+    var t0 = Date.now();
+    return fetchWithTimeout(url, { method: "GET" }, NET_CHECK_TIMEOUT_MS).then(function (res) {
+      var secs = ((Date.now() - t0) / 1000).toFixed(1);
+      return { label: label, ok: true, secs: secs, status: res.status };
+    }, function (err) {
+      return { label: label, ok: false, timeout: !!(err && err.message === "request-timeout") };
+    });
+  }
+  function runNetCheck() {
+    var btn = $("netCheckBtn");
+    var box = $("netCheckResults");
+    if (!btn || !box) return;
+    btn.disabled = true;
+    box.hidden = false;
+    setNetCheckLine("netCheckApp", "App server: check ho raha hai…", null);
+    setNetCheckLine("netCheckSb", "Supabase server: check ho raha hai…", null);
+    var appUrl = window.location.origin + "/";
+    var sbUrl = API + "/auth/v1/health";
+    Promise.all([netCheckOne(appUrl, "App server"), netCheckOne(sbUrl, "Supabase server")]).then(function (rs) {
+      btn.disabled = false;
+      rs.forEach(function (r) {
+        var id = r.label === "App server" ? "netCheckApp" : "netCheckSb";
+        if (r.ok) setNetCheckLine(id, "✓ " + r.label + ": theek hai (" + r.secs + "s)", true);
+        else if (r.timeout) setNetCheckLine(id, "✗ " + r.label + ": waqt par jawab nahi mila (slow/timeout)", false);
+        else setNetCheckLine(id, "✗ " + r.label + ": nahi mil raha", false);
+      });
+    });
   }
 
   function ensureProfile() {
@@ -7870,6 +7924,9 @@
     window._signupCommunitySearchTimer=setTimeout(function(){loadSignupCommunityDirectory(value);},250);
   });
   $("authSubmitBtn").addEventListener("click", doAuth);
+  // v139: login screen internet check — sirf tap par chalta hai.
+  var netCheckBtnEl = $("netCheckBtn");
+  if (netCheckBtnEl) netCheckBtnEl.addEventListener("click", runNetCheck);
   // v24: guest mode — aik tap, koi email/password nahi.
   $("guestBtn").addEventListener("click", enterGuestMode);
   function setGuestNameMsg(text, ok) {

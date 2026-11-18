@@ -116,6 +116,14 @@ p{margin:0 0 10px}
   background:var(--card);border:1px solid var(--line);border-radius:999px;
   padding:4px 11px;font-size:.78rem;font-weight:600;box-shadow:var(--shadow);
 }
+/* v139: login screen version stamp — chhota, muted, logo ke neeche.
+   Footer "Developed by Asad" se bilkul alag element hai. */
+.auth-version{margin:8px 0 0;font-size:.78rem;color:var(--muted);text-align:center}
+/* v139: login screen internet check — button + do alag nateeje. */
+.net-check{margin-top:12px}
+.net-check-line{margin:4px 0;font-size:.85rem;text-align:left}
+.net-check-line.ok{color:var(--green)}
+.net-check-line.err{color:var(--red)}
 
 /* ---------- app header ---------- */
 .app-header{
