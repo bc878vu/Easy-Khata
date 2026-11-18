@@ -186,7 +186,13 @@
   // v137: auth calls (login/signup/refresh/forgot) bhi isi budget par —
   // 12s par slow link par login hi timeout ho jata tha ("Internet
   // connection nahi mil raha" — user ke 18 Nov 20:56 wale screenshot ka error).
+  // v138: auth ko 60s do — user ka link 0.07 KB/s tak gir gaya hai (18 Nov
+  // 21:22 screenshot); 25s mein sirf ~1.75 KB aata hai, TLS handshake hi
+  // poora nahi hota, is liye v137 ka auto-retry bhi fail ho gaya. 60s mein
+  // 0.15 KB/s par ~9 KB aata hai — TLS + auth POST ke liye kaafi. Data path
+  // (sb retry/flush/probe) 25s par hi rehta hai — sirf auth 60s par hai.
   var SLOW_TIMEOUT_MS = 25000;
+  var AUTH_TIMEOUT_MS = 60000;
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -196,7 +202,7 @@
         "Authorization": "Bearer " + ANON
       },
       body: JSON.stringify(body || {})
-    }, SLOW_TIMEOUT_MS).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+    }, AUTH_TIMEOUT_MS).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
   function sb(path, opts) {
     opts = opts || {};
@@ -1020,12 +1026,20 @@
     }).catch(function (err) {
       btn.disabled = false;
       // v137: login timeout par aik dafa khud dobara koshish karein (dobara
-      // 25s budget) — slow link par pehli koshish aksar adhoori rehti hai.
+      // 60s budget) — slow link par pehli koshish aksar adhoori rehti hai.
       // Sirf login par, sirf aik dafa. NOTE: click handler event object bhejta
       // hai, is liye truthiness check NAHI — sirf isRetry === true rokta hai.
       if (err && err.message === "request-timeout" && !isSignup && isRetry !== true) {
         setAuthMsg("Internet slow hai — dobara koshish ho rahi hai…", false);
         setTimeout(function () { doAuth(true); }, 2000);
+        return;
+      }
+      // v138: auto-retry bhi timeout ho to button dobara usable hai (upar
+      // btn.disabled = false ho chuka) — user ko saaf batao ke net bahut
+      // slow hai aur woh khud dobara try kare. Speed ka number NAHI likhte —
+      // app speed napta nahi, sirf timeout janta hai.
+      if (err && err.message === "request-timeout" && !isSignup && isRetry === true) {
+        setAuthMsg("Net bahut slow hai — login poora nahi ho saka. Speed behtar hote hi 'Login karein' dobara dabayein.", false);
         return;
       }
       setAuthMsg(authNetErrText(err), false);
@@ -1083,7 +1097,7 @@
       method: "PUT",
       headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
       body: JSON.stringify({ password: pw })
-    }, SLOW_TIMEOUT_MS).then(function (r) {
+    }, AUTH_TIMEOUT_MS).then(function (r) {
       return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
         .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
     });
@@ -1161,10 +1175,11 @@
       return;
     }
     // v137: boot check bhi 25s budget par — 8s par slow link par har reopen
-    // session check fail karta tha.
+    // session check fail karta tha. v138: 60s (AUTH_TIMEOUT_MS) — 0.07 KB/s
+    // par 25s mein TLS hi poora nahi hota.
     fetchWithTimeout(API + "/auth/v1/user", {
       headers: { "apikey": ANON, "Authorization": "Bearer " + session.access_token }
-    }, SLOW_TIMEOUT_MS).then(function (r) {
+    }, AUTH_TIMEOUT_MS).then(function (r) {
       if (r.ok) return r.json();
       if (session.refresh_token) {
         return authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
