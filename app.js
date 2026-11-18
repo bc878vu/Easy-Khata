@@ -180,6 +180,13 @@
     });
   }
 
+  // v136: slow-link budget — user ke link par data rate ~0.15 KB/s hai; 12s
+  // mein ek chhota Supabase jawab bhi poora nahi aata (TLS + headers hi
+  // ~2-4 KB hain). Retry aur outbox/switch jaise aham calls ko 25s do.
+  // v137: auth calls (login/signup/refresh/forgot) bhi isi budget par —
+  // 12s par slow link par login hi timeout ho jata tha ("Internet
+  // connection nahi mil raha" — user ke 18 Nov 20:56 wale screenshot ka error).
+  var SLOW_TIMEOUT_MS = 25000;
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -189,12 +196,8 @@
         "Authorization": "Bearer " + ANON
       },
       body: JSON.stringify(body || {})
-    }, 12000).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+    }, SLOW_TIMEOUT_MS).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
-  // v136: slow-link budget — user ke link par data rate ~0.15 KB/s hai; 12s
-  // mein ek chhota Supabase jawab bhi poora nahi aata (TLS + headers hi
-  // ~2-4 KB hain). Retry aur outbox/switch jaise aham calls ko 25s do.
-  var SLOW_TIMEOUT_MS = 25000;
   function sb(path, opts) {
     opts = opts || {};
     var method = String(opts.method || "GET").toUpperCase();
@@ -855,6 +858,14 @@
     return m || "Kuch ghalat ho gaya — dobara try karein.";
   }
 
+  // v137: timeout ko "internet nahi" mat kaho — request chal rahi thi, sirf
+  // slow thi (0.15-1.21 KB/s par 12s mein poori nahi hoti thi). Sirf asal
+  // timeout par "slow" likho; baaki errors par purana text waisa hi.
+  function authNetErrText(err) {
+    if (err && err.message === "request-timeout") return "Internet slow hai — dobara koshish karein.";
+    return "Internet connection nahi mil raha. Dobara koshish karein.";
+  }
+
   function ensureProfile() {
     var u = session.user;
     // Check first: if the profile already exists, leave it alone.
@@ -972,7 +983,7 @@
     });
   }
 
-  function doAuth() {
+  function doAuth(isRetry) {
     var email = $("authEmail").value.trim();
     var password = $("authPassword").value;
     var name = $("authName").value.trim();
@@ -1006,9 +1017,18 @@
         return;
       }
       afterAuth(res, isSignup);
-    }).catch(function () {
+    }).catch(function (err) {
       btn.disabled = false;
-      setAuthMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
+      // v137: login timeout par aik dafa khud dobara koshish karein (dobara
+      // 25s budget) — slow link par pehli koshish aksar adhoori rehti hai.
+      // Sirf login par, sirf aik dafa. NOTE: click handler event object bhejta
+      // hai, is liye truthiness check NAHI — sirf isRetry === true rokta hai.
+      if (err && err.message === "request-timeout" && !isSignup && isRetry !== true) {
+        setAuthMsg("Internet slow hai — dobara koshish ho rahi hai…", false);
+        setTimeout(function () { doAuth(true); }, 2000);
+        return;
+      }
+      setAuthMsg(authNetErrText(err), false);
     });
   }
 
@@ -1053,17 +1073,17 @@
         btn.disabled = false;
         if (!res.ok) { setForgotMsg(authErrorText(res), false); return; }
         setForgotMsg("Reset link bhej diya — apna inbox (aur spam/junk bhi) check karein.", true);
-      }).catch(function () {
+      }).catch(function (err) {
         btn.disabled = false;
-        setForgotMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
+        setForgotMsg(authNetErrText(err), false);
       });
   }
   function updatePassword(pw) {
-    return fetch(API + "/auth/v1/user", {
+    return fetchWithTimeout(API + "/auth/v1/user", {
       method: "PUT",
       headers: { "apikey": ANON, "Authorization": "Bearer " + authToken(), "Content-Type": "application/json" },
       body: JSON.stringify({ password: pw })
-    }).then(function (r) {
+    }, SLOW_TIMEOUT_MS).then(function (r) {
       return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
         .catch(function () { return { ok: r.ok, status: r.status, body: null }; });
     });
@@ -1086,9 +1106,9 @@
       $("newPass1").value = "";
       $("newPass2").value = "";
       setPassMsg("Password badal gaya!", true);
-    }).catch(function () {
+    }).catch(function (err) {
       btn.disabled = false;
-      setPassMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
+      setPassMsg(authNetErrText(err), false);
     });
   }
   function doReset() {
@@ -1106,9 +1126,9 @@
       saveSession(null);
       showAuth();
       setAuthMsg("Password badal gaya — naye password se login karein.", true);
-    }).catch(function () {
+    }).catch(function (err) {
       btn.disabled = false;
-      setResetMsg("Internet connection nahi mil raha. Dobara koshish karein.", false);
+      setResetMsg(authNetErrText(err), false);
     });
   }
   // If the app is opened from an email reset/confirm link, grab that session.
@@ -1140,9 +1160,11 @@
       enterGuestMode();
       return;
     }
+    // v137: boot check bhi 25s budget par — 8s par slow link par har reopen
+    // session check fail karta tha.
     fetchWithTimeout(API + "/auth/v1/user", {
       headers: { "apikey": ANON, "Authorization": "Bearer " + session.access_token }
-    }, 8000).then(function (r) {
+    }, SLOW_TIMEOUT_MS).then(function (r) {
       if (r.ok) return r.json();
       if (session.refresh_token) {
         return authCall("/token?grant_type=refresh_token", { refresh_token: session.refresh_token })
@@ -1175,10 +1197,13 @@
         maybeShowPinLock(); // v78: offline cache boot — PIN set ho to lock screen
         return;
       }
-      saveSession(null);
-      // v24.1: session expire/invalid bhi guest dashboard par le jata hai
-      // (login screen nahi) — dobara login navbar ke Login icon se hota hai.
-      enterGuestMode();
+      // v137: network/timeout fail par session WIPE MAT KARO — sirf "expired"
+      // (server ne 401 + refresh bhi reject kiya) par wipe hota hai (upar).
+      // enterGuestMode() khud saveSession(null) karta hai (v71 privacy), is
+      // liye yahan guest NAHI — login screen dikhao; session localStorage
+      // mein mehfooz rehta hai, dobara kholne par wahi session retry hoga.
+      showAuth();
+      setAuthMsg("Internet slow hai — dobara koshish karein.", false);
     });
   }
 
