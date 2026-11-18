@@ -191,6 +191,10 @@
       body: JSON.stringify(body || {})
     }, 12000).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
+  // v136: slow-link budget — user ke link par data rate ~0.15 KB/s hai; 12s
+  // mein ek chhota Supabase jawab bhi poora nahi aata (TLS + headers hi
+  // ~2-4 KB hain). Retry aur outbox/switch jaise aham calls ko 25s do.
+  var SLOW_TIMEOUT_MS = 25000;
   function sb(path, opts) {
     opts = opts || {};
     var method = String(opts.method || "GET").toUpperCase();
@@ -204,17 +208,17 @@
       headers["Range-Unit"] = "items";
       headers["Range"] = opts.range;
     }
-    function request() {
+    function request(budgetMs) {
       return fetchWithTimeout(API + "/rest/v1/" + path, {
         method: method, headers: headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined
-      }, navigator.onLine ? 12000 : 6000).then(function (r) {
+      }, opts.timeoutMs || budgetMs || (navigator.onLine ? 12000 : 6000)).then(function (r) {
         lastNetworkResponseAt = Date.now();
         // v68: server ne jawab de diya = internet maujood hai. Agar badge
         // laga hua tha to abhi hatao (pehle sirf online event ya agle
         // loadAll par hat-ta tha — slow connection par atak jata tha).
-        if (r.ok && offlineMode) { offlineMode = false; stopOfflineRecheck(); renderOffline(); }
-        else if (r.ok) offlineMode = false;
+        // v136: reason bhi saaf karo (warna badge "Slow internet" par atka rehta).
+        if (r.ok) { var wasOffline = offlineMode; offlineMode = false; offlineReason = ""; if (wasOffline) { stopOfflineRecheck(); renderOffline(); } }
         return r.text().then(function (t) {
           var j = null;
           try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
@@ -234,7 +238,9 @@
       });
     }
     function run(authRetried,networkAttempt) {
-      return request().then(function(res){
+      // v136: retry ko lamba budget (25s) — pehla attempt 12s par timeout ho
+      // to dobara wahi 12s dena slow link par bekaar hai.
+      return request(networkAttempt ? SLOW_TIMEOUT_MS : undefined).then(function(res){
         if(res.status===401&&!authRetried&&session&&session.refresh_token){
           return refreshOnce().then(function(ok){return ok?run(true,networkAttempt):res;});
         }
@@ -301,8 +307,10 @@
      tarah offline chalti hai; online hote hi outbox sync ho jata hai.
      Admin kaam (RPCs) online-only hain — un ke liye internet chahiye. */
   var offlineMode = false;
+  var offlineReason = "";   // v136: "timeout" | "server" | "offline" — badge sach bole
   var lastNetworkResponseAt = 0;
   var syncing = false;       // flushOutbox guard (ek waqt mein aik sync)
+  var flushRetryTimer = null; // v136: flush fail ho to 20s baad dobara try karein
   var CACHE_KEY = "easykhata_cache_v1_anonymous";
   var OUTBOX_KEY = "easykhata_outbox_v1_anonymous";
   var ACTIVE_WS_KEY = "easykhata_active_workspace_v1_anonymous";
@@ -1359,12 +1367,19 @@
     if(pinned)saveOutbox(pendingOps);
     $("workspaceSelect").disabled=true;
     cdSync($("workspaceSelect")); // v73: custom button bhi disabled dikhe
-    sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
+    // v136: slow link par switch RPC ko lamba budget (25s) — 12s par timeout
+    // ho kar poora switch fail ho jata tha.
+    sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}, timeoutMs: SLOW_TIMEOUT_MS}).then(function(res){
       $("workspaceSelect").disabled=false;
       if(!res.ok){setTxnMsg("Community change nahi ho saki. Dobara koshish karein.",false);renderWorkspaceBar();return;}
       currentWorkspaceId=id;
       try { window.localStorage.setItem(ACTIVE_WS_KEY,id); } catch(e) {}
-      profiles=[];txns=[];myContacts=[];hiddenTxnIds={};teardownRealtime();loadAll();
+      // v136: pehle target workspace ka saved hisaab foran dikhao (cache-first),
+      // phir loadAll background mein taaza kare. Cache na ho to hi state wipe karo.
+      var switchedCache = loadCache(id);
+      if (switchedCache) { applyCacheToState(switchedCache); renderWorkspaceBar(); renderAll(); renderNotifBadge(); }
+      else { profiles=[];txns=[];myContacts=[];hiddenTxnIds={}; }
+      teardownRealtime();loadAll();
     }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Community change nahi ho saki. Internet check karke dobara koshish karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
@@ -1619,6 +1634,18 @@
   // Outbox sync: pending ops ko order mein server par bhejein.
   // Settled-lock rejection = op drop karein (kabhi accept nahi hoga),
   // network error = ruk jayein (ops queued rahein, baad mein retry).
+  // v136: slow link par flush ka aik attempt fail ho jaye to 20s baad khud
+  // dobara try karein (sirf network/timeout fail par — 401/403 login mangta
+  // hai, us par retry bekaar hai). 30s interval bhi retry karta hai; ye
+  // us ke beech ka gap bhar deta hai.
+  function scheduleFlushRetry() {
+    if (guestMode || flushRetryTimer) return;
+    if (!loadOutbox().length) return;
+    flushRetryTimer = setTimeout(function () {
+      flushRetryTimer = null;
+      if (!guestMode && loadOutbox().length) flushOutbox();
+    }, 20000);
+  }
   function flushOutbox() {
     if (guestMode) return Promise.resolve(false); // v24: guest ka koi outbox nahi — kuch sync nahi hota
     if (syncing) return Promise.resolve(false);
@@ -1646,6 +1673,7 @@
     if (converted) saveOutbox(ops);
     if (!ops.length) return Promise.resolve(false);
     syncing = true;
+    renderOffline(); // v136: badge foran "Syncing…" dikhaye (flush slow link par 13s+ chal sakta hai)
     setTxnMsg("Aap ke pending records update ho rahe hain…", true);
     var done = 0, skipped = 0, skippedSettled = 0;
     function dropOp(key) {
@@ -1655,6 +1683,7 @@
     function next(i) {
       if (i >= ops.length) {
         syncing = false;
+        if (flushRetryTimer) { clearTimeout(flushRetryTimer); flushRetryTimer = null; }
         renderOffline();
         if (loadOutbox().length) return flushOutbox(); // sync ke dauran naye ops aa gaye
         loadAll();
@@ -1665,14 +1694,16 @@
       }
       var op = ops[i];
       var p;
+      // v136: har op ko 25s budget — 12s par slow link par POST timeout ho
+      // kar flush ruk jata tha, aur 2 pending changes kabhi sync nahi hote the.
       if (op.op === "insert") {
-        p = sb(op.table, { method: "POST", prefer: "return=representation", body: op.body });
+        p = sb(op.table, { method: "POST", prefer: "return=representation", body: op.body, timeoutMs: SLOW_TIMEOUT_MS });
       } else if (op.op === "update") {
-        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "PATCH", prefer: "return=minimal", body: op.body });
+        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "PATCH", prefer: "return=minimal", body: op.body, timeoutMs: SLOW_TIMEOUT_MS });
       } else if (op.op === "unhide") {
-        p = sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(op.id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE" });
+        p = sb("khata_txn_hidden?txn_id=eq." + encodeURIComponent(op.id) + "&user_id=eq." + encodeURIComponent(myId()), { method: "DELETE", timeoutMs: SLOW_TIMEOUT_MS });
       } else {
-        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "DELETE" });
+        p = sb(op.table + "?id=eq." + encodeURIComponent(op.id), { method: "DELETE", timeoutMs: SLOW_TIMEOUT_MS });
       }
       return p.then(function (res) {
         if (res.ok) {
@@ -1709,6 +1740,7 @@
           syncing = false;
           renderOffline();
           setTxnMsg("Internet aate hi pending records khud update ho jayenge.", false);
+          scheduleFlushRetry(); // v136: 20s baad khud dobara try karein
           return Promise.resolve(false);
         }
         skipped++;
@@ -1719,6 +1751,7 @@
         syncing = false;
         renderOffline();
         setTxnMsg("Internet aate hi pending records khud update ho jayenge.", false);
+        scheduleFlushRetry(); // v136: 20s baad khud dobara try karein
         return Promise.resolve(false);
       });
     }
@@ -1906,6 +1939,34 @@
     return loadPage();
   }
 
+  // v136: timeout vs server farq — chain ke apne "X load failed" Error
+  // (server ne jawab diya lekin !ok) ko timeout mat samjho. isNetErr ka
+  // "load failed" pattern usay ghalat pakarta hai; Safari ka asal fetch
+  // fail TypeError hota hai, is liye naam-check hi kaafi hai.
+  function isTimeoutErr(err) {
+    if (!err) return false;
+    if (err.name === "TypeError") return true;
+    if (err.message === "request-timeout") return true;
+    return /failed to fetch|networkerror|network request failed/i.test(String(err.message || ""));
+  }
+
+  // v136: cache se state bharo (boot / space-switch par foran paint + loadAll
+  // catch par fallback — aik hi jagah, dono raste wahi state banayein).
+  function applyCacheToState(c) {
+    dbReady = true;
+    profiles = c.profiles || [];
+    workspaces = Array.isArray(c.workspaces) ? c.workspaces : workspaces;
+    currentWorkspaceId = c.workspaceId || currentWorkspaceId;
+    try { if (currentWorkspaceId) window.localStorage.setItem(ACTIVE_WS_KEY, currentWorkspaceId); } catch (e) {}
+    txns = c.txns || [];
+    hiddenTxnIds = {};
+    (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
+    myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
+    notifs = c.notifs || [];
+    recurringRules = c.recurring || []; // v87: offline bhi rules cache se
+    monthlyReportSeen = c.monthlyReportSeen || ""; // v88
+  }
+
   function loadAll() {
     if (guestMode) {
       // v24: guest mode mein Refresh sirf local store dobara parhta hai —
@@ -1918,6 +1979,18 @@
       return;
     }
     setTxnMsg("");
+    // v136: cache-first paint — boot/space-switch par saved hisaab foran
+    // dikhao, network background mein sync kare. Sirf tab jab in-memory
+    // state khaali ho (save ke baad wale refresh par stale flicker na ho).
+    if (!profiles.length && !txns.length) {
+      var cachedFirst = loadCache(currentWorkspaceId);
+      if (cachedFirst) {
+        applyCacheToState(cachedFirst);
+        renderWorkspaceBar();
+        renderAll();
+        renderNotifBadge();
+      }
+    }
     acceptInviteFromUrl().then(function (accepted) {
       if (accepted) { teardownRealtime(); loadAll(); return; }
       profilesQuery(true).then(function (res) {
@@ -1950,6 +2023,7 @@
       txns = rows;
       rtLastFetch = Date.now();
       offlineMode = false;
+      offlineReason = ""; // v136
       return loadHiddenIds().then(function () {
         renderAll();
         if (currentView === "admin") renderAdminDashboard();
@@ -1965,24 +2039,16 @@
         saveCache();
         flushOutbox();
       });
-    }).catch(function () {
+    }).catch(function (err) {
       // Offline: aakhri save hua data dikhayein (agar cache hai).
       var c = loadCache(currentWorkspaceId);
       if (c) {
         offlineMode = true;
+        // v136: wajah record karo — badge "Offline" sirf tab jab browser
+        // khud offline kehta hai; slow link par "Slow internet" dikhe.
+        offlineReason = !navigator.onLine ? "offline" : (isTimeoutErr(err) ? "timeout" : "server");
         startOfflineRecheck(); // v68: 15s probe — theek hote hi badge khud hat jaye
-        dbReady = true;
-        profiles = c.profiles || [];
-        workspaces = Array.isArray(c.workspaces) ? c.workspaces : workspaces;
-        currentWorkspaceId = c.workspaceId || currentWorkspaceId;
-        try { if(currentWorkspaceId) window.localStorage.setItem(ACTIVE_WS_KEY,currentWorkspaceId); } catch(e) {}
-        txns = c.txns || [];
-        hiddenTxnIds = {};
-        (c.hidden || []).forEach(function (hid) { hiddenTxnIds[hid] = true; });
-        myContacts = (c.contacts || []).map(function (x) { x.manual = true; return x; });
-        notifs = c.notifs || [];
-        recurringRules = c.recurring || []; // v87: offline bhi rules cache se
-        monthlyReportSeen = c.monthlyReportSeen || ""; // v88
+        applyCacheToState(c);
         renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
@@ -1992,8 +2058,15 @@
         maybeMonthlyReport(); // v88: offline bhi banner dikhe, PDF online aate hi
         return;
       }
+      // v136: cache na ho to bhi offline state dikhao — pehle ye branch
+      // offlineMode lagati hi nahi thi, is liye pehli dafa load fail hone
+      // par badge chhupa rehta tha (harness ne pakda).
+      offlineMode = true;
+      offlineReason = !navigator.onLine ? "offline" : (isTimeoutErr(err) ? "timeout" : "server");
+      startOfflineRecheck();
       setTxnMsg("Records load nahi hue — refresh karein.", false);
       renderAll(); // v24.8: cache na ho to bhi khaali state saaf render ho (blank screen nahi)
+      renderOffline();
     });
     });
   }
@@ -2120,7 +2193,9 @@
   function liveReload() {
     if (guestMode) return; // v71: guest mode mein kabhi account data fetch nahi
     var ind = $("liveUpdating");
-    var slowTimer = setTimeout(function () { if (ind) ind.hidden = false; }, 800);
+    // v136: offline/slow link par "Updating…" mat dikhao — background refresh
+    // hai, user ko lagta hai kuch atak gaya hai (screenshot 2 wala haal).
+    var slowTimer = setTimeout(function () { if (ind && !offlineMode) ind.hidden = false; }, 800);
     var done = function () { clearTimeout(slowTimer); if (ind) ind.hidden = true; rtLastFetch = Date.now(); };
     refreshTxns().then(function () { loadNotifs(); loadContacts(); loadRecurringRules(); done(); }).catch(function () { done(); });
   }
@@ -2185,9 +2260,15 @@
       scheduleLiveReload();
       if (!rtChannel) setupRealtime();
     }
+    // v136: app wapas khulte hi pending changes sync karne ki koshish karein.
+    if (!document.hidden && session && !guestMode && loadOutbox().length) flushOutbox();
   });
   window.addEventListener("online", function () {
     if (session && !guestMode) { setupRealtime(); loadAll(); }
+  });
+  // v136: window focus par bhi pending outbox flush karein (tab wapas aane par).
+  window.addEventListener("focus", function () {
+    if (session && !guestMode && loadOutbox().length) flushOutbox();
   });
   // Realtime is an optimization, not the only source of truth. Poll quietly
   // while the tab is visible so a dropped socket cannot leave stale balances.
@@ -6955,6 +7036,7 @@
     document.querySelectorAll("[data-i18n-aria]").forEach(function (el) { el.setAttribute("aria-label", tr(el.getAttribute("data-i18n-aria"))); });
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText();
     renderAcctLang(); // v123: Account Language row ki value update karein (header button hata diya gaya)
+    renderOffline(); // v136: badge ka text wapas sahi state par lao (data-i18n ne "Offline" likh diya hota hai)
   }
   // v123: Account Language row ki value — zaban ka naam (proper name, translate nahi hota).
   function renderAcctLang() {
@@ -8203,13 +8285,16 @@
   // probe har 15s mein dobara check karta hai aur theek hote hi badge
   // hata deta hai; (3) har kamyab jawab par bhi badge foran update hota hai.
   var offlineRecheckTimer = null;
+  var probeRunning = false; // v136: 15s interval par 20s probe overlap na kare
   function probeReachability() {
     // Chhota sa Supabase probe: koi bhi HTTP jawab (200 ho ya 401) =
     // internet maujood hai; sirf network error/timeout = asal offline.
+    // v136: timeout 8s -> 20s — 0.15 KB/s link par 8s mein probe khud
+    // timeout ho jata tha, is liye badge kabhi nahi hat-ta tha.
     return fetchWithTimeout(API + "/rest/v1/khata_profiles?select=id&limit=1", {
       method: "GET",
       headers: { "apikey": ANON, "Authorization": "Bearer " + authToken() }
-    }, 8000).then(function () { return true; }).catch(function () { return false; });
+    }, 20000).then(function () { return true; }).catch(function () { return false; });
   }
   function stopOfflineRecheck() {
     if (offlineRecheckTimer) { clearInterval(offlineRecheckTimer); offlineRecheckTimer = null; }
@@ -8220,8 +8305,11 @@
       if (!offlineMode) { stopOfflineRecheck(); return; }
       if (guestMode) return;
       if (!navigator.onLine) { renderOffline(); return; }
+      if (probeRunning) return; // v136: pichla probe abhi chal raha hai
+      probeRunning = true;
       probeReachability().then(function (ok) {
-        if (ok) { offlineMode = false; stopOfflineRecheck(); renderOffline(); flushOutbox(); }
+        probeRunning = false;
+        if (ok) { offlineMode = false; offlineReason = ""; stopOfflineRecheck(); renderOffline(); flushOutbox(); }
         else renderOffline();
       });
     }, 15000);
@@ -8238,13 +8326,17 @@
     }
     var pending = loadOutbox().length;
     var recentlyReachable = lastNetworkResponseAt && (Date.now()-lastNetworkResponseAt)<20000;
+    // v136: "Offline" sirf tab jab browser khud kehta hai internet nahi hai.
+    // Slow link (WiFi on, jawab 12s+ mein aata hai) par "Offline" jhooth hai —
+    // user ke screenshots mein yahi ghalat badge tha (data rate 0.15 KB/s).
+    // Sync chal rahi ho to "Syncing…" dikhao, pending ho to sachhi ginti.
+    if (syncing) { b.hidden = false; b.textContent = "Syncing…"; return; }
     var actuallyOffline = offlineMode || (!navigator.onLine && !recentlyReachable);
     if (actuallyOffline) {
-      // offlineMode = load fail hua aur cache se dikhaya ja raha hai
-      // (navigator.onLine kabhi kabhi ghalat "online" batata hai).
-      // v24.8: offline honay par bhi pending count dikhao (sachhi haalat).
+      if (!navigator.onLine) { b.hidden = false; b.textContent = "Offline"; return; }
+      if (offlineReason === "server") { b.hidden = false; b.textContent = "Server error"; return; }
       b.hidden = false;
-      b.textContent = pending > 0 ? "Offline · "+pending+" changes baqi" : "Offline";
+      b.textContent = pending > 0 ? "Slow internet · "+pending+" baqi" : "Slow internet";
     } else if (pending > 0) {
       b.hidden = false;
       b.textContent = pending+" changes baqi hain";
@@ -8256,7 +8348,7 @@
     // Browser kehta hai internet wapas aaya — probe se tasdeeq karo
     // (kabhi kabhi "online" event par bhi server nahi milta).
     probeReachability().then(function (ok) {
-      if (ok && offlineMode) { offlineMode = false; stopOfflineRecheck(); }
+      if (ok && offlineMode) { offlineMode = false; offlineReason = ""; stopOfflineRecheck(); }
       renderOffline(); flushOutbox();
     });
   });

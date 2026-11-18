@@ -164,7 +164,7 @@ p{margin:0 0 10px}
 .offline-badge{
   display:inline-block;font-size:.66rem;font-weight:700;color:var(--red-dark);
   background:var(--red-soft);border-radius:999px;padding:2px 7px;cursor:pointer;
-  white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;
+  white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto; /* v136: 120px par "Offline · 2 changes baqi" kat kar "2 changes b…" ban jata tha */
 }
 .live-updating{font-size:.72rem;color:var(--muted);white-space:nowrap}
 
