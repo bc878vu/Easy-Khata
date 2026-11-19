@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=107">
+<link rel="stylesheet" href="styles.css?v=108">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v146</p>
+    <p id="authVersion" class="auth-version">v147</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -259,6 +259,11 @@ window.addEventListener("error", function (e) {
         <button id="dueJumpBtn" class="btn btn-soft tool-btn" type="button" title="Due-soon udhaar dekhein" data-i18n="⏰ Due" data-i18n-title="Due-soon udhaar dekhein">⏰ Due</button>
         <button id="budgetJumpBtn" class="btn btn-soft tool-btn" type="button" title="Monthly Budget dekhein" data-i18n="💰 Budget" data-i18n-title="Monthly Budget dekhein">💰 Budget</button>
         <button id="goalJumpBtn" class="btn btn-soft tool-btn" type="button" title="Bachat Goal dekhein" data-i18n="🎯 Goal" data-i18n-title="Bachat Goal dekhein">🎯 Goal</button>
+      </div>
+      <!-- v147: friend suggestions — DOST list ke upar, logged-in only (guest mein chhupa). -->
+      <div id="suggestBox" class="card suggest-box" hidden>
+        <p class="section-label" data-i18n="Aap ke liye suggestions">Aap ke liye suggestions</p>
+        <div id="suggestList"></div>
       </div>
       <p id="peopleMsg" class="msg" role="status"></p>
       <div id="peopleList" class="people"></div>
@@ -932,6 +937,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=143"></script>
+<script src="app.js?v=144"></script>
 </body>
 </html>

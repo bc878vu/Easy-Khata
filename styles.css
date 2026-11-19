@@ -1904,3 +1904,22 @@ input,select,textarea,button{max-width:100%}
 .map-box .leaflet-popup-content a.map-user-btn,.map-box .leaflet-popup-content a.map-user-btn-wa{color:#fff;text-decoration:none}
 .map-box .leaflet-popup-content p.map-user-addr,.map-box .leaflet-popup-content p.map-user-nophone,.map-box .leaflet-popup-content p.map-user-time{margin:8px 0 0}
 .map-box .leaflet-popup-content p.map-user-phone{margin:6px 0 0}
+
+/* ---------- Friend suggestions (v147) ----------
+   DOST list ke upar — card v144/v145 map card jaisa (avatar + naam + role
+   badge + pata), theme-aware (var(--card)/var(--ink)/var(--line)); Add
+   button v145 ke deep tokens (accent-btn, safed text 5:1+). Compact:
+   aik card ~3 lines + reason; phone number card mein hota hi nahi. */
+.suggest-box{margin:12px 0;padding:12px}
+.suggest-box .section-label{margin:0 0 8px}
+.suggest-card{position:relative;display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px}
+.suggest-card:last-child{margin-bottom:0}
+.suggest-card .map-user-avatar{flex:none;width:44px;height:44px;font-size:1rem}
+.suggest-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.suggest-main .map-user-addr{margin:2px 0 0}
+.suggest-reason{margin:3px 0 0;font-size:.8rem;font-weight:600;color:var(--accent);line-height:1.35}
+.suggest-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.suggest-add{border:0;cursor:pointer;font:inherit;padding:8px 12px;border-radius:10px;background:var(--accent-btn);color:#fff;font-weight:800;font-size:.82rem;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.25)}
+.suggest-add:disabled{opacity:.55;cursor:default}
+.suggest-dismiss{border:0;cursor:pointer;background:transparent;color:var(--muted);font-size:.85rem;line-height:1;padding:2px 6px;border-radius:8px}
+.suggest-dismiss:hover{color:var(--ink);background:var(--surface)}

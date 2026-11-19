@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v146";
+  var APP_VERSION = "v147";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -651,6 +651,18 @@
       if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, first: null, last: null };
     });
     myContacts.forEach(function (c) {
+      if (map[c.id]) {
+        // v147: contact row jis ki id kisi profile ki id hai (rename ya
+        // Add-friend) — profile ka data (photo/phone/role) barkarar rakho,
+        // sirf naam override + credit limit lo. "Manual" tag nahi — ye asal
+        // app user hai, manual dost nahi. Pehle yahan poora replace hota
+        // tha, is liye rename karne par photo/phone gayab ho jate thay.
+        var ex = map[c.id];
+        if (c.name) ex.name = c.name;
+        if (c.credit_limit != null && !isNaN(c.credit_limit)) ex.credit_limit = Number(c.credit_limit);
+        ex.friend = true; // v147: contacts mein joda hua (Add-friend / rename)
+        return;
+      }
       map[c.id] = { name: c.name || "Unknown", phone: c.phone || "", givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, manual: true, first: null, last: null, credit_limit: (c.credit_limit == null ? null : Number(c.credit_limit)) }; // v115: dukaan credit limit
     });
     function bump(p, d) {
@@ -2775,6 +2787,7 @@
     renderMonthStats();
     renderInsights();
     renderPeople();
+    renderSuggestions(); // v147: friend suggestions (logged-in only)
     renderPersonSelect();
     renderTxnFilterOptions();
     renderTxns();
@@ -3148,6 +3161,7 @@
         myContacts = (Array.isArray(res.body) ? res.body : []).map(function (c) { c.manual = true; return c; });
         renderSummary(); // BUGFIX (v19): contacts Total Balance ko badalte hain — summary yahan dobara chahiye, warna manual dost (Ayaz) cards mein nahi aate
         renderPeople();
+        renderSuggestions(); // v147: contacts aate hi exclusion set badalta hai — suggestions taaza karo
         renderPersonSelect();
         renderTxnFilterOptions();
         // BUGFIX (v21): ledger contacts se PEHLE render ho jata hai (loadAll mein
@@ -3173,6 +3187,7 @@
         if (p.id !== myId() && contactPhoneMatch(c.phone, p.phone)) target = p;
       });
       if (!target) return;
+      if (target.id === c.id) return; // v147: contact ki id hi profile ki id hai (Add-friend/rename) — pehle se linked hai, delete nahi karna
       jobs.push(linkContactToProfile(c, target));
     });
     if (!jobs.length) return Promise.resolve(0);
@@ -5291,6 +5306,202 @@
     });
     $("peopleList").innerHTML = html;
     if (detailPersonId) renderPersonDetail();
+  }
+
+  /* ---------- Friend suggestions (v147 — Boss order 19 Nov 15:45 PKT) ----------
+     "Friends list mein dusre log suggestions hon — us ki category ke
+     related ya jo us ko faida de sakain."
+     - Sirf LOGGED-IN users ko dikhti hain — guest ko suggestions NAHI
+       (guest mode mein ye section chhupa rehta hai, koi fetch nahi).
+     - Candidates = khata_profiles ke baaki users (pehle se load hain —
+       profilesQuery), EXCLUDE: khud, mere contacts (id ya phone match),
+       aur jin se mera len-den ho chuka hai (woh pehle se dost hain).
+     - Ranking: COMPLEMENTARY role pehle (Customer→Supplier/Dealer,
+       Supplier→Customer/Businessman, Dealer→Customer/Supplier,
+       Businessman→Supplier/Customer/Dealer), phir same role, phir same
+       area (address text match — koi geocoding nahi), phir recently active
+       location sharers (user_locations). Role NAHI hota to guess NAHI
+       karte — role-less user sirf area/share se rank karta hai, aur us
+       par koi ghalat role label nahi lagta.
+     - Card mein phone number KABHI NAHI (v146 guest rule jaisa least
+       exposure) — phone sirf dost banne ke BAAD person detail mein dikhta
+       hai (profile entry se, peopleMap merge). "Add friend" koi ledger
+       transaction NAHI banata — sirf khata_contacts row (id = profile id,
+       phone null — maybeLinkContacts ka phone-match delete na kare).
+     - v144 migration pending ho (business_role/address columns na hon) to
+       bhi kaam karta hai: profiles mein fields undefined hote hain, score
+       area/share fallback se banta hai, crash/blank nahi hota. */
+  var SUGGEST_MAX = 5;
+  var SUGGEST_DISMISS_KEY = "easykhata_suggest_dismissed_v1";
+  var suggestDismissed = {};
+  var suggestDismissedLoaded = false;
+  var suggestSharers = null; // null = abhi load nahi hue; {} = load ho gaye (khaali bhi ho sakte hain)
+  var suggestSharersLoading = false;
+  var SUGGEST_COMPLEMENT = {
+    Customer: ["Supplier", "Dealer"],
+    Supplier: ["Customer", "Businessman"],
+    Dealer: ["Customer", "Supplier"],
+    Businessman: ["Supplier", "Customer", "Dealer"]
+  };
+  function loadSuggestDismissed() {
+    if (suggestDismissedLoaded) return;
+    suggestDismissedLoaded = true;
+    try {
+      var raw = window.localStorage.getItem(SUGGEST_DISMISS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr)) arr.forEach(function (id) { suggestDismissed[id] = true; });
+    } catch (e) { suggestDismissed = {}; }
+  }
+  function saveSuggestDismissed() {
+    try { window.localStorage.setItem(SUGGEST_DISMISS_KEY, JSON.stringify(Object.keys(suggestDismissed))); } catch (e) {}
+  }
+  function suggestAreaTokens(addr) {
+    var out = {};
+    String(addr || "").toLowerCase().split(/[^a-z0-9]+/).forEach(function (t) {
+      if (t && t.length >= 4) out[t] = true;
+    });
+    return out;
+  }
+  function suggestSameArea(a, b) {
+    var ta = suggestAreaTokens(a), tb = suggestAreaTokens(b), k;
+    for (k in tb) if (ta[k]) return true;
+    return false;
+  }
+  function loadSuggestSharers() {
+    // Logged-in only — guest mode mein kabhi nahi (loadSharedLocations ka
+    // guard bhi wahi kehta hai). Aik dafa per boot; table na ho to {}.
+    // v147: offlineMode ho to ye enrichment fetch BILKUL NAHI — sb() ki
+    // kamyabi offlineMode saaf kar deti hai (v68 design), aur "Slow
+    // internet / Offline / Server error" badge jhootha hat jata hai jabke
+    // hisaab abhi load hi nahi hua (harness ne pakda: c1/h1/h2/h3/k3).
+    // suggestSharers null rehta hai — agle kamyab render par dobara try hoga.
+    if (offlineMode) return;
+    if (suggestSharers !== null || suggestSharersLoading) return;
+    if (guestMode || !session) { suggestSharers = {}; return; }
+    suggestSharersLoading = true;
+    loadSharedLocations().then(function (r) {
+      suggestSharersLoading = false;
+      suggestSharers = {};
+      if (r && r.ok && Array.isArray(r.rows)) r.rows.forEach(function (row) { if (row.user_id) suggestSharers[row.user_id] = row.updated_at || ""; });
+      renderSuggestions();
+    }).catch(function () { suggestSharersLoading = false; suggestSharers = {}; renderSuggestions(); });
+  }
+  function suggestCandidates() {
+    if (guestMode || !session) return [];
+    loadSuggestDismissed();
+    var me = myId();
+    var myP = myProfile() || {};
+    var myRole = myP.business_role || null;
+    var myAddr = myP.address || "";
+    var map = peopleMap();
+    var excluded = {};
+    myContacts.forEach(function (c) { excluded[c.id] = true; });
+    var contactPhones = {};
+    myContacts.forEach(function (c) { if (c.phone) contactPhones[normPhone(c.phone)] = true; });
+    Object.keys(map).forEach(function (id) { var p = map[id]; if (p.first || p.last) excluded[id] = true; });
+    var list = [];
+    profiles.forEach(function (p) {
+      if (!p || p.id === me) return;
+      if (excluded[p.id] || suggestDismissed[p.id]) return;
+      if (p.phone && contactPhones[normPhone(p.phone)]) return; // manual contact se pehle se joda hua
+      var role = p.business_role || null;
+      var score = 0, reasons = [];
+      if (myRole && role) {
+        var comp = SUGGEST_COMPLEMENT[myRole] || [];
+        if (comp.indexOf(role) !== -1) { score += 3; reasons.push("comp"); }
+        else if (role === myRole) { score += 2; reasons.push("same"); }
+      }
+      if (myAddr && p.address && suggestSameArea(myAddr, p.address)) { score += 1; reasons.push("area"); }
+      if (suggestSharers && suggestSharers[p.id]) { score += 1; reasons.push("share"); }
+      if (score <= 0) return; // bina wajah ke random naam nahi — suggestion ki koi reason honi chahiye
+      list.push({ p: p, score: score, reasons: reasons });
+    });
+    list.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.p.name || "").localeCompare(String(b.p.name || ""));
+    });
+    return list.slice(0, SUGGEST_MAX);
+  }
+  function suggestReasonText(c) {
+    var parts = [];
+    if (c.reasons.indexOf("comp") !== -1) parts.push(tr("Aap ke kaam ka hai — faida de sakta hai"));
+    else if (c.reasons.indexOf("same") !== -1) parts.push(tr("Aap ki tarah hi hain"));
+    if (c.reasons.indexOf("area") !== -1) parts.push(tr("Aap ke area mein hain"));
+    if (c.reasons.indexOf("share") !== -1) parts.push(tr("Location share kar raha hai"));
+    return parts.join(" · ");
+  }
+  function renderSuggestions() {
+    var box = $("suggestBox"), listEl = $("suggestList");
+    if (!box || !listEl) return;
+    if (guestMode || !session || (peopleSearchText && peopleSearchText.trim())) { box.hidden = true; listEl.innerHTML = ""; return; }
+    if (suggestSharers === null) loadSuggestSharers();
+    var cands = suggestCandidates();
+    if (!cands.length) { box.hidden = true; listEl.innerHTML = ""; return; }
+    var html = "";
+    cands.forEach(function (c) {
+      var p = c.p;
+      var role = p.business_role || "";
+      var roleHtml = role
+        ? '<span class="map-user-role">' + esc(role) + '</span>'
+        : '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + '</span>';
+      // NOTE: card mein phone number KABHI NAHI — na text, na tel:, na
+      // wa.me. Phone sirf dost banne ke baad person detail mein dikhta hai.
+      html += '<div class="suggest-card">' +
+        '<span class="map-user-avatar">' + avatarHtml(p.avatar_url, initials(p.name)) + '</span>' +
+        '<span class="suggest-main"><span class="map-user-name">' + esc(p.name || p.email || "?") + '</span>' +
+        roleHtml +
+        (p.address ? '<span class="map-user-addr">' + esc(p.address) + '</span>' : '') +
+        '<span class="suggest-reason">' + esc(suggestReasonText(c)) + '</span></span>' +
+        '<span class="suggest-side">' +
+        '<button class="suggest-dismiss" type="button" data-suggest-dismiss="' + esc(p.id) + '" aria-label="' + esc(tr("Suggestion chhupayein")) + '">✕</button>' +
+        '<button class="suggest-add" type="button" data-suggest-add="' + esc(p.id) + '">' + esc(tr("Dost add karein")) + '</button>' +
+        '</span></div>';
+    });
+    listEl.innerHTML = html;
+    box.hidden = false;
+  }
+  function dismissSuggestion(id) {
+    loadSuggestDismissed();
+    suggestDismissed[id] = true;
+    saveSuggestDismissed();
+    renderSuggestions();
+  }
+  function addSuggestFriend(id) {
+    if (guestMode || !session) return;
+    var p = null;
+    profiles.forEach(function (x) { if (x.id === id) p = x; });
+    if (!p) return;
+    var already = null;
+    myContacts.forEach(function (c) { if (c.id === id) already = c; });
+    if (already) { renderSuggestions(); return; } // double-tap / race — dobara POST nahi
+    // id = profile id (rename flow jaisa), phone null — maybeLinkContacts
+    // phone-match se is row ko foran delete na kar de; profile ka phone
+    // peopleMap merge se hi milta hai. Koi ledger transaction nahi banti.
+    var body = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null };
+    sb("khata_contacts", { method: "POST", prefer: "return=representation", body: body }).then(function (res) {
+      if (!res.ok) {
+        if (isTransientResponse(res)) {
+          offlineContactInsert(body);
+          setPeopleMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
+          renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+          return;
+        }
+        setPeopleMsg(tr("Dost add nahi ho saka — dobara try karein."), false);
+        var btn = document.querySelector('[data-suggest-add="' + id + '"]');
+        if (btn) btn.disabled = false; // dobara try kar sake
+        return;
+      }
+      var created = res.body && res.body[0];
+      if (created) { created.manual = true; myContacts.push(created); }
+      else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null, manual: true });
+      saveCache();
+      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      setPeopleMsg((p.name || "") + " " + tr("dost ban gaya!"), true);
+    }).catch(function () {
+      offlineContactInsert(body);
+      setPeopleMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
+      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+    });
   }
 
   function renderAccount() {
@@ -7692,6 +7903,17 @@
   "Pata 200 harf se zyada nahi ho sakta.": "Address can't be longer than 200 characters.",
   // ---- Map view v146 (guest map — bina login ke pins, phone nahi) ----
   "Call ya WhatsApp karne ke liye login karein.": "Login to call or WhatsApp.",
+  // ---- Friend suggestions v147 (category-based, DOST list ke upar) ----
+  "Aap ke liye suggestions": "Suggestions for you",
+  "Aap ke kaam ka hai — faida de sakta hai": "Useful for your work — can benefit you",
+  "Aap ki tarah hi hain": "Same as you",
+  "Aap ke area mein hain": "In your area",
+  "Location share kar raha hai": "Sharing their location",
+  "Suggestion chhupayein": "Hide suggestion",
+  "Dost add ho gaya!": "Friend added!",
+  "Internet aate hi update ho jayega.": "It will update once you're back online.",
+  "Dost add nahi ho saka — dobara try karein.": "Couldn't add friend — try again.",
+  "dost ban gaya!": "is now your friend!",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -8575,7 +8797,7 @@
   $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
-  $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); });
+  $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain
   $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
@@ -8617,6 +8839,20 @@
     if (!t) return;
     if (ev.preventDefault) ev.preventDefault();
     showAuth();
+  });
+  // v147: suggestion card ke buttons — card HTML render hota hai (kisi
+  // marker par listener nahi lag sakta), is liye delegated listener.
+  document.addEventListener("click", function (ev) {
+    if (!ev || !ev.target || !ev.target.closest) return;
+    var dis = ev.target.closest("[data-suggest-dismiss]");
+    if (dis) { if (ev.preventDefault) ev.preventDefault(); dismissSuggestion(dis.getAttribute("data-suggest-dismiss")); return; }
+    var add = ev.target.closest("[data-suggest-add]");
+    if (add) {
+      if (add.disabled) return; // double-tap guard
+      add.disabled = true;
+      if (ev.preventDefault) ev.preventDefault();
+      addSuggestFriend(add.getAttribute("data-suggest-add"));
+    }
   });
   $("mapShareBtn").addEventListener("click", function () { shareMyLocation(setMapMsg).then(function (ok) { if (ok) refreshMap(); }); }); // v141: zero-sharer CTA
   $("mapRetryBtn").addEventListener("click", retryMapTiles); // v141: tiles dobara mangwao
