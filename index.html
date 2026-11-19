@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=110">
+<link rel="stylesheet" href="styles.css?v=111">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v150</p>
+    <p id="authVersion" class="auth-version">v151</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -501,8 +501,22 @@ window.addEventListener("error", function (e) {
           <span id="acctRoleBadge" class="map-user-role" hidden></span>
           <span id="acctAddress" class="muted acct-addr" hidden></span>
           <span id="acctBio" class="acct-bio" hidden></span>
+          <span id="acctBharosa" class="bharosa-chip" hidden></span>
         </div>
         <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit" data-i18n-title="Edit">✎</button>
+      </div>
+      <!-- v151: Khata Card — shareable profile card + QR. Preview yahan
+           render hota hai (renderKhataCard); QR dabane par banta hai. -->
+      <div id="khataCardBox" class="card">
+        <h3 style="margin-top:0"><span aria-hidden="true">🪪</span> <span data-i18n="Mera Khata Card">Mera Khata Card</span></h3>
+        <div id="khataCardPreview"></div>
+        <div class="khata-card-actions">
+          <button id="khataCardQrBtn" class="btn btn-primary" type="button"><span aria-hidden="true">📷</span> <span data-i18n="QR dikhayein">QR dikhayein</span></button>
+          <button id="khataCardCopyBtn" class="btn btn-soft" type="button"><span aria-hidden="true">🔗</span> <span data-i18n="Link copy karein">Link copy karein</span></button>
+        </div>
+        <div id="khataCardQrBox" class="khata-card-qr" hidden></div>
+        <p id="khataCardMsg" class="msg" role="status"></p>
+        <p id="khataCardGuestNote" class="muted" hidden data-i18n="Khata Card share karne ke liye login karein.">Khata Card share karne ke liye login karein.</p>
       </div>
       <!-- v24: GUEST MODE account box — sirf guest mode mein dikhta hai.
            Naam (optional), Account Banayein (upgrade + migration offer) aur
@@ -608,6 +622,8 @@ window.addEventListener("error", function (e) {
         <p id="pushMsg" class="msg" role="status"></p>
         <button id="acctLocBtn" class="menu-item" type="button"><span class="mi-ico">📍</span><span id="acctLocLabel" data-i18n="Meri location map par dikhayein">Meri location map par dikhayein</span><span class="menu-right" id="acctLocValue">Band</span></button>
         <p id="locMsg" class="msg" role="status"></p>
+        <button id="acctInstallBtn" class="menu-item" type="button" hidden><span class="mi-ico">⬇️</span><span id="acctInstallLabel" data-i18n="App install karein">App install karein</span><span class="menu-right">›</span></button>
+        <p id="installMsg" class="msg" role="status"></p>
         <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
         <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
@@ -660,6 +676,24 @@ window.addEventListener("error", function (e) {
         <p id="mapCount" class="map-sub" aria-live="polite"></p>
       </div>
       <div class="card map-card">
+        <!-- v151: Map / Nearby shops toggle — guest ko toggle dikhta hi nahi (refreshMap mein hidden). -->
+        <div class="map-view-toggle" id="mapViewToggle" role="tablist" aria-label="Map view">
+          <button id="mapTabBtn" type="button" class="map-view-tab is-active" data-map-tab="map"><span aria-hidden="true">🗺️</span> <span data-i18n="Map">Map</span></button>
+          <button id="nearbyTabBtn" type="button" class="map-view-tab" data-map-tab="nearby"><span aria-hidden="true">🏪</span> <span data-i18n="Nearby shops">Nearby shops</span></button>
+        </div>
+        <div id="nearbyShopsBox" hidden>
+          <p class="muted" data-i18n="Aas-paas ki dukaanen">Aas-paas ki dukaanen</p>
+          <div class="nearby-filters" id="nearbyFilters" role="group" aria-label="Category">
+            <button type="button" class="nearby-filter is-active" data-nearby-filter="All" data-i18n="Sab">Sab</button>
+            <button type="button" class="nearby-filter" data-nearby-filter="Businessman">Businessman</button>
+            <button type="button" class="nearby-filter" data-nearby-filter="Supplier">Supplier</button>
+            <button type="button" class="nearby-filter" data-nearby-filter="Dealer">Dealer</button>
+            <button type="button" class="nearby-filter" data-nearby-filter="Customer">Customer</button>
+          </div>
+          <div id="nearbyShopsList" class="nearby-list"></div>
+          <p id="nearbyMsg" class="msg" role="status"></p>
+          <button id="nearbyRefreshBtn" class="btn btn-soft" type="button"><span aria-hidden="true">🔄</span> <span data-i18n="Location update karein">Location update karein</span></button>
+        </div>
         <div class="map-wrap" id="mapWrap">
           <div id="mapBox" class="map-box" role="img" aria-label="Map"></div>
           <div id="mapLoading" class="map-loading" hidden><span class="map-spinner" aria-hidden="true"></span><span data-i18n="Map load ho raha hai…">Map load ho raha hai…</span></div>
@@ -684,6 +718,16 @@ window.addEventListener("error", function (e) {
           <p class="muted" data-i18n="Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.">Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.</p>
           <p class="muted" data-i18n="Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.">Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.</p>
         </details>
+      </div>
+    </section>
+    <!-- v151: Khata Card view — ?card= link / QR scan se khulta hai. -->
+    <section id="cardView" hidden>
+      <div class="card">
+        <button id="cardBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
+        <h2 style="margin-top:10px" data-i18n="Khata Card">Khata Card</h2>
+        <div id="cardViewBody"></div>
+        <button id="cardAddFriendBtn" class="btn btn-primary btn-block" type="button" hidden><span data-i18n="Dost add karein">Dost add karein</span></button>
+        <p id="cardMsg" class="msg" role="status"></p>
       </div>
     </section>
     <section id="notifView" hidden>
@@ -960,6 +1004,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=147"></script>
+<script src="app.js?v=148"></script>
 </body>
 </html>

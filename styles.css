@@ -1946,3 +1946,27 @@ input,select,textarea,button{max-width:100%}
 .app-header .login-btn{color:#fff;background:#005A9C;border-color:#60C1E5}
 .app-header .icon-btn{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
 .app-header .icon-btn.light{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+
+/* ---------- v151: Attraction Pack — Khata Card + QR, Bharosa, Nearby shops, Install ---------- */
+/* Bharosa chip — token-driven (v149 palette), dono themes mein contrast-safe:
+   halka neela bg (--accent-soft) + gehra neela text (--accent). */
+.bharosa-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 9px;font-size:.8rem;font-weight:700;line-height:1.5;white-space:nowrap}
+.suggest-main .bharosa-chip{margin-top:4px}
+/* Khata Card preview — map popup card ke classes reuse (avatar/role/addr/bio). */
+.khata-card-preview .map-user-top{margin-bottom:2px}
+.khata-card-preview .acct-biz{display:block}
+.khata-card-preview .bharosa-chip{margin-top:6px}
+.khata-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.khata-card-qr{margin-top:12px;text-align:center}
+.khata-card-qr .share-sheet-qr-box svg{width:180px}
+.khata-card-link{font-size:.8rem;color:var(--muted);word-break:break-all;margin:8px 0 0}
+/* Map / Nearby shops toggle — segmented, active = gehra neela + safed text. */
+.map-view-toggle{display:flex;gap:6px;margin-bottom:10px}
+.map-view-tab{flex:1;padding:9px 6px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:.9rem;font-weight:700;cursor:pointer}
+.map-view-tab.is-active{background:var(--accent-btn);border-color:var(--accent-btn);color:#fff}
+/* Nearby filter chips + list — suggest-card reuse (avatar/role/buttons). */
+.nearby-filters{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+.nearby-filter{padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer}
+.nearby-filter.is-active{background:var(--accent-btn);border-color:var(--accent-btn);color:#fff}
+.nearby-list .suggest-card .suggest-side{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.nearby-list .map-user-btn{white-space:nowrap}

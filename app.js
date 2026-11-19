@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v150";
+  var APP_VERSION = "v151";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -737,6 +737,74 @@
   }
   var LOCK_MSG = "Ye record locked hai — settled history ko edit/delete nahi kar sakte.";
 
+  /* ---------- Bharosa Score (v151) ----------
+     Sirf apne hisaab se — koi bahari rating nahi, koi andaza nahi, koi
+     hardcoded value nahi. Har renderAll par txns se dobara compute hota
+     hai, is liye hisaab badalte hi score badal jata hai.
+     Formula: sirf due_date wale (non-settlement) records gine jate hain.
+     - WAQT PAR: record settle hua AUR usay cover karne wala PEHLA
+       settlement (us ke baad wala) due date par ya us se pehle hua.
+     - LATE: settlement due date ke BAAD hua, ya due date guzar gayi aur
+       record abhi tak khula hai (ada nahi hua).
+     - Due aane wali hai aur record khula hai: abhi faisla nahi — count nahi.
+     Score = round(100 * onTime / (onTime + late)). Koi due history na ho
+     to score null — UI mein "Naya" dikhta hai, kabhi jhootha number nahi.
+     otherId = null → mera apna score (saare dost); warna us dost ke saath
+     mera hisaab (doosre ki poori history hum dekh hi nahi sakte — sirf
+     apna hisaab us ke saath). */
+  function bharosaStats(otherId) {
+    var me = myId();
+    var today = todayLocal();
+    var onTime = 0, late = 0;
+    // Per pair: settlement records (date + created_at), tareekh ke hisaab se sort.
+    var settlements = {};
+    visibleTxns().forEach(function (t) {
+      if (!isSettlementNote(t.note)) return;
+      if (t.payer_id !== me && t.receiver_id !== me) return;
+      var k = pairKey(t.payer_id, t.receiver_id);
+      (settlements[k] = settlements[k] || []).push({ date: String(t.txn_date || ""), createdAt: String(t.created_at || "") });
+    });
+    Object.keys(settlements).forEach(function (k) {
+      settlements[k].sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (a.createdAt === b.createdAt) return 0;
+        return a.createdAt < b.createdAt ? -1 : 1;
+      });
+    });
+    visibleTxns().forEach(function (t) {
+      if (isSettlementNote(t.note)) return;
+      if (!t.due_date) return;
+      if (t.payer_id !== me && t.receiver_id !== me) return;
+      var other = t.payer_id === me ? t.receiver_id : t.payer_id;
+      if (otherId && other !== otherId) return;
+      var k = pairKey(t.payer_id, t.receiver_id);
+      var list = settlements[k] || [];
+      var td = String(t.txn_date || ""), tc = String(t.created_at || "");
+      // Cover karne wala pehla settlement: txn ke BAAD (ya usi date par
+      // us ke baad create hua). computeLockedIds wali semantics.
+      var cover = null;
+      for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        if (s.date > td || (s.date === td && (!tc || !s.createdAt || s.createdAt >= tc))) { cover = s; break; }
+      }
+      var due = String(t.due_date);
+      if (cover) { if (cover.date <= due) onTime++; else late++; }
+      else if (due < today) late++; // due guzar gayi, abhi tak ada nahi
+      // warna: due aane wali hai — abhi faisla nahi, count nahi.
+    });
+    var total = onTime + late;
+    return { onTime: onTime, late: late, total: total, score: total ? Math.round(100 * onTime / total) : null };
+  }
+  function bharosaLabel(st) {
+    return st && st.score !== null && st.score !== undefined ? String(st.score) : tr("Naya");
+  }
+  // Bharosa chip — profile card, suggestions, nearby shops aur Khata Card
+  // mein wahi aik markup. Title mein formula ka matlab (hover par).
+  function bharosaChipHtml(otherId) {
+    var st = bharosaStats(otherId || null);
+    return '<span class="bharosa-chip" title="' + esc(tr("Waqt par ada kiye gaye udhaar ki bunyaad par")) + '">🛡️ ' + esc(tr("Bharosa")) + ' ' + esc(bharosaLabel(st)) + '</span>';
+  }
+
   /* ---------- auth UI ---------- */
   function setAuthMsg(text, ok) {
     var el = $("authMsg");
@@ -822,6 +890,9 @@
     handleShortcutAction(); // v118: manifest shortcut (?action=add / ?action=balance)
     $("txnDate").value = todayLocal();
     if (!guestMode) { var communityLinkName=""; try { communityLinkName=new URLSearchParams(window.location.search).get("community")||""; } catch(e) {} if (communityLinkName) setTimeout(function(){ if(session&&!guestMode){openCommunityModal("join");$("joinCommunityUsername").value=communityLinkName.toLowerCase();} },700); }
+    // v151: Khata Card link (?card=<userId>) — QR scan se aaya ho to card
+    // kholo. loadAll/renderAll ke baad openPendingCard() chalega (neeche).
+    try { var cardLinkId = new URLSearchParams(window.location.search).get("card") || ""; if (cardLinkId) pendingCardId = cardLinkId; } catch (e) {}
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
     notifFirstLoad = true;
     loadNotifs();
@@ -853,8 +924,9 @@
     if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
     if ($("monthlyView")) $("monthlyView").hidden = name !== "monthly";
     if ($("mapView")) $("mapView").hidden = name !== "map";
+    if ($("cardView")) $("cardView").hidden = name !== "card"; // v151: Khata Card view
     if ($("historyView")) $("historyView").hidden = name !== "history"; // v150
-    $("navKhata").classList.toggle("active", name === "khata" || name === "detail" || name === "history"); // v150: History bhi Khata tab ka hissa
+    $("navKhata").classList.toggle("active", name === "khata" || name === "detail" || name === "history" || name === "card"); // v150: History bhi Khata tab ka hissa; v151: Card bhi
     $("navMap").classList.toggle("active", name === "map");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly");
     $("fabAdd").hidden = name !== "khata";
@@ -1311,6 +1383,13 @@
     var wrap = $("mapWrap"), emptyBox = $("mapEmptyBox"),
         actions = $("mapActions");
     var isGuest = guestMode || !session;
+    // v151: har map entry Map tab se shuru — Nearby box/tabs reset; guest ko toggle dikhta hi nahi.
+    nearbyTab = "map";
+    var nb0 = $("nearbyShopsBox"); if (nb0) nb0.hidden = true;
+    var mb0 = $("mapTabBtn"), nb1 = $("nearbyTabBtn");
+    if (mb0) mb0.classList.add("is-active");
+    if (nb1) nb1.classList.remove("is-active");
+    var tg0 = $("mapViewToggle"); if (tg0) tg0.hidden = isGuest;
     // v146 (Boss order 19 Nov): Map HAR visitor ko dikhta hai — bina
     // login ke bhi. Guest sirf dekhta hai: live pins + info (naam, role,
     // pata, updated time). Phone/Call/WhatsApp nahi, location update/share
@@ -1344,6 +1423,7 @@
         // v142: pehle pins (view set ho jaye), phir tile layer — aik hi
         // dafa tiles mangwaye (zoom 5 phir 13 ka dohra round khatam).
         var n = renderMapPins(res.rows || [], isGuest);
+        mapRowsCache = { rows: res.rows || [], isGuest: isGuest }; // v151: Nearby shops list isi data se
         setMapMsg("");
         renderMapCount(n);
         // v146: share CTA sirf logged-in ko — guest ke liye emptyBox ka
@@ -2806,6 +2886,7 @@
     renderAccount();
     renderAdmin();
     renderRecurringList(); // v87: recurring page ki list taaza (chhoti list, sasti)
+    openPendingCard(); // v151: ?card= link se aaya ho to Khata Card kholo (aik dafa)
   }
 
   /* ---------- notifications ---------- */
@@ -5484,7 +5565,8 @@
         '<span class="suggest-main"><span class="map-user-name">' + esc(p.name || p.email || "?") + '</span>' +
         roleHtml +
         (p.address ? '<span class="map-user-addr">' + esc(p.address) + '</span>' : '') +
-        '<span class="suggest-reason">' + esc(suggestReasonText(c)) + '</span></span>' +
+        '<span class="suggest-reason">' + esc(suggestReasonText(c)) + '</span>' +
+        bharosaChipHtml(p.id) + '</span>' +
         '<span class="suggest-side">' +
         '<button class="suggest-dismiss" type="button" data-suggest-dismiss="' + esc(p.id) + '" aria-label="' + esc(tr("Suggestion chhupayein")) + '">✕</button>' +
         '<button class="suggest-add" type="button" data-suggest-add="' + esc(p.id) + '">' + esc(tr("Dost add karein")) + '</button>' +
@@ -5569,6 +5651,13 @@
     }
     if (addrEl) { addrEl.textContent = (me && me.address) || ""; addrEl.hidden = !(me && me.address); }
     if (bioEl) { bioEl.textContent = (me && me.bio) || ""; bioEl.hidden = !(me && me.bio); }
+    // v151: Bharosa Score — apne hisaab se compute, har render par taaza.
+    var bhEl = $("acctBharosa");
+    if (bhEl) {
+      bhEl.textContent = "🛡️ " + tr("Bharosa") + " " + bharosaLabel(bharosaStats(null));
+      bhEl.title = tr("Waqt par ada kiye gaye udhaar ki bunyaad par");
+      bhEl.hidden = false;
+    }
     // v24: guest mode mein Account sirf guest cheezein dikhata hai — profile
     // edit (server), push button aur privacy (account wali) chhup jate hain.
     var gb = $("guestAcctBox");
@@ -5612,7 +5701,317 @@
     renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
     renderWorkspaceBar();
     renderPinLockMenu(); // v78: PIN set ho to label "change / band" + "Abhi lock" dikhao
+    renderKhataCard(); // v151: Khata Card preview taaza (profile badle to card bhi)
+    renderInstallBtn(); // v151: install button ki state taaza (prompt aaya ho to dikhao)
   }
+  /* ---------- Khata Card + QR (v151) ----------
+     Account page par shareable card: photo + naam + business + category
+     + pata + bio + Bharosa. "QR dikhayein" QR banata hai (v108 wala
+     qrcode lib reuse — vendor/qrcode.js, SW cached, offline bhi) — scan
+     karne par app khulti hai aur ?card=<id> se wohi card dikhta hai.
+     Guest ka card share nahi hota (guest id server par maujood hi nahi)
+     — sirf preview + login note. */
+  function khataCardUrl() {
+    return APP_URL + "/?card=" + encodeURIComponent(myId());
+  }
+  function setKhataCardMsg(t, ok) { var el = $("khataCardMsg"); if (el) { el.textContent = t || ""; el.className = "msg" + (ok ? " ok" : t ? " err" : ""); } }
+  function khataCardPreviewHtml() {
+    var me = myProfile();
+    var name = (me && me.name) || myName() || "";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+    var html = '<div class="khata-card-preview">';
+    html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml(me && me.avatar_url, initial) + '</span>';
+    html += '<div class="map-user-id"><strong class="map-user-name">' + esc(name || "—") + "</strong>";
+    if (me && me.business_name) html += '<span class="acct-biz">' + esc(me.business_name) + "</span>";
+    var r = (me && me.business_role) || "";
+    if (r) html += '<span class="map-user-role">' + esc(r) + "</span>";
+    else html += '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + "</span>";
+    html += "</div></div>";
+    if (me && me.address) html += '<p class="map-user-addr">' + esc(me.address) + "</p>";
+    if (me && me.bio) html += '<p class="acct-bio">' + esc(me.bio) + "</p>";
+    html += bharosaChipHtml(null);
+    html += "</div>";
+    return html;
+  }
+  function renderKhataCard() {
+    var prev = $("khataCardPreview");
+    if (prev) prev.innerHTML = khataCardPreviewHtml();
+    var qrBtn = $("khataCardQrBtn"), copyBtn = $("khataCardCopyBtn"), note = $("khataCardGuestNote");
+    if (qrBtn) qrBtn.hidden = guestMode;
+    if (copyBtn) copyBtn.hidden = guestMode;
+    if (note) note.hidden = !guestMode;
+    var box = $("khataCardQrBox");
+    if (box && guestMode) box.hidden = true;
+  }
+  var khataCardQrRendered = false;
+  function showKhataCardQr() {
+    var box = $("khataCardQrBox");
+    if (!box || guestMode) return;
+    if (!box.hidden) { box.hidden = true; return; } // dobara dabao → chhupa do
+    box.hidden = false;
+    if (khataCardQrRendered) return;
+    ensureReportLib("qrcode").then(function (qrLib) {
+      if (!qrLib) { box.hidden = true; setKhataCardMsg(tr("QR tayyar nahi ho saka — internet check kar ke dobara try karein."), false); return; }
+      try {
+        var qr = qrLib(0, "M");
+        qr.addData(khataCardUrl());
+        qr.make();
+        box.innerHTML = '<div class="share-sheet-qr-box">' + qr.createSvgTag({ cellSize: 3, margin: 8 }) + '</div><p class="khata-card-link">' + esc(khataCardUrl()) + "</p>";
+        khataCardQrRendered = true;
+      } catch (e) { box.hidden = true; setKhataCardMsg(tr("QR tayyar nahi ho saka — internet check kar ke dobara try karein."), false); }
+    });
+  }
+  function copyKhataCardLink() {
+    if (guestMode) return;
+    var url = khataCardUrl();
+    try {
+      var cp = copyText(url);
+      if (cp && cp.then) cp.then(function () { setKhataCardMsg(tr("Link copy ho gaya"), true); },
+        function () { setKhataCardMsg(url, true); });
+      else setKhataCardMsg(tr("Link copy ho gaya"), true);
+    } catch (e) { setKhataCardMsg(url, true); }
+  }
+
+  /* ---------- Khata Card view — ?card= link (v151) ----------
+     QR scan ya shared link se aane wala visitor is bande ka card dekhta
+     hai — photo, naam, business, category, pata, bio, Bharosa — aur
+     "Dost add karein" button. Card ka data: pehle loaded profiles,
+     warna seedha fetch (logged-in: khata_profiles; guest: public view
+     map_public_locations — sirf safe columns, phone kabhi nahi). */
+  var pendingCardId = null;
+  function openPendingCard() {
+    if (!pendingCardId) return;
+    var id = pendingCardId;
+    pendingCardId = null;
+    try { window.history.replaceState(null, "", window.location.pathname); } catch (e) {}
+    openCardView(id);
+  }
+  function setCardMsg(t, ok) { var el = $("cardMsg"); if (el) { el.textContent = t || ""; el.className = "msg" + (ok ? " ok" : t ? " err" : ""); } }
+  function cardViewHtml(p) {
+    var name = (p && p.name) || "—";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+    var html = '<div class="khata-card-preview">';
+    html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml(p && p.avatar_url, initial) + '</span>';
+    html += '<div class="map-user-id"><strong class="map-user-name">' + esc(name) + "</strong>";
+    if (p && p.business_name) html += '<span class="acct-biz">' + esc(p.business_name) + "</span>";
+    var r = (p && p.business_role) || "";
+    if (r) html += '<span class="map-user-role">' + esc(r) + "</span>";
+    else html += '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + "</span>";
+    html += "</div></div>";
+    if (p && p.address) html += '<p class="map-user-addr">' + esc(p.address) + "</p>";
+    if (p && p.bio) html += '<p class="acct-bio">' + esc(p.bio) + "</p>";
+    // Apna card ho to apna score, warna us dost ke saath mera hisaab.
+    html += bharosaChipHtml(p && p.id === myId() ? null : (p && p.id));
+    html += "</div>";
+    return html;
+  }
+  function renderCardView(p) {
+    var body = $("cardViewBody");
+    if (body) body.innerHTML = cardViewHtml(p);
+    var btn = $("cardAddFriendBtn");
+    if (!btn) return;
+    if (!p || !p.id) { btn.hidden = true; return; }
+    if (p.id === myId()) { btn.hidden = true; setCardMsg(tr("Ye aap ka apna card hai"), true); return; }
+    var already = false;
+    (myContacts || []).forEach(function (c) { if (c.id === p.id) already = true; });
+    if (already) { btn.hidden = true; setCardMsg(tr("Pehle se dost hain"), true); return; }
+    btn.hidden = false;
+    btn.disabled = false;
+    btn.setAttribute("data-card-add", p.id);
+  }
+  function openCardView(userId) {
+    if (!userId) return;
+    var body = $("cardViewBody");
+    if (body) body.innerHTML = '<p class="empty">' + esc(tr("Card load ho raha hai…")) + "</p>";
+    var btn = $("cardAddFriendBtn");
+    if (btn) { btn.hidden = true; btn.removeAttribute("data-card-add"); }
+    setCardMsg("");
+    showView("card");
+    var found = null;
+    (profiles || []).forEach(function (p) { if (p && p.id === userId) found = p; });
+    if (found) { renderCardView(found); return; }
+    var q = (guestMode || !session)
+      ? "map_public_locations?select=user_id,display_name,lat,lng,updated_at,name,avatar_url,business_role,address&user_id=eq." + encodeURIComponent(userId)
+      : "khata_profiles?select=id,name,email,avatar_url,username,phone,business_role,address,business_name,bio&id=eq." + encodeURIComponent(userId);
+    sb(q, {}).then(function (res) {
+      var rows = (res && res.ok && Array.isArray(res.body)) ? res.body : [];
+      var row = null;
+      rows.forEach(function (r) { if (r && (r.id === userId || r.user_id === userId)) row = r; });
+      if (!row && rows.length === 1) row = rows[0]; // server ne pehle se filter kar diya ho to
+      if (!row) {
+        if (body) body.innerHTML = '<p class="empty">' + esc(tr("Card nahi mila — link ghalat ho sakta hai. Login kar ke dobara try karein.")) + "</p>";
+        return;
+      }
+      var p = (guestMode || !session)
+        ? { id: row.user_id, name: row.name || row.display_name, avatar_url: row.avatar_url, business_role: row.business_role, address: row.address, business_name: "", bio: "" }
+        : row;
+      renderCardView(p);
+    }).catch(function () {
+      if (body) body.innerHTML = '<p class="empty">' + esc(tr("Card nahi mila — link ghalat ho sakta hai. Login kar ke dobara try karein.")) + "</p>";
+    });
+  }
+  // Card se dost add karo — addSuggestFriend jaisa POST (profile-keyed
+  // contact, phone null, koi ledger transaction nahi), lekin is ke apne
+  // card messages ke saath (v147 wala code chheda nahi — wahan ka
+  // setPeopleMsg History view par hai, yahan cardMsg chahiye).
+  function addCardFriend(id) {
+    if (guestMode || !session) { setCardMsg(tr("Dost add karne ke liye pehle login karein."), false); return; }
+    var p = null;
+    (profiles || []).forEach(function (x) { if (x.id === id) p = x; });
+    var nm = (p && p.name) || "";
+    var already = null;
+    (myContacts || []).forEach(function (c) { if (c.id === id) already = c; });
+    if (already) { setCardMsg(tr("Pehle se dost hain"), true); var b0 = $("cardAddFriendBtn"); if (b0) b0.hidden = true; return; }
+    var body = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null };
+    sb("khata_contacts", { method: "POST", prefer: "return=representation", body: body }).then(function (res) {
+      if (!res.ok) {
+        if (isTransientResponse(res)) {
+          offlineContactInsert(body);
+          setCardMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
+          var b1 = $("cardAddFriendBtn"); if (b1) b1.hidden = true;
+          renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+          return;
+        }
+        setCardMsg(tr("Dost add nahi ho saka — dobara try karein."), false);
+        var b2 = $("cardAddFriendBtn"); if (b2) b2.disabled = false;
+        return;
+      }
+      var created = res.body && res.body[0];
+      if (created) { created.manual = true; myContacts.push(created); }
+      else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null, manual: true });
+      saveCache();
+      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      setCardMsg((nm || "") + " " + tr("dost ban gaya!"), true);
+      var b3 = $("cardAddFriendBtn"); if (b3) b3.hidden = true;
+    });
+  }
+
+  /* ---------- Nearby shops — Map tab (v151) ----------
+     Sirf logged-in users — guest ko toggle dikhta hi nahi (refreshMap
+     mein hidden). Sirf woh log jo is waqt location share kar rahe hain
+     (loadSharedLocations rows — wahi data jo map pins banata hai, koi
+     alag fetch nahi). Category filter: profile ka business_role.
+     Bharosa chip apne hisaab se; Call/WhatsApp sirf logged-in ko —
+     phone profile se aata hai, guest rows mein hota hi nahi. */
+  var mapRowsCache = { rows: [], isGuest: true };
+  var nearbyTab = "map"; // "map" | "nearby"
+  var nearbyFilter = "All";
+  function setNearbyMsg(t, ok) { var el = $("nearbyMsg"); if (el) { el.textContent = t || ""; el.className = "msg" + (ok ? " ok" : t ? " err" : ""); } }
+  function showMapTab(tab) {
+    nearbyTab = tab;
+    var isNearby = tab === "nearby";
+    var mb = $("mapTabBtn"), nb = $("nearbyTabBtn");
+    if (mb) mb.classList.toggle("is-active", !isNearby);
+    if (nb) nb.classList.toggle("is-active", isNearby);
+    var box = $("nearbyShopsBox");
+    if (box) box.hidden = !isNearby;
+    if (isNearby) {
+      var wrap = $("mapWrap"), actions = $("mapActions"), emptyBox = $("mapEmptyBox"), tiles = $("mapTilesNote"), msg = $("mapMsg");
+      if (wrap) wrap.hidden = true;
+      if (actions) actions.hidden = true;
+      if (emptyBox) emptyBox.hidden = true;
+      if (tiles) tiles.hidden = true;
+      if (msg) msg.hidden = true;
+      renderNearbyShops();
+    } else {
+      refreshMap(); // map UI state (wrap/actions/empty/tiles) dobara sahi — refreshMap hi is ka malik hai
+    }
+  }
+  function renderNearbyShops() {
+    var listEl = $("nearbyShopsList");
+    if (!listEl) return;
+    setNearbyMsg("");
+    var rows = (mapRowsCache && mapRowsCache.rows) || [];
+    var me = myId();
+    var html = "";
+    var shown = 0;
+    rows.forEach(function (r) {
+      var p = (r && r.user_id) ? profileById(r.user_id) : null;
+      var role = (p && p.business_role) || (r && r.business_role) || "";
+      if (nearbyFilter !== "All" && role !== nearbyFilter) return;
+      var nm = (p && p.name) || (r && r.name) || (r && r.display_name) || "Dost";
+      var isMe = !!(r && r.user_id && r.user_id === me);
+      var addr = (p && p.address) || (r && r.address) || "";
+      var phone = (p && p.phone) || "";
+      var tel = normPhone(phone);
+      var roleHtml = role
+        ? '<span class="map-user-role">' + esc(role) + '</span>'
+        : '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + "</span>";
+      html += '<div class="suggest-card">' +
+        '<span class="map-user-avatar">' + avatarHtml((p && p.avatar_url) || (r && r.avatar_url), initials(nm)) + '</span>' +
+        '<span class="suggest-main"><span class="map-user-name">' + esc(nm) + (isMe ? " • Aap" : "") + "</span>" +
+        roleHtml +
+        (addr ? '<span class="map-user-addr">' + esc(addr) + "</span>" : "") +
+        bharosaChipHtml(isMe ? null : (r && r.user_id)) + "</span>" +
+        '<span class="suggest-side">' +
+        (isMe ? "" : (tel
+          ? '<a class="map-user-btn" href="tel:+' + tel + '">📞 ' + esc(tr("Call karein")) + "</a>" +
+            '<a class="map-user-btn map-user-btn-wa" href="https://wa.me/' + tel + '" target="_blank" rel="noopener">💬 WhatsApp</a>'
+          : '<span class="map-user-nophone">' + esc(tr("Phone number nahi diya")) + "</span>")) +
+        "</span></div>";
+      shown++;
+    });
+    listEl.innerHTML = html;
+    if (!shown) setNearbyMsg(rows.length ? tr("Koi dukaan nahi mili") : tr("Abhi koi dost location share nahi kar raha"), false);
+  }
+  // Nearby list ka taaza fetch — map UI ko chhede baghair (refreshMap
+  // mapWrap dobara dikha deta hai, is liye Nearby tab se ye halka
+  // rasta use hota hai, refreshMap nahi).
+  function refreshNearbyShops() {
+    if (guestMode || !session) return;
+    loadSharedLocations().then(function (res) {
+      if (res && res.ok) { mapRowsCache = { rows: res.rows || [], isGuest: false }; renderNearbyShops(); }
+      else setNearbyMsg(tr("Locations load nahi hui — internet check kar ke dobara try karein."), false);
+    });
+  }
+
+  /* ---------- In-app Install button (v151) ----------
+     PWA beforeinstallprompt — browser khud batata hai ke install
+     mumkin hai ya nahi. Event aaye to button dikhao; prompt() par
+     asal install dialog khulta hai. Event na aaye (pehle se installed /
+     browser support nahi karta) to button chhupa rehta hai — kabhi dead
+     button nahi. iPhone Safari mein beforeinstallprompt hota hi nahi —
+     wahan button dabane par Share → "Add to Home Screen" ka tareeqa
+     batata hai. Install ho jaye (appinstalled) to button khud chhup
+     jata hai. */
+  var installPromptEvent = null;
+  function isIosSafari() {
+    try { var ua = window.navigator.userAgent || ""; return /iPad|iPhone|iPod/.test(ua) && !window.MSStream; } catch (e) { return false; }
+  }
+  function isStandaloneMode() {
+    try { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || !!window.navigator.standalone; } catch (e) { return false; }
+  }
+  function renderInstallBtn() {
+    var b = $("acctInstallBtn");
+    if (!b) return;
+    if (isStandaloneMode()) { b.hidden = true; return; }
+    b.hidden = !(installPromptEvent || isIosSafari());
+  }
+  function setInstallMsg(t, ok) { var el = $("installMsg"); if (el) { el.textContent = t || ""; el.className = "msg" + (ok ? " ok" : t ? " err" : ""); } }
+  function onInstallBtn() {
+    if (installPromptEvent) {
+      var ev = installPromptEvent;
+      installPromptEvent = null;
+      renderInstallBtn();
+      try {
+        var p = ev.prompt();
+        if (p && p.then) p.then(function () { renderInstallBtn(); }).catch(function () {});
+      } catch (e) {}
+      return;
+    }
+    if (isIosSafari()) { setInstallMsg(tr("iPhone par: Safari mein Share button dabayein, phir \"Add to Home Screen\" chunein."), true); return; }
+    setInstallMsg("", true);
+  }
+  window.addEventListener("beforeinstallprompt", function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+    installPromptEvent = e;
+    renderInstallBtn();
+  });
+  window.addEventListener("appinstalled", function () {
+    installPromptEvent = null;
+    renderInstallBtn();
+  });
+
   function openPersonDetail(id) {
     if (!findPerson(id)) return;
     detailPersonId = id;
@@ -7977,6 +8376,31 @@
   "Example: General store chalata hoon — Lahore": "Example: I run a general store — Lahore",
   "Business ka naam 80 harf se zyada nahi ho sakta.": "Business name can't be longer than 80 characters.",
   "Bio 200 harf se zyada nahi ho sakta.": "Bio can't be longer than 200 characters.",
+  // ---- v151: Attraction Pack — Khata Card + QR, Bharosa Score, Nearby shops, Install ----
+  "Bharosa Score": "Trust Score",
+  "Bharosa": "Trust",
+  "Naya": "New",
+  "Mera Khata Card": "My Khata Card",
+  "Khata Card": "Khata Card",
+  "QR dikhayein": "Show QR",
+  "QR chhupayein": "Hide QR",
+  "Link copy karein": "Copy link",
+  "Link copy ho gaya": "Link copied",
+  "Card load ho raha hai…": "Loading card…",
+  "Card nahi mila — link ghalat ho sakta hai. Login kar ke dobara try karein.": "Card not found — the link may be wrong. Try again after logging in.",
+  "Dost add karne ke liye pehle login karein.": "Log in first to add a friend.",
+  "Khata Card share karne ke liye login karein.": "Log in to share your Khata Card.",
+  "Ye aap ka apna card hai": "This is your own card",
+  "Pehle se dost hain": "Already friends",
+  "Map": "Map",
+  "Nearby shops": "Nearby shops",
+  "Aas-paas ki dukaanen": "Nearby shops",
+  "Sab": "All",
+  "Koi dukaan nahi mili": "No shops found",
+  "App install karein": "Install the app",
+  "iPhone par: Safari mein Share button dabayein, phir \"Add to Home Screen\" chunein.": "On iPhone: tap Share in Safari, then choose \"Add to Home Screen\".",
+  "QR tayyar nahi ho saka — internet check kar ke dobara try karein.": "QR could not be created — check the internet and try again.",
+  "Waqt par ada kiye gaye udhaar ki bunyaad par": "Based on loans repaid on time",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -8921,6 +9345,32 @@
     }
   });
   $("mapShareBtn").addEventListener("click", function () { shareMyLocation(setMapMsg).then(function (ok) { if (ok) refreshMap(); }); }); // v141: zero-sharer CTA
+  // v151: Khata Card (QR + copy link), Card view (back + add friend), Nearby refresh, Install.
+  $("khataCardQrBtn").addEventListener("click", showKhataCardQr);
+  $("khataCardCopyBtn").addEventListener("click", copyKhataCardLink);
+  $("cardBackBtn").addEventListener("click", function () { showView("khata"); });
+  $("cardAddFriendBtn").addEventListener("click", function () {
+    var b = $("cardAddFriendBtn");
+    var id = b && b.getAttribute("data-card-add");
+    if (!id || (b && b.disabled)) return;
+    b.disabled = true;
+    addCardFriend(id);
+  });
+  $("nearbyRefreshBtn").addEventListener("click", refreshNearbyShops);
+  $("acctInstallBtn").addEventListener("click", onInstallBtn);
+  // v151: Nearby filter chips + Map/Nearby tabs — static buttons, aik delegated listener.
+  document.addEventListener("click", function (ev) {
+    if (!ev || !ev.target || !ev.target.closest) return;
+    var f = ev.target.closest("[data-nearby-filter]");
+    if (f) {
+      nearbyFilter = f.getAttribute("data-nearby-filter") || "All";
+      document.querySelectorAll("[data-nearby-filter]").forEach(function (b) { b.classList.toggle("is-active", b === f); });
+      renderNearbyShops();
+      return;
+    }
+    var tab = ev.target.closest("[data-map-tab]");
+    if (tab) showMapTab(tab.getAttribute("data-map-tab") || "map");
+  });
   $("mapRetryBtn").addEventListener("click", retryMapTiles); // v141: tiles dobara mangwao
   $("mapLocateBtn").addEventListener("click", locateMe); // v142: "Meri location" — map apni location par centre karo (local only, koi upload nahi)
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
