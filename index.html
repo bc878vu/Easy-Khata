@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=108">
+<link rel="stylesheet" href="styles.css?v=109">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v147</p>
+    <p id="authVersion" class="auth-version">v148</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -486,6 +486,10 @@ window.addEventListener("error", function (e) {
         <div class="acct-info">
           <strong id="acctName">—</strong>
           <span id="acctPhone" class="muted">—</span>
+          <span id="acctBizName" class="acct-biz" hidden></span>
+          <span id="acctRoleBadge" class="map-user-role" hidden></span>
+          <span id="acctAddress" class="muted acct-addr" hidden></span>
+          <span id="acctBio" class="acct-bio" hidden></span>
         </div>
         <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit" data-i18n-title="Edit">✎</button>
       </div>
@@ -551,6 +555,14 @@ window.addEventListener("error", function (e) {
         <div class="field">
           <label for="myAddress" data-i18n="Mera pata (address)">Mera pata (address)</label>
           <input id="myAddress" type="text" maxlength="200" placeholder="Example: Lahore, Pakistan" data-i18n-ph="Example: Lahore, Pakistan">
+        </div>
+        <div class="field">
+          <label for="myBizName" data-i18n="Mera business / dukaan ka naam">Mera business / dukaan ka naam</label>
+          <input id="myBizName" type="text" maxlength="80" placeholder="Example: Asad General Store" autocomplete="organization" data-i18n-ph="Example: Asad General Store">
+        </div>
+        <div class="field">
+          <label for="myBio" data-i18n="Mere baare mein (bio — optional)">Mere baare mein (bio — optional)</label>
+          <textarea id="myBio" rows="2" maxlength="200" placeholder="Example: General store chalata hoon — Lahore" data-i18n-ph="Example: General store chalata hoon — Lahore"></textarea>
         </div>
         <button id="savePhoneBtn" class="btn btn-primary" type="button" data-i18n="Profile save karein">Profile save karein</button>
         <p id="phoneMsg" class="msg" role="status"></p>
@@ -937,6 +949,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=144"></script>
+<script src="app.js?v=145"></script>
 </body>
 </html>

@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v147";
+  var APP_VERSION = "v148";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -1816,7 +1816,7 @@
     // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
     // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
     // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
-    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal" + (withPhone ? ",phone" : "") + ",business_role,address&order=name.asc"); // v116: monthly_budget bhi; v117: savings_goal bhi; v144: business_role + address bhi (map popup card)
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal" + (withPhone ? ",phone" : "") + ",business_role,address,business_name,bio&order=name.asc"); // v116: monthly_budget bhi; v117: savings_goal bhi; v144: business_role + address bhi (map popup card); v148: business_name + bio bhi (proper profile)
   }
 
   function renderWorkspaceBar() {
@@ -2616,11 +2616,16 @@
     acceptInviteFromUrl().then(function (accepted) {
       if (accepted) { teardownRealtime(); loadAll(); return; }
       profilesQuery(true).then(function (res) {
-      // v144: naye columns (business_role/address) na hon to 42703 aata hai —
-      // pehle v143 wale columns se dobara try karo (avatar/phone salamat),
-      // phir bhi 42703 ho to minimal columns (purana SQL).
-      if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal,phone&order=name.asc").then(function (res2) {
-        if (!res2.ok && res2.body && res2.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
+      // v148: naye columns na hon to 42703 aata hai — stages: (1) full
+      // (business_name/bio samet); (2) v144 wale columns (business_role/
+      // address, bina business_name/bio — v144 migration chali ho to role
+      // data salamat rehta hai); (3) v143 wale columns (avatar/phone
+      // salamat); (4) minimal columns (purana SQL). Koi stage crash nahi.
+      if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal,phone,business_role,address&order=name.asc").then(function (res2) {
+        if (!res2.ok && res2.body && res2.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal,phone&order=name.asc").then(function (res3) {
+          if (!res3.ok && res3.body && res3.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
+          return res3;
+        });
         return res2;
       });
       return res;
@@ -4560,6 +4565,9 @@
     var roleSel = $("myRole");
     if (roleSel) { roleSel.value = (me && me.business_role) || ""; cdSync(roleSel); }
     if ($("myAddress")) $("myAddress").value = (me && me.address) || "";
+    // v148: business name + bio (proper profile).
+    if ($("myBizName")) $("myBizName").value = (me && me.business_name) || "";
+    if ($("myBio")) $("myBio").value = (me && me.bio) || "";
     pendingAvatarFile = null; removeAvatar = false;
     if ($("profilePicInput")) $("profilePicInput").value = "";
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
@@ -4671,6 +4679,8 @@
     var phone = $("myPhone").value.trim();
     var role = $("myRole") ? $("myRole").value : "";
     var address = $("myAddress") ? $("myAddress").value.trim() : "";
+    var bizName = $("myBizName") ? $("myBizName").value.trim() : "";
+    var bio = $("myBio") ? $("myBio").value.trim() : "";
     var ROLES = ["Businessman", "Supplier", "Customer", "Dealer"]; // v144: map popup badge
     if (!name) { setPhoneMsg("Apna naam likhein.", false); return; }
     if (name.length > 80) { setPhoneMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
@@ -4678,6 +4688,8 @@
     if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
     if (role && ROLES.indexOf(role) === -1) { setPhoneMsg("Role galat hai — list se chunein.", false); return; }
     if (address.length > 200) { setPhoneMsg("Pata 200 harf se zyada nahi ho sakta.", false); return; }
+    if (bizName.length > 80) { setPhoneMsg("Business ka naam 80 harf se zyada nahi ho sakta.", false); return; }
+    if (bio.length > 200) { setPhoneMsg("Bio 200 harf se zyada nahi ho sakta.", false); return; }
     // v24.11: offline pre-check hata diya — navigator.onLine ka ghalat false
     // flag save rok deta tha jabke internet theek tha (yehi Toseef ke case
     // ka sab se likely cause hai: koi network call hue baghair hi "internet
@@ -4705,10 +4717,15 @@
           if (removeAvatar) return "__REMOVE__";
           return null;
         }).then(function (avatarUrl) {
-          var body = { name: name, phone: phone || null, username: username || null, business_role: role || null, address: address || null };
+          var body = { name: name, phone: phone || null, username: username || null, business_role: role || null, address: address || null, business_name: bizName || null, bio: bio || null };
           if (avatarUrl === "__REMOVE__") body.avatar_url = null;
           else if (avatarUrl) body.avatar_url = avatarUrl;
-          var newColsOk = true;
+          // v148: DO-STEP retry — pehla 400 aam tor par sirf v148 columns
+          // (business_name/bio) ki wajah se hota hai jab v144 migration
+          // chali ho lekin v148 na chali ho; is liye pehle dobara try karo
+          // sirf business_name/bio hata kar (role/address salamat — warna
+          // role kabhi save hi na hota), phir bhi 400 ho to minimal body.
+          var bizColsOk = true, roleColsOk = true;
           var patchOnce = function (b) {
             return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
               method: "PATCH",
@@ -4716,16 +4733,28 @@
               body: b
             });
           };
+          var withoutBiz = function () {
+            var b = { name: name, phone: phone || null, username: username || null, business_role: role || null, address: address || null };
+            if (avatarUrl === "__REMOVE__") b.avatar_url = null;
+            else if (avatarUrl) b.avatar_url = avatarUrl;
+            return b;
+          };
+          var minimalBody = function () {
+            var b = { name: name, phone: phone || null, username: username || null };
+            if (avatarUrl === "__REMOVE__") b.avatar_url = null;
+            else if (avatarUrl) b.avatar_url = avatarUrl;
+            return b;
+          };
           return patchOnce(body).then(function (res) {
-            // v144: migration abhi na chali ho to naye columns (business_role/
-            // address) nahi honge — PostgREST 400 deta hai; dobara try karein
-            // bina un ke taake profile save kabhi na ruke.
             if (!res.ok && res.status === 400) {
-              newColsOk = false;
-              var body2 = { name: name, phone: phone || null, username: username || null };
-              if (avatarUrl === "__REMOVE__") body2.avatar_url = null;
-              else if (avatarUrl) body2.avatar_url = avatarUrl;
-              return patchOnce(body2);
+              bizColsOk = false;
+              return patchOnce(withoutBiz());
+            }
+            return res;
+          }).then(function (res) {
+            if (!res.ok && res.status === 400) {
+              roleColsOk = false;
+              return patchOnce(minimalBody());
             }
             return res;
           }).then(function (res) {
@@ -4733,7 +4762,8 @@
             if (res.body && res.body.length) return res.body[0];
             // No profile row exists — PATCH silently does nothing, so create it.
             var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
-            if (newColsOk) { up.business_role = role || null; up.address = address || null; }
+            if (roleColsOk) { up.business_role = role || null; up.address = address || null; }
+            if (bizColsOk) { up.business_name = bizName || null; up.bio = bio || null; }
             if (body.avatar_url) up.avatar_url = body.avatar_url;
             return sb("khata_profiles?on_conflict=id", {
               method: "POST",
@@ -4759,6 +4789,8 @@
         else if (removeAvatar) me.avatar_url = null;
         if (saved && "business_role" in saved) me.business_role = saved.business_role;
         if (saved && "address" in saved) me.address = saved.address;
+        if (saved && "business_name" in saved) me.business_name = saved.business_name;
+        if (saved && "bio" in saved) me.bio = saved.bio;
       }
       myPhone = phone;
       if (session.user) {
@@ -5521,6 +5553,21 @@
     var phoneTxt = myPhone || "Number nahi diya";
     if (me && me.username) phoneTxt += " · @" + me.username;
     $("acctPhone").textContent = phoneTxt;
+    // v148: proper profile card — business name, category badge, address, bio.
+    // Khaali fields chhup jate hain (koi "not set" line nahi — sirf role par
+    // "Role set nahi hai" dikhta hai taake user ko yaad rahe ke category
+    // set karni hai — wahi business_role jo map popup + suggestions use
+    // karte hain, koi doosra type field nahi).
+    var bizEl = $("acctBizName"), roleEl = $("acctRoleBadge"), addrEl = $("acctAddress"), bioEl = $("acctBio");
+    if (bizEl) { bizEl.textContent = (me && me.business_name) || ""; bizEl.hidden = !(me && me.business_name); }
+    if (roleEl) {
+      var r148 = (me && me.business_role) || "";
+      roleEl.textContent = r148 || tr("Role set nahi hai");
+      roleEl.className = "map-user-role" + (r148 ? "" : " map-user-role-none");
+      roleEl.hidden = false;
+    }
+    if (addrEl) { addrEl.textContent = (me && me.address) || ""; addrEl.hidden = !(me && me.address); }
+    if (bioEl) { bioEl.textContent = (me && me.bio) || ""; bioEl.hidden = !(me && me.bio); }
     // v24: guest mode mein Account sirf guest cheezein dikhata hai — profile
     // edit (server), push button aur privacy (account wali) chhup jate hain.
     var gb = $("guestAcctBox");
@@ -5531,6 +5578,9 @@
       // kehta — wohi jumla guest box ki heading mein bhi tha (do baar repeat).
       // Subtitle ab mukhtalif aur chhota hai; poora notice sirf guest box mein.
       $("acctPhone").textContent = tr("Bina login ke — personal hisaab");
+      // v148: guest ka koi profile nahi — meta rows (business/category/
+      // address/bio) chhup jayen, "Role set nahi hai" bhi nahi.
+      ["acctBizName", "acctRoleBadge", "acctAddress", "acctBio"].forEach(function (id) { var e = $(id); if (e) e.hidden = true; });
       var gn = $("guestNameInput");
       if (gn) gn.value = guestMeName || "";
     }
@@ -7914,6 +7964,13 @@
   "Internet aate hi update ho jayega.": "It will update once you're back online.",
   "Dost add nahi ho saka — dobara try karein.": "Couldn't add friend — try again.",
   "dost ban gaya!": "is now your friend!",
+  // ---- Proper profile v148 (Account → Profile: business name + bio) ----
+  "Mera business / dukaan ka naam": "My business / shop name",
+  "Example: Asad General Store": "Example: Asad General Store",
+  "Mere baare mein (bio — optional)": "About me (bio — optional)",
+  "Example: General store chalata hoon — Lahore": "Example: I run a general store — Lahore",
+  "Business ka naam 80 harf se zyada nahi ho sakta.": "Business name can't be longer than 80 characters.",
+  "Bio 200 harf se zyada nahi ho sakta.": "Bio can't be longer than 200 characters.",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
