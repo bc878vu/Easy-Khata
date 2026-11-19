@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v145";
+  var APP_VERSION = "v146";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -982,7 +982,11 @@
     if (!cnt) return;
     if (n < 0) { cnt.textContent = ""; return; }
     cnt.textContent = n === 0
-      ? tr("Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega.")
+      ? ((guestMode || !session)
+        // v146: guest ka Account sharing nahi hota — us ko "Account se
+        // apni location on karein" kehna ghalat hai; sirf chhota text.
+        ? tr("Abhi koi dost location share nahi kar raha")
+        : tr("Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega."))
       : n === 1 ? tr("1 dost location share kar raha hai.") : n + " " + tr("dost location share kar rahe hain.");
   }
   function setLocMsg(t) { var el = $("locMsg"); if (el) el.textContent = t || ""; }
@@ -1046,9 +1050,27 @@
     }).catch(function () { return { ok: false, reason: "save-failed" }; });
   }
   function loadSharedLocations() {
-    // Guest mode mein ZERO network calls (v24 rule) — map ke liye login zaroori.
+    // Logged-in path — user_locations + profiles (phone bhi, popup ke liye).
+    // Guest mode mein ye function kabhi nahi chalta (neeche guard) — guest
+    // map loadGuestLocations() (public view) use karta hai, v146 Boss order.
+    // Is guard ko hatana nahi: authenticated path guest ke liye band hai.
     if (guestMode || !session) return Promise.resolve({ ok: false, reason: "guest" });
     return sb("user_locations?sharing_enabled=eq.true&select=user_id,display_name,lat,lng,updated_at&order=updated_at.desc&limit=200", {})
+      .then(function (res) {
+        if (res.ok) return { ok: true, rows: Array.isArray(res.body) ? res.body : [] };
+        if (locTableMissing(res)) return { ok: false, reason: "no-table" };
+        return { ok: false, reason: "load-failed" };
+      }).catch(function () { return { ok: false, reason: "load-failed" }; });
+  }
+  // v146 (Boss order 19 Nov): guest/visitor map — bina login ke live pins.
+  // Guest SIRF public view padhta hai (map_public_locations) — is mein
+  // phone/email hota hi nahi, is liye guest phone kabhi fetch hi nahi
+  // karta (sirf chhupana nahi). View owner (postgres) ke rights se chalta
+  // hai — khata_profiles ki RLS guest ko seedha kuch nahi deti (anon probe:
+  // []), view se sirf safe columns (naam/photo/role/pata) milte hain. View
+  // na ho (migration pending) to "no-table" — map khaali, crash nahi.
+  function loadGuestLocations() {
+    return sb("map_public_locations?select=user_id,display_name,lat,lng,updated_at,name,avatar_url,business_role,address&order=updated_at.desc&limit=200", {})
       .then(function (res) {
         if (res.ok) return { ok: true, rows: Array.isArray(res.body) ? res.body : [] };
         if (locTableMissing(res)) return { ok: false, reason: "no-table" };
@@ -1210,22 +1232,30 @@
   // pata + phone (Call + WhatsApp). Jo field nahi hai, woh chhup jata hai
   // ya halka fallback dikhta hai — card kabhi khaali ya crash nahi karta
   // (migration na chali ho to bhi: role/address/phone undefined hote hain).
-  function mapUserPopupHtml(r) {
+  // v146: isGuest=true par card mein phone KABHI nahi — na row, na tel:/
+  // wa.me link. Guest ko sirf naam/role/pata/updated time + Login button
+  // (Call/WhatsApp ke liye login lazmi — Boss order). Guest rows mein
+  // profile fields view se aate hain (r.name/r.avatar_url/r.business_role/
+  // r.address); logged-in rows mein profiles se (profileById).
+  function mapUserPopupHtml(r, isGuest) {
     var p = (r && r.user_id) ? profileById(r.user_id) : null;
-    var nm = (p && p.name) || (r && r.display_name) || "Dost";
+    var nm = (p && p.name) || (r && r.name) || (r && r.display_name) || "Dost";
     if (r && r.user_id && r.user_id === myId()) nm += " • Aap";
-    var role = p && p.business_role;
-    var addr = p && p.address;
-    var phone = (p && p.phone) || "";
+    var role = (p && p.business_role) || (r && r.business_role);
+    var addr = (p && p.address) || (r && r.address);
+    var phone = (!isGuest && p && p.phone) || "";
     var tel = normPhone(phone);
     var html = '<div class="map-user-card">';
-    html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml(p && p.avatar_url, initials(nm)) + '</span>';
+    html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml((p && p.avatar_url) || (r && r.avatar_url), initials(nm)) + '</span>';
     html += '<div class="map-user-id"><strong class="map-user-name">' + esc(nm) + "</strong>";
     if (role) html += '<span class="map-user-role">' + esc(role) + "</span>";
     else html += '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + "</span>";
     html += "</div></div>";
     if (addr) html += '<p class="map-user-addr">' + esc(addr) + "</p>";
-    if (tel) {
+    if (isGuest) {
+      html += '<p class="map-user-nophone">' + esc(tr("Call ya WhatsApp karne ke liye login karein.")) + "</p>";
+      html += '<div class="map-user-actions"><a class="map-user-btn" href="#" data-map-login="1">🔑 ' + esc(tr("Login karein")) + "</a></div>";
+    } else if (tel) {
       html += '<div class="map-user-actions">';
       html += '<a class="map-user-btn" href="tel:+' + tel + '">📞 ' + esc(tr("Call karein")) + "</a>";
       html += '<a class="map-user-btn map-user-btn-wa" href="https://wa.me/' + tel + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
@@ -1238,7 +1268,7 @@
     html += "</div>";
     return html;
   }
-  function renderMapPins(rows) {
+  function renderMapPins(rows, isGuest) {
     if (!mapObj || !window.L) return 0;
     try {
       mapMarkers.forEach(function (m) { try { mapObj.removeLayer(m); } catch (e) {} });
@@ -1249,9 +1279,11 @@
         var lat = Number(r.lat), lng = Number(r.lng);
         if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
         var prof = r.user_id ? profileById(r.user_id) : null;
-        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name, prof && prof.avatar_url) }).addTo(mapObj);
+        // v146: guest rows mein avatar view se aata hai (r.avatar_url);
+        // logged-in rows mein profiles se — dono mein se jo mile.
+        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name, (r && r.avatar_url) || (prof && prof.avatar_url)) }).addTo(mapObj);
         try {
-          marker.bindPopup(mapUserPopupHtml(r), { maxWidth: 260 });
+          marker.bindPopup(mapUserPopupHtml(r, isGuest), { maxWidth: 260 });
         } catch (e) {}
         mapMarkers.push(marker);
         bounds.push([lat, lng]);
@@ -1263,32 +1295,26 @@
     } catch (e) { return 0; }
   }
   function refreshMap() {
-    var wrap = $("mapWrap"), guestBox = $("mapGuestBox"), emptyBox = $("mapEmptyBox"),
+    var wrap = $("mapWrap"), emptyBox = $("mapEmptyBox"),
         actions = $("mapActions");
-    if (guestMode || !session) {
-      // v141: guest — koi grey box nahi, koi map init nahi, ZERO network.
-      // Designed empty state (login button ke saath) dikhta hai.
-      if (wrap) wrap.hidden = true;
-      if (guestBox) guestBox.hidden = false;
-      if (emptyBox) emptyBox.hidden = true;
-      if (actions) actions.hidden = true;
-      showTilesNote(false);
-      showMapLoading(false);
-      setMapMsg("");
-      renderMapCount(-1);
-      return;
-    }
+    var isGuest = guestMode || !session;
+    // v146 (Boss order 19 Nov): Map HAR visitor ko dikhta hai — bina
+    // login ke bhi. Guest sirf dekhta hai: live pins + info (naam, role,
+    // pata, updated time). Phone/Call/WhatsApp nahi, location update/share
+    // nahi, refresh button nahi (us ka kaam apni location update karna hai).
+    // v141 wala guest empty state hata diya — us ka text ("location nahi
+    // dikhti") ab ghalat hai. Guest ka data sirf public view se aata hai.
     if (wrap) wrap.hidden = false;
-    if (guestBox) guestBox.hidden = true;
-    if (actions) actions.hidden = false;
+    if (actions) actions.hidden = isGuest;
     if (emptyBox) emptyBox.hidden = true;
+    if ($("mapShareBtn")) $("mapShareBtn").hidden = isGuest;
     resetTileCounters();
     showTilesNote(false);
     setMapMsg("");
     renderMapCount(-1);
     showMapLoading(true);
-    var self = locSharingOn() ? updateMyLocation() : Promise.resolve(null);
-    self.then(function () { return loadSharedLocations(); }).then(function (res) {
+    var self = (!isGuest && locSharingOn()) ? updateMyLocation() : Promise.resolve(null);
+    self.then(function () { return isGuest ? loadGuestLocations() : loadSharedLocations(); }).then(function (res) {
       showMapLoading(false);
       if (!res.ok && res.reason === "no-table") {
         setMapMsg(tr("Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge."));
@@ -1304,10 +1330,13 @@
         if (!initMapObject()) { setMapMsg(tr("Map load nahi hua — dobara try karein.")); return; }
         // v142: pehle pins (view set ho jaye), phir tile layer — aik hi
         // dafa tiles mangwaye (zoom 5 phir 13 ka dohra round khatam).
-        var n = renderMapPins(res.rows || []);
+        var n = renderMapPins(res.rows || [], isGuest);
         setMapMsg("");
         renderMapCount(n);
-        if (emptyBox) emptyBox.hidden = n !== 0;
+        // v146: share CTA sirf logged-in ko — guest ke liye emptyBox ka
+        // "Account se share karein" text ghalat hai (guest ka Account
+        // sharing nahi hota); guest ko 0 pins par count subtitle hi kaafi.
+        if (emptyBox) emptyBox.hidden = isGuest || n !== 0;
         addTileLayerOnce();
         if (mapTileLayer && mapTilesBad) reloadTiles();
         else if (mapTileLayer) { try { mapTileLayer.redraw(); } catch (e) {} }
@@ -7622,8 +7651,6 @@
   "Location update karein": "Update location",
   "Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.": "The map tiles need internet — on slow or offline connections tiles may not load, but pins and zoom buttons stay visible.",
   "Map load ho raha hai…": "Loading map…",
-  "Map dekhne ke liye login karein": "Login to view the map",
-  "Guest mode mein location nahi dikhti — login karein taake doston ki location map par dekhein.": "Locations don't show in guest mode — login to see your friends' locations on the map.",
   "Abhi koi dost location share nahi kar raha": "No friend is sharing their location yet",
   "Account se apni location share karein — aap ka pin map par dikhega.": "Share your location from Account — your pin will appear on the map.",
   "Apni location share karein": "Share my location",
@@ -7663,6 +7690,8 @@
   "Example: Lahore, Pakistan": "Example: Lahore, Pakistan",
   "Role galat hai — list se chunein.": "Invalid role — choose from the list.",
   "Pata 200 harf se zyada nahi ho sakta.": "Address can't be longer than 200 characters.",
+  // ---- Map view v146 (guest map — bina login ke pins, phone nahi) ----
+  "Call ya WhatsApp karne ke liye login karein.": "Login to call or WhatsApp.",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -8579,7 +8608,16 @@
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctLocBtn").addEventListener("click", onLocToggle); // v140: location sharing toggle
   $("mapRefreshBtn").addEventListener("click", refreshMap); // v140: map refresh
-  $("mapLoginBtn").addEventListener("click", function () { showAuth(); }); // v141: guest empty state -> login screen
+  // v146: guest popup ka "Login karein" button — popup HTML Leaflet
+  // banata hai (marker par alag listener nahi lag sakta), is liye
+  // delegated listener: popup ke andar [data-map-login] par tap ho to
+  // login screen kholo. Logged-in card mein ye attribute hota hi nahi.
+  document.addEventListener("click", function (ev) {
+    var t = ev && ev.target && ev.target.closest ? ev.target.closest("[data-map-login]") : null;
+    if (!t) return;
+    if (ev.preventDefault) ev.preventDefault();
+    showAuth();
+  });
   $("mapShareBtn").addEventListener("click", function () { shareMyLocation(setMapMsg).then(function (ok) { if (ok) refreshMap(); }); }); // v141: zero-sharer CTA
   $("mapRetryBtn").addEventListener("click", retryMapTiles); // v141: tiles dobara mangwao
   $("mapLocateBtn").addEventListener("click", locateMe); // v142: "Meri location" — map apni location par centre karo (local only, koi upload nahi)
