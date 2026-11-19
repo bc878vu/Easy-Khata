@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v152";
+  var APP_VERSION = "v153";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -2867,6 +2867,11 @@
     });
   }
 
+  function refreshPeopleUI() { // v153: dost badle to people renders aik saath (pehle 11 jagah yahi lines dohra rahe the)
+    renderPeople();
+    renderPersonSelect();
+    renderTxnFilterOptions();
+  }
   function renderAll() {
     lockedCache = computeLockedIds(); // settled-history lock map, fresh on every data change
     renderSummary();
@@ -2884,6 +2889,8 @@
     renderSavingsGoal(); // v117: bachat goal taaza
     fillMyPhone();
     renderAccount();
+    renderWorkspaceBar(); // v153: workspace bar main page par hai — renderAccount se yahan, taake Account band ho to bhi taaza rahe
+    renderLocRow(); // v153: location toggle row — boot par bhi state sahi honi chahiye (v140 s9/s19)
     renderAdmin();
     renderRecurringList(); // v87: recurring page ki list taaza (chhoti list, sasti)
     openPendingCard(); // v151: ?card= link se aaya ho to Khata Card kholo (aik dafa)
@@ -3417,6 +3424,8 @@
   function renderRecurringList() {
     var box = $("recurringList");
     if (!box) return;
+    // v153: Recurring page band ho to list rebuild mat karo — kholte hi acctRecurringBtn handler render karta hai.
+    var rv = $("recurringView"); if (rv && rv.hidden) return;
     // v92: live stats — active/paused ginti + agla record (khud update hota hai).
     var stats = $("recurringStats");
     if (stats) {
@@ -3513,7 +3522,7 @@
       $("newContactPhone").value = "";
       setContactMsg("Dost add ho gaya!", true);
       renderSummary();
-      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      refreshPeopleUI();
       $("txnPerson").value = guestRec.id;
       cdSync($("txnPerson")); // v73: custom dropdown label bhi naye dost par le jao
       return;
@@ -3524,7 +3533,7 @@
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: contactBody }).then(function (res) {
       btn.disabled = false;
       if (!res.ok) {
-        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Dost ka naam phone mein save ho gaya; thodi der mein khud update ho jayega.",true);renderSummary();renderPeople();renderPersonSelect();renderTxnFilterOptions();$("txnPerson").value=queued.id;cdSync($("txnPerson"));return;}
+        if(isTransientResponse(res)){markConnectionIssue();var queued=offlineContactInsert(contactBody);$("newContactName").value="";$("newContactPhone").value="";setContactMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Dost ka naam phone mein save ho gaya; thodi der mein khud update ho jayega.",true);renderSummary();refreshPeopleUI();$("txnPerson").value=queued.id;cdSync($("txnPerson"));return;}
         setContactMsg("Dost save nahi hua ("+res.status+")" + saveErrDetail(res) + " — dobara try karein.", false); return;
       }
       var created = res.body && res.body[0];
@@ -3533,7 +3542,7 @@
       $("newContactPhone").value = "";
       setContactMsg("Dost add ho gaya!", true);
       renderSummary();
-      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      refreshPeopleUI();
       if (created) { $("txnPerson").value = created.id; cdSync($("txnPerson")); } // v73: label sync
     }).catch(function () {
       btn.disabled = false;
@@ -3542,7 +3551,7 @@
       $("newContactPhone").value = "";
       setContactMsg("Dost ka naam save ho gaya. Internet aate hi update ho jayega.", true);
       renderSummary();
-      renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      refreshPeopleUI();
       $("txnPerson").value = createdOffline.id;
       cdSync($("txnPerson")); // v73: label sync
     });
@@ -3582,7 +3591,7 @@
         myContacts = myContacts.filter(function (x) { return x.id !== id; });
         saveCache();
         renderSummary();
-        renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+        refreshPeopleUI();
         setPeopleMsg("Dost ka naam remove ho gaya. Internet aate hi update ho jayega.", true);
       };
       var deleteTxnsOffline = function () {
@@ -3596,7 +3605,7 @@
             if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
             myContacts = myContacts.filter(function (x) { return x.id !== id; });
             renderSummary();
-            renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+            refreshPeopleUI();
             setPeopleMsg("Contact remove ho gaya.", true);
           }).catch(function () {
             deleteTxnsOffline();
@@ -4077,9 +4086,14 @@
     var url=URL.createObjectURL(blob), link=document.createElement("a");
     link.href=url;link.download="easy-khata-users-"+todayLocal()+".csv";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
   }
+  function renderAdminBtn() { // v153: sirf admin button toggle — network nahi, har renderAll par sasta
+    var b = $("navAdminBtn"); if (b) b.hidden = !isAdmin();
+  }
   function renderAdmin() {
-    if (!isAdmin()) { $("navAdminBtn").hidden = true; return; }
-    $("navAdminBtn").hidden = false;
+    renderAdminBtn();
+    // v153: RPCs sirf tab jab admin page khula ho — boot/har save par nahi.
+    var av = $("adminView"), auv = $("adminUserView");
+    if (av && av.hidden && auv && auv.hidden) return;
     setAdminMsg("Dashboard data load ho raha hai…",true);
     sb("rpc/admin_list_users", { method: "POST", body: {} })
       .then(function (res) {
@@ -5598,7 +5612,7 @@
         if (isTransientResponse(res)) {
           offlineContactInsert(body);
           setPeopleMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
-          renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+          renderSuggestions(); refreshPeopleUI();
           return;
         }
         setPeopleMsg(tr("Dost add nahi ho saka — dobara try karein."), false);
@@ -5610,16 +5624,21 @@
       if (created) { created.manual = true; myContacts.push(created); }
       else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null, manual: true });
       saveCache();
-      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      renderSuggestions(); refreshPeopleUI();
       setPeopleMsg((p.name || "") + " " + tr("dost ban gaya!"), true);
     }).catch(function () {
       offlineContactInsert(body);
       setPeopleMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
-      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      renderSuggestions(); refreshPeopleUI();
     });
   }
 
-  function renderAccount() {
+  function renderLocRow() { // v153: location toggle row — Account menu mein hai, lekin boot par bhi state sahi honi chahiye (v140 s9/s19: sharing ON → "On", guest → chhupa)
+    var lb2 = $("acctLocBtn");
+    if (lb2) lb2.hidden = guestMode;
+    renderLocToggle();
+  }
+  function renderHeader() { // v153: header (avatar + naam + Guest badge + Login icon) — har renderAll par, bina poora Account render kiye
     var me = myProfile();
     var name = (me && me.name) || myName() || "";
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
@@ -5631,6 +5650,14 @@
     if (gbd) gbd.hidden = !guestMode;
     var lb = $("loginIconBtn");
     if (lb) lb.hidden = !guestMode;
+  }
+  function renderAccount() {
+    renderHeader(); // header har view par dikhta hai — hamesha taaza
+    // v153: Account page band ho to baaki render skip — kholte hi navAccount handler render karta hai.
+    var av = $("accountView"); if (av && av.hidden) return;
+    var me = myProfile();
+    var name = (me && me.name) || myName() || "";
+    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
     setAvatarEl($("acctAvatar"), me && me.avatar_url, initial);
     $("acctName").textContent = name || "—";
     var phoneTxt = myPhone || "Number nahi diya";
@@ -5678,11 +5705,7 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
-    // v140: location sharing toggle — guest mode mein nahi (guest ka koi
-    // account hi nahi, location save karne ki jagah nahi).
-    var lb2 = $("acctLocBtn");
-    if (lb2) lb2.hidden = guestMode;
-    renderLocToggle();
+    // v153: location toggle row renderAll mein chala gaya (renderLocRow) — boot par bhi state sahi rehti hai.
     // v120: Logout sirf logged-in mode mein — guest ka koi account hi nahi,
     // is liye guest menu mein Logout dikhana ghalat tha. Guest ke liye
     // "Guest mode se bahar niklein" guest box mein pehle se hai.
@@ -5699,7 +5722,6 @@
         : tr("Guest hisaab transfer karein");
     }
     renderRateState(); // v64: menu mein apni rating (sitare) dikhao, ho to
-    renderWorkspaceBar();
     renderPinLockMenu(); // v78: PIN set ho to label "change / band" + "Abhi lock" dikhao
     renderKhataCard(); // v151: Khata Card preview taaza (profile badle to card bhi)
     renderInstallBtn(); // v151: install button ki state taaza (prompt aaya ho to dikhao)
@@ -5869,7 +5891,7 @@
           offlineContactInsert(body);
           setCardMsg(tr("Dost add ho gaya!") + " " + tr("Internet aate hi update ho jayega."), true);
           var b1 = $("cardAddFriendBtn"); if (b1) b1.hidden = true;
-          renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+          renderSuggestions(); refreshPeopleUI();
           return;
         }
         setCardMsg(tr("Dost add nahi ho saka — dobara try karein."), false);
@@ -5880,7 +5902,7 @@
       if (created) { created.manual = true; myContacts.push(created); }
       else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null, manual: true });
       saveCache();
-      renderSuggestions(); renderPeople(); renderPersonSelect(); renderTxnFilterOptions();
+      renderSuggestions(); refreshPeopleUI();
       setCardMsg((nm || "") + " " + tr("dost ban gaya!"), true);
       var b3 = $("cardAddFriendBtn"); if (b3) b3.hidden = true;
     });
@@ -6151,6 +6173,8 @@
   }
 
   function renderTxnFilterOptions() {
+    // v153: History band ho to filter options rebuild mat karo — kholte hi handler render karta hai.
+    var hv = $("historyView"); if (hv && hv.hidden) return;
     var sel = $("txnFilterPerson");
     var prev = sel.value;
     var html = '<option value="">All</option>';
@@ -6165,9 +6189,9 @@
     cdSync(sel); // v73: custom dropdown ka label + menu fresh karo
   }
 
-  function filteredTxns() {
+  function filteredTxns(base) { // v153: base diya ho to visibleTxns() dobara mat compute karo (renderTxns single pass)
     var q = txnSearchText.trim().toLowerCase();
-    return visibleTxns().filter(function (t) {
+    return (base || visibleTxns()).filter(function (t) {
       if (txnFilterPerson && t.payer_id !== txnFilterPerson && t.receiver_id !== txnFilterPerson) return false;
       if (txnFromDate && String(t.txn_date || "") < txnFromDate) return false;
       if (txnToDate && String(t.txn_date || "") > txnToDate) return false;
@@ -7498,8 +7522,11 @@
   }
   window.addEventListener("resize", refreshScrollHints);
   function renderTxns() {
+    // v153: History band ho to list render mat karo — kholte hi historyJumpBtn handler render karta hai.
+    var hv = $("historyView"); if (hv && hv.hidden) return;
     var me = myId();
-    var list = filteredTxns();
+    var vis = visibleTxns(); // v153: aik dafa compute — neeche empty check + filter dono isi se
+    var list = filteredTxns(vis);
     // Live filter count (v21): koi filter laga ho to batayein kitne records mile.
     var fc = $("filterCount");
     if (fc) {
@@ -7507,7 +7534,7 @@
       fc.hidden = !anyFilter;
       if (anyFilter) fc.textContent = list.length + " records shown";
     }
-    if (!visibleTxns().length) {
+    if (!vis.length) {
       $("txnList").innerHTML = '<p class="empty">' + tr("Abhi koi record nahi — upar se pehla record add karein.") + '</p>';
       refreshScrollHints();
       return;
@@ -7581,6 +7608,8 @@
   }
   function renderDiary() {
     var grid = $("calGrid"); if (!grid) return;
+    // v153: diary modal band ho to calendar rebuild mat karo — kholte hi jumpToDiary render karta hai.
+    var dm = $("diaryModal"); if (dm && dm.hidden) return;
     var key = diaryMonthKey();
     $("calMonthLabel").textContent = monthName(key + "-01");
     var totals = diaryDayTotals();
@@ -8464,7 +8493,7 @@
     if (!document.querySelector(".app-dialog-overlay:not([hidden])")) document.body.classList.remove("dialog-open");
   }
   // v124: Diary button → diary modal card kholein (inline card hata diya gaya).
-  function jumpToDiary() { renderDiary(); openToolModal("diaryModal"); } // taaza calendar
+  function jumpToDiary() { openToolModal("diaryModal"); renderDiary(); } // taaza calendar
   function closeDiaryModal() { closeToolModals(); }
   // v125: baaki tools — kholne se pehle taaza render.
   function jumpToHousehold() { renderHousehold(); openToolModal("householdModal"); }
@@ -9283,13 +9312,13 @@
   $("logoutBtn").addEventListener("click", function () { if (guestMode) return; saveSession(null); showAuth(); }); // v120: guest mein Logout ka koi matlab nahi
   $("navKhata").addEventListener("click", function () { showView("khata"); });
   $("navMap").addEventListener("click", function () { showView("map"); }); // v140
-  $("navAccount").addEventListener("click", function () { showView("account"); });
+  $("navAccount").addEventListener("click", function () { showView("account"); renderAccount(); });
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain
   $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
   // v152: History — All Records kholo (taaza render) / wapas Khata par jao. (v150 correction: doston ki list main page par wapas, History mein sirf records.)
-  $("historyJumpBtn").addEventListener("click", function () { renderTxns(); showView("history"); });
+  $("historyJumpBtn").addEventListener("click", function () { showView("history"); renderTxnFilterOptions(); renderTxns(); });
   $("historyBackBtn").addEventListener("click", function () { showView("khata"); });
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
@@ -9654,7 +9683,7 @@
   $("hiddenBackBtn").addEventListener("click", function () { showView("account"); });
   $("acctBackupMenuBtn").addEventListener("click", function () { showView("backup"); });
   // v87: recurring page — list + wapas + pause/delete (delegation, aik listener).
-  $("acctRecurringBtn").addEventListener("click", function () { renderRecurringList(); showView("recurring"); });
+  $("acctRecurringBtn").addEventListener("click", function () { showView("recurring"); renderRecurringList(); });
   $("recurringBackBtn").addEventListener("click", function () { showView("account"); });
   $("recurringList").addEventListener("click", function (e) {
     var nw = e.target.closest("[data-rec-new]");

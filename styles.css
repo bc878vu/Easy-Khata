@@ -193,7 +193,7 @@ p{margin:0 0 10px}
 /* ---------- cards ---------- */
 .card{
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;box-shadow:var(--shadow);margin:12px 0;
+  padding:14px;box-shadow:var(--shadow);margin:10px 0; /* v153: compact — 16px/12px se 14px/10px, tap targets + readability waisay hi */
 }
 .card.accent{border-top:3px solid var(--accent)}
 .card.setup{max-width:640px;margin:14px auto}
@@ -319,7 +319,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .search-wrap input[type="search"]{padding-left:36px;width:100%}
 /* v24.2: section label — TOTAL BALANCE jaisa hi left inset (2px, .wrap ki
    14px padding ke andar), kabhi cut nahi hota; vertical gap tight. */
-.section-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:12px 2px 6px}
+.section-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:10px 2px 5px} /* v153: compact — 12px/6px se 10px/5px */
 
 /* ---------- people list ---------- */
 .people{display:grid;gap:8px}
@@ -439,7 +439,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    (2) max-height viewport-relative — box + button ke neeche nahi jata, is liye
    aakhri row ka Delete hamesha tappable rehta hai. */
 .scroll-box{
-  max-height:calc(100dvh - 380px);overflow-y:auto;overscroll-behavior:auto;
+  /* v153: chhoti (landscape) screens par floor — calc(100dvh-380px) 20px reh jata tha, ab kam-az-kam ~3 rows dikhte hain. */
+  max-height:max(180px, calc(100dvh - 380px));overflow-y:auto;overscroll-behavior:auto;
   border:1px solid var(--line);border-radius:12px;padding:8px;
   background:var(--bg);
   scrollbar-width:thin;scrollbar-color:var(--muted) transparent;
