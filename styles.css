@@ -1867,20 +1867,40 @@ input,select,textarea,button{max-width:100%}
 .map-pin-avatar{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--surface);color:var(--text);font-weight:800;font-size:1rem;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);overflow:hidden}
 .map-pin-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 /* v144: popup card — compact, mobile-first; Leaflet popup ke andar */
-.map-box .leaflet-popup-content{margin:10px 12px;line-height:1.35}
-.map-box .leaflet-popup-content-wrapper{border-radius:12px}
-.map-user-card{width:230px;max-width:calc(100vw - 96px)}
-.map-user-top{display:flex;gap:10px;align-items:center;min-width:0}
-.map-user-avatar{flex:none;width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.05rem}
+/* v145: map popup — theme-aware + high-contrast (Boss order 19 Nov 15:19 PKT).
+   ROOT CAUSES (screenshots 15:07 + 15:19 — Call/WhatsApp labels dark dikhte thay):
+   (1) Leaflet `.leaflet-container a{color:#0078A8}` ki specificity (0,1,1) app ke
+   `.map-user-btn{color:#fff}` (0,1,0) ko harati hai — buttons <a> hain, is liye
+   Leaflet ka gehra neela text aata tha. Fix: .map-box scope wale (0,3,1) rules —
+   koi !important nahi. (2) Call button var(--accent) use karta tha — dark theme
+   mein #60a5fa (halka neela, safed text sirf ~2.5:1); WhatsApp #25d366 par safed
+   text sirf ~2:1. Fix: --accent-btn / --btn-green-bg (donon themes mein gehre,
+   safed text 5:1+). (3) Leaflet wrapper hardcoded white hai — dark theme mein
+   app ka halka muted text safed par dhundla parta tha. Fix: wrapper/tip/content
+   sab theme-aware (var(--card)/var(--ink)/var(--line)). (4) Leaflet
+   `.leaflet-popup-content p{margin:17px 0}` (0,1,1) card ke 8px margins ko harata
+   tha — card loose lagta tha. Fix: neeche scoped p rules. */
+.map-box .leaflet-popup-content{margin:10px 12px;line-height:1.35;color:var(--ink)}
+.map-box .leaflet-popup-content-wrapper{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(2,6,23,.35)}
+.map-box .leaflet-popup-tip{background:var(--card);box-shadow:0 3px 14px rgba(0,0,0,.4)}
+.map-box .leaflet-popup a.leaflet-popup-close-button{color:var(--muted)}
+.map-box .leaflet-popup a.leaflet-popup-close-button:hover,.map-box .leaflet-popup a.leaflet-popup-close-button:focus{color:var(--ink)}
+.map-user-card{width:230px;max-width:calc(100vw - 96px);color:var(--ink)}
+.map-user-top{display:flex;gap:10px;align-items:center;min-width:0;padding-right:16px}
+.map-user-avatar{flex:none;width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.05rem;border:2px solid var(--accent)}
 .map-user-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .map-user-id{flex:1;min-width:0}
-.map-user-name{display:block;font-size:.95rem;overflow-wrap:anywhere}
-.map-user-role{display:inline-block;margin-top:3px;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
-.map-user-role-none{background:transparent;color:var(--muted);padding-left:0;font-weight:600}
+.map-user-name{display:block;font-size:.95rem;font-weight:800;color:var(--ink);overflow-wrap:anywhere}
+.map-user-role{display:inline-block;margin-top:3px;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+.map-user-role-none{background:transparent;color:var(--muted);padding-left:0;font-weight:600;border-color:transparent}
 .map-user-addr{margin:8px 0 0;font-size:.83rem;color:var(--muted);overflow-wrap:anywhere}
 .map-user-actions{display:flex;gap:8px;margin-top:10px}
-.map-user-btn{flex:1;text-align:center;padding:8px 6px;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;font-size:.85rem;text-decoration:none;white-space:nowrap}
-.map-user-btn-wa{background:#25d366}
-.map-user-phone{margin:6px 0 0;font-size:.8rem;color:var(--muted);text-align:center}
+.map-user-btn{flex:1;text-align:center;padding:9px 6px;border-radius:10px;background:var(--accent-btn);color:#fff;font-weight:800;font-size:.85rem;text-decoration:none;white-space:nowrap;box-shadow:0 2px 6px rgba(2,6,23,.25)}
+.map-user-btn-wa{background:var(--btn-green-bg)}
+.map-user-phone{margin:6px 0 0;font-size:.85rem;font-weight:700;color:var(--ink);text-align:center}
 .map-user-nophone{margin:8px 0 0;font-size:.82rem;color:var(--muted)}
 .map-user-time{margin:8px 0 0;font-size:.75rem;color:var(--muted)}
+/* Leaflet overrides ko harane wale scoped guarantees (specificity (0,3,1) vs Leaflet (0,1,1)): */
+.map-box .leaflet-popup-content a.map-user-btn,.map-box .leaflet-popup-content a.map-user-btn-wa{color:#fff;text-decoration:none}
+.map-box .leaflet-popup-content p.map-user-addr,.map-box .leaflet-popup-content p.map-user-nophone,.map-box .leaflet-popup-content p.map-user-time{margin:8px 0 0}
+.map-box .leaflet-popup-content p.map-user-phone{margin:6px 0 0}
