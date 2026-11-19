@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v148";
+  var APP_VERSION = "v149";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -5191,7 +5191,7 @@
           }
         }
         g.textAlign = "center";
-        g.fillStyle = "#005b4b"; // brand green
+        g.fillStyle = "#1B365D"; // brand navy (v149 palette)
         g.font = "bold " + nameSize + "px system-ui, -apple-system, 'Segoe UI', sans-serif";
         g.fillText("Easy Khata", size / 2, size + nameGap + nameSize);
         g.fillStyle = "#5b6b66";
@@ -6345,8 +6345,8 @@
     var W = 595, M = 40, R = W - M;
     var st = { y: 52 };
     var C = {
-      navy: [10, 26, 47], steel: [18, 58, 95], cyan: [56, 189, 248],
-      green: [22, 163, 74], red: [220, 38, 38], blue: [37, 99, 235],
+      navy: [27, 54, 93], steel: [0, 90, 156], cyan: [96, 193, 229],
+      green: [22, 163, 74], red: [220, 38, 38], blue: [0, 90, 156],
       zebra: [245, 247, 250], box: [245, 247, 250], line: [220, 226, 235],
       grey: [100, 116, 139], dark: [15, 23, 42]
     };
@@ -6882,7 +6882,7 @@
   // cpexcel.js sirf Node mein chahiye hota hai, browser path mein require
   // guard hai.)
   var XS = {
-    navy: "FF0A1A2F", white: "FFFFFFFF", zebra: "FFF1F5F9",
+    navy: "FF1B365D", white: "FFFFFFFF", zebra: "FFF1F5F9",
     red: "FFDC2626", grey: "FF64748B", line: "FFDCE3EA", dark: "FF0F172A"
   };
   var X_TITLE = { font: { bold: true, sz: 16, color: { rgb: XS.navy } } };
