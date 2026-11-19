@@ -1859,3 +1859,9 @@ input,select,textarea,button{max-width:100%}
 .map-note p{margin:8px 0 0;font-size:.85rem}
 .map-pin{background:none;border:none}
 .map-pin-dot{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:800;font-size:1rem;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.map-prog{font-size:.82rem;color:var(--muted);margin:0 0 8px}
+.map-prog[hidden]{display:none}
+.map-locate-btn{position:absolute;right:10px;bottom:28px;z-index:1000;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#111;box-shadow:0 1px 6px rgba(0,0,0,.25);font-size:1.15rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.map-locate-btn:active{transform:scale(.96)}
+.map-locate{background:none;border:none}
+.map-locate-dot{display:block;width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.35),0 2px 8px rgba(0,0,0,.35)}

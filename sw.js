@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v141-0";
+var CACHE = "easy-khata-v142-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=104",
+  "styles.css?v=105",
   "config.js?v=4",
-  "app.js?v=138",
+  "app.js?v=139",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",
@@ -70,7 +70,11 @@ self.addEventListener("install", function (e) {
 
 self.addEventListener("activate", function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.map(function (k) { if (k !== CACHE) return caches.delete(k); }));
+    // v142: TILE_CACHE mehfooz rakho — tiles app update par bhi rehne
+    // chahiye (v141 mein activate har cache mitata tha, is liye tile
+    // cache har deploy par khaali ho jata tha). Sirf purane app shells
+    // aur purane tile-cache versions delete karo.
+    return Promise.all(keys.map(function (k) { if (k !== CACHE && k !== TILE_CACHE) return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
 
@@ -145,14 +149,18 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  if (url.host === "tile.openstreetmap.org") {
-    // v141: tiles — cache-first + background refresh (SWR). Cache mein ho to
+  if (url.host === "tile.openstreetmap.org" || url.host === "server.arcgisonline.com") {
+    // v142: tiles — cache-first + background refresh (SWR). Cache mein ho to
     // foran dikhe, peeche se taaza ho jaye; na ho to network se le kar cache
-    // kare. Tiles OSM se CORS ke saath aati hain (cacheable, opaque nahi).
+    // kare. v141 bug: Leaflet <img> requests no-cors hain, is liye response
+    // OPAQUE hoti hai (res.ok false) aur `if (res.ok)` ki wajah se cache
+    // kabhi bharta hi nahi tha. Ab opaque responses bhi cache hoti hain
+    // (cache.put opaque ko allow karta hai). Dono providers (OSM + Esri
+    // fallback) yahi branch use karte hain.
     e.respondWith(caches.open(TILE_CACHE).then(function (c) {
       return c.match(req).then(function (cached) {
         var net = fetch(req).then(function (res) {
-          if (res.ok) { var copy = res.clone(); c.put(req, copy).then(function () { trimTileCache(); }); }
+          if (res.ok || res.type === "opaque") { var copy = res.clone(); c.put(req, copy).then(function () { trimTileCache(); }); }
           return res;
         }).catch(function () { return cached; });
         return cached || net;

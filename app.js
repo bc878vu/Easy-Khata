@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v141";
+  var APP_VERSION = "v142";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -965,7 +965,20 @@
   }
   function renderLocToggle() {
     var v = $("acctLocValue");
-    if (v) v.textContent = locSharingOn() ? "On" : "Band";
+    if (v) v.textContent = locSharingOn() ? "On" : tr("Band");
+  }
+  // v142: map header count — tr() se, taake English mode mein English ho.
+  // lastMapPinCount yaad rehta hai taake zaban badalne par count dobara
+  // likha ja sake (applyLanguage se).
+  var lastMapPinCount = -1;
+  function renderMapCount(n) {
+    lastMapPinCount = n;
+    var cnt = $("mapCount");
+    if (!cnt) return;
+    if (n < 0) { cnt.textContent = ""; return; }
+    cnt.textContent = n === 0
+      ? tr("Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega.")
+      : n === 1 ? tr("1 dost location share kar raha hai.") : n + " " + tr("dost location share kar rahe hain.");
   }
   function setLocMsg(t) { var el = $("locMsg"); if (el) el.textContent = t || ""; }
   function setMapMsg(t) { var el = $("mapMsg"); if (el) el.textContent = t || ""; }
@@ -1069,37 +1082,101 @@
     return leafletLoadPromise;
   }
   var mapTileLayer = null;
-  var mapTilesFailed = false;
+  // v142: tile providers — OSM pehle (chhoti tiles, slow link ke liye
+  // behtareen), Esri fallback (World Street Map, attribution ke saath,
+  // koi key nahi). OSM is network par "x-blocked: Access denied" de raha
+  // hai (har tile aik hi 6725-byte placeholder) — user ke phone par bhi
+  // tiles error hue, is liye 3 errors + 0 loads par khud Esri par badal
+  // jata hai. Esri tiles JPEG hain (~17-35 KB) — OSM se bari, lekin jo
+  // tile milti hi nahi us se behtareen hai.
+  var TILE_PROVIDERS = {
+    osm: { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", maxZoom: 19, attribution: "© OpenStreetMap contributors" },
+    esri: { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", maxZoom: 19, attribution: "Esri, HERE, Garmin, OpenStreetMap contributors, and the GIS user community" }
+  };
+  var tileProvider = "osm";
+  var tileFallbackTried = false;
+  var tileStarted = 0, tileLoaded = 0, tileFailed = 0, tilePending = 0;
+  var mapTilesBad = false;
+  function resetTileCounters() { tileStarted = 0; tileLoaded = 0; tileFailed = 0; tilePending = 0; }
   function showMapLoading(on) { var el = $("mapLoading"); if (el) el.hidden = !on; }
   function showTilesNote(on) { var el = $("mapTilesNote"); if (el) el.hidden = !on; }
-  // Tiles dobara mangwao — tileerror ke baad retry (SW tile cache se ho to foran).
-  function retryMapTiles() {
-    showTilesNote(false);
-    try { if (mapTileLayer && mapTileLayer.redraw) mapTileLayer.redraw(); } catch (e) {}
-    try { if (mapObj) mapObj.invalidateSize(); } catch (e) {}
+  function showTilesProg(on, text) { var el = $("mapTilesProg"); if (!el) return; el.hidden = !on; if (on && text !== undefined) el.textContent = text; }
+  // Tile progress — kitni tiles mangi gayin, kitni aa gayin. Note sirf tab
+  // jab sab fail hon; pehli error par note dikhana ghalat hota (baaki tiles
+  // abhi load ho rahi hoti hain).
+  function renderTileProgress() {
+    if (tilePending > 0) {
+      showTilesProg(true, tr("Tiles load ho rahi hain…") + " (" + tileLoaded + "/" + tileStarted + ")");
+      showTilesNote(false);
+    } else {
+      showTilesProg(false);
+      mapTilesBad = (tileLoaded === 0 && tileFailed > 0);
+      if (mapTilesBad) showTilesNote(true);
+      else showTilesNote(false);
+    }
   }
-  function initMapIfNeeded() {
+  function wireTileLayer(layer) {
+    try {
+      layer.on("tileloadstart", function () { tileStarted++; tilePending++; renderTileProgress(); });
+      layer.on("tileload", function () { tileLoaded++; tilePending = Math.max(0, tilePending - 1); renderTileProgress(); });
+      layer.on("tileerror", function () {
+        tileFailed++; tilePending = Math.max(0, tilePending - 1); renderTileProgress();
+        if (!tileFallbackTried && tileFailed >= 3 && tileLoaded === 0) switchTileProvider();
+      });
+    } catch (e) {}
+  }
+  function makeTileLayer() {
+    var p = TILE_PROVIDERS[tileProvider] || TILE_PROVIDERS.osm;
+    var layer = window.L.tileLayer(p.url, { maxZoom: p.maxZoom, attribution: p.attribution });
+    wireTileLayer(layer);
+    return layer;
+  }
+  // Provider badlo — purani layer hatane se us ki atki hui <img> requests
+  // cancel hoti hain, phir nayi layer taaza requests bhejti hai.
+  function switchTileProvider() {
+    if (tileFallbackTried || !mapObj || !window.L) return;
+    tileFallbackTried = true;
+    tileProvider = "esri";
+    try { if (mapTileLayer) mapObj.removeLayer(mapTileLayer); } catch (e) {}
+    resetTileCounters();
+    mapTileLayer = makeTileLayer();
+    try { mapTileLayer.addTo(mapObj); } catch (e) {}
+    showTilesProg(true, tr("OpenStreetMap tiles nahi mil rahe — doosra map load ho raha hai…"));
+    showTilesNote(false);
+  }
+  // Tiles dobara mangwao — layer hata kar dobara lagao taake atki hui
+  // requests cancel hon (sirf redraw() purani hanging requests ke peeche
+  // queue mein khara rehta hai, is liye slow link par bekaar lagta tha).
+  function reloadTiles() {
+    if (!mapObj || !window.L) return;
+    resetTileCounters();
+    showTilesNote(false);
+    showTilesProg(false);
+    try { if (mapTileLayer) mapObj.removeLayer(mapTileLayer); } catch (e) {}
+    mapTileLayer = makeTileLayer();
+    try { mapTileLayer.addTo(mapObj); } catch (e) {}
+    try { mapObj.invalidateSize(); } catch (e) {}
+  }
+  function retryMapTiles() { reloadTiles(); }
+  // Map object banao — BINA tile layer ke. Layer pins ke baad lagti hai
+  // taake pehli view aik hi dafa tiles mangwaye (v141 mein zoom 5 par
+  // tiles aati thiin, phir pin par zoom 13 par dobara — do round).
+  function initMapObject() {
     if (mapObj) return true;
     if (!window.L || !window.L.map) return false;
     if (!$("mapBox")) return false;
     try {
-      // v141: pinch zoom (touchZoom) + double-tap + on-screen +/- controls
-      // sab ON; zoom limits sane (min 3, max 19 — tiles ke barabar).
       mapObj = window.L.map("mapBox", {
         zoomControl: true, touchZoom: true, doubleClickZoom: true,
         scrollWheelZoom: true, minZoom: 3, maxZoom: 19, zoomSnap: 1, zoomDelta: 1
       }).setView([30.3753, 69.3451], 5);
-      mapTileLayer = window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "© OpenStreetMap contributors"
-      });
-      try {
-        mapTileLayer.on("tileerror", function () { mapTilesFailed = true; showTilesNote(true); });
-        mapTileLayer.on("tileload", function () { mapTilesFailed = false; showTilesNote(false); });
-      } catch (e) {}
-      mapTileLayer.addTo(mapObj);
       return true;
     } catch (e) { mapObj = null; return false; }
+  }
+  function addTileLayerOnce() {
+    if (!mapObj || mapTileLayer) return;
+    mapTileLayer = makeTileLayer();
+    try { mapTileLayer.addTo(mapObj); } catch (e) {}
   }
   // Custom pin — naam ke pehle harf wala rang-biranga dot (default Leaflet
   // marker ki PNG images ki zaroorat nahi — local bundle mein images nahi hain).
@@ -1134,13 +1211,12 @@
         bounds.push([lat, lng]);
         count++;
       });
-      if (count === 1) mapObj.setView(bounds[0], 13);
+      if (count === 1) mapObj.setView(bounds[0], 10); // v142: zoom 10 (sheher nazar aaye) — 13 par dobara tiles mangwani parti thiin
       else if (count > 1) { try { mapObj.fitBounds(window.L.latLngBounds(bounds).pad(0.2)); } catch (e) {} }
       return count;
     } catch (e) { return 0; }
   }
   function refreshMap() {
-    var cnt = $("mapCount");
     var wrap = $("mapWrap"), guestBox = $("mapGuestBox"), emptyBox = $("mapEmptyBox"),
         actions = $("mapActions");
     if (guestMode || !session) {
@@ -1151,42 +1227,51 @@
       if (emptyBox) emptyBox.hidden = true;
       if (actions) actions.hidden = true;
       showTilesNote(false);
+      showTilesProg(false);
       showMapLoading(false);
       setMapMsg("");
-      if (cnt) cnt.textContent = "";
+      renderMapCount(-1);
       return;
     }
     if (wrap) wrap.hidden = false;
     if (guestBox) guestBox.hidden = true;
     if (actions) actions.hidden = false;
     if (emptyBox) emptyBox.hidden = true;
+    resetTileCounters();
     showTilesNote(false);
+    showTilesProg(false);
     setMapMsg("");
-    if (cnt) cnt.textContent = "";
+    renderMapCount(-1);
     showMapLoading(true);
     var self = locSharingOn() ? updateMyLocation() : Promise.resolve(null);
     self.then(function () { return loadSharedLocations(); }).then(function (res) {
       showMapLoading(false);
       if (!res.ok && res.reason === "no-table") {
-        setMapMsg("Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge.");
+        setMapMsg(tr("Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge."));
         return;
       }
       if (!res.ok) {
-        setMapMsg("Locations load nahi hui — internet check kar ke dobara try karein.");
+        setMapMsg(tr("Locations load nahi hui — internet check kar ke dobara try karein."));
         return;
       }
       return ensureLeaflet().then(function (ok) {
         showMapLoading(false);
-        if (!ok) { setMapMsg("Map load nahi hua — internet check kar ke dobara try karein."); return; }
-        if (!initMapIfNeeded()) { setMapMsg("Map load nahi hua — dobara try karein."); return; }
-        // v141: tiles dobara mangwao (slow link par pehli dafa fail hue hon to).
-        try { if (mapTileLayer && mapTileLayer.redraw) mapTileLayer.redraw(); } catch (e) {}
+        if (!ok) { setMapMsg(tr("Map load nahi hua — internet check kar ke dobara try karein.")); return; }
+        if (!initMapObject()) { setMapMsg(tr("Map load nahi hua — dobara try karein.")); return; }
+        // v142: pehle pins (view set ho jaye), phir tile layer — aik hi
+        // dafa tiles mangwaye (zoom 5 phir 13 ka dohra round khatam).
         var n = renderMapPins(res.rows || []);
         setMapMsg("");
-        if (cnt) cnt.textContent = n === 0
-          ? "Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega."
-          : n === 1 ? "1 dost location share kar raha hai." : n + " dost location share kar rahe hain.";
+        renderMapCount(n);
         if (emptyBox) emptyBox.hidden = n !== 0;
+        addTileLayerOnce();
+        if (mapTileLayer && mapTilesBad) reloadTiles();
+        else if (mapTileLayer) { try { mapTileLayer.redraw(); } catch (e) {} }
+        // Tiles atki hon to 45s baad fallback check (load/error mein se
+        // kuch to hua ho — sirf hang hone par bhi doosra provider try karo).
+        setTimeout(function () {
+          if (mapObj && tileLoaded === 0 && tileFailed > 0 && !tileFallbackTried) switchTileProvider();
+        }, 45000);
         try { mapObj.invalidateSize(); } catch (e) {}
       });
     });
@@ -1196,53 +1281,86 @@
   // (setLocMsg ya setMapMsg). ON pehle se ho to sirf dobara update karo.
   function shareMyLocation(say) {
     say = say || setMapMsg;
-    if (guestMode || !session) { say("Location share karne ke liye pehle login karein."); return Promise.resolve(false); }
+    if (guestMode || !session) { say(tr("Location share karne ke liye pehle login karein.")); return Promise.resolve(false); }
     if (locSharingOn()) {
-      say("Location update ho rahi hai…");
+      say(tr("Location update ho rahi hai…"));
       return updateMyLocation().then(function (res) {
         if (res && res.ok) { say(""); return true; }
-        say("Location save nahi hui — internet check kar ke dobara try karein.");
+        say(tr("Location save nahi hui — internet check kar ke dobara try karein."));
         return false;
       });
     }
-    say("Location li ja rahi hai — phone par Allow dabayein…");
+    say(tr("Location li ja rahi hai — phone par Allow dabayein…"));
     return getMyPosition().then(function (pos) {
       return saveMyLocation(pos.coords.latitude, pos.coords.longitude);
     }).then(function (res) {
       if (!res || !res.ok) {
-        if (res && res.reason === "no-table") say("Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).");
-        else say("Location save nahi hui — internet check kar ke dobara try karein.");
+        if (res && res.reason === "no-table") say(tr("Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai)."));
+        else say(tr("Location save nahi hui — internet check kar ke dobara try karein."));
         return false;
       }
       setLocSharing(true);
       renderLocToggle();
-      say("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho.");
+      say(tr("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho."));
       return true;
     }).catch(function (err) {
       var r = err && err.locReason;
-      if (r === "denied") say("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein.");
-      else if (r === "timeout") say("Location waqt par nahi mili — dobara try karein.");
-      else if (r === "unsupported") say("Is browser mein location support nahi hai.");
-      else say("Location nahi mili — dobara try karein.");
+      if (r === "denied") say(tr("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein."));
+      else if (r === "timeout") say(tr("Location waqt par nahi mili — dobara try karein."));
+      else if (r === "unsupported") say(tr("Is browser mein location support nahi hai."));
+      else say(tr("Location nahi mili — dobara try karein."));
       return false;
     });
   }
   function onLocToggle() {
-    if (guestMode || !session) { setLocMsg("Location share karne ke liye pehle login karein."); return; }
+    if (guestMode || !session) { setLocMsg(tr("Location share karne ke liye pehle login karein.")); return; }
     if (locSharingOn()) {
       // Band karo — pehle server par sharing_enabled=false, phir local off.
       // Server fail ho to toggle ON hi rehta hai (jhootha "band" nahi).
-      setLocMsg("Location share band ho raha hai…");
+      setLocMsg(tr("Location share band ho raha hai…"));
       stopSharingLocation().then(function (res) {
-        if (!res.ok) { setLocMsg("Band nahi ho saka — internet check kar ke dobara try karein."); return; }
+        if (!res.ok) { setLocMsg(tr("Band nahi ho saka — internet check kar ke dobara try karein.")); return; }
         setLocSharing(false);
         renderLocToggle();
-        setLocMsg("Location share band ho gaya — aap ka pin map se hat gaya.");
+        setLocMsg(tr("Location share band ho gaya — aap ka pin map se hat gaya."));
       });
       return;
     }
     // ON karo — shareMyLocation (map wala button bhi yahi use karta hai).
     shareMyLocation(setLocMsg);
+  }
+  // v142: "Meri location" (locate) — map ko apni location par centre karo.
+  // SIRF local hai: koi upload nahi hota (sharing toggle se bilkul alag) —
+  // locate dabane se sharing ON nahi hoti. Tiles fail hon to bhi kaam karta
+  // hai (marker DOM hai, tiles par depend nahi).
+  var mapLocateMarker = null;
+  function locateMe() {
+    if (!mapObj || !window.L) { setMapMsg(tr("Map load nahi hua — dobara try karein.")); return Promise.resolve(false); }
+    setMapMsg(tr(tr("Location li ja rahi hai — phone par Allow dabayein…")));
+    return getMyPosition().then(function (pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      try { if (mapLocateMarker) mapObj.removeLayer(mapLocateMarker); } catch (e) {}
+      try {
+        mapLocateMarker = window.L.marker([lat, lng], { icon: window.L.divIcon({
+          className: "map-locate", html: '<span class="map-locate-dot" aria-hidden="true"></span>',
+          iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -12]
+        }) }).addTo(mapObj);
+        mapLocateMarker.bindPopup("<strong>" + esc(tr("Aap yahan hain")) + "</strong>");
+      } catch (e) {}
+      try {
+        if (mapObj.flyTo) mapObj.flyTo([lat, lng], 15, { duration: 1 });
+        else mapObj.setView([lat, lng], 15);
+      } catch (e) { try { mapObj.setView([lat, lng], 15); } catch (e2) {} }
+      setMapMsg("");
+      return true;
+    }).catch(function (err) {
+      var r = err && err.locReason;
+      if (r === "denied") setMapMsg(tr("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein."));
+      else if (r === "timeout") setMapMsg(tr(tr("Location waqt par nahi mili — dobara try karein.")));
+      else if (r === "unsupported") setMapMsg(tr(tr("Is browser mein location support nahi hai.")));
+      else setMapMsg(tr(tr("Location nahi mili — dobara try karein.")));
+      return false;
+    });
   }
 
   function ensureProfile() {
@@ -7430,6 +7548,32 @@
   "Map ke tiles nahi load ho rahe — internet slow hai.": "Map tiles are not loading — internet is slow.",
   "Dobara try karein": "Try again",
   "Map ke baare mein": "About the map",
+  // ---- Map view v142 (tiles fallback + progress + locate + count i18n) ----
+  "1 dost location share kar raha hai.": "1 friend is sharing their location.",
+  "dost location share kar rahe hain.": "friends are sharing their location.",
+  "Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega.": "No friend is sharing their location yet — turn on your location from Account and your pin will appear.",
+  "Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge.": "The map table isn't created yet — the admin needs to run the SQL, then pins will appear.",
+  "Locations load nahi hui — internet check kar ke dobara try karein.": "Locations didn't load — check your internet and try again.",
+  "Map load nahi hua — internet check kar ke dobara try karein.": "Map didn't load — check your internet and try again.",
+  "Map load nahi hua — dobara try karein.": "Map didn't load — try again.",
+  "Band": "Off",
+  "Location update ho rahi hai…": "Updating location…",
+  "Location save nahi hui — internet check kar ke dobara try karein.": "Location didn't save — check your internet and try again.",
+  "Location li ja rahi hai — phone par Allow dabayein…": "Getting your location — tap Allow on your phone…",
+  "Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho.": "Location sharing is on — your pin will appear on the map while the app is open.",
+  "Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein.": "Location permission wasn't given — allow location in your phone settings, then try again.",
+  "Location waqt par nahi mili — dobara try karein.": "Location didn't arrive in time — try again.",
+  "Location nahi mili — dobara try karein.": "Location not found — try again.",
+  "Is browser mein location support nahi hai.": "This browser doesn't support location.",
+  "Location share band ho raha hai…": "Turning off location sharing…",
+  "Band nahi ho saka — internet check kar ke dobara try karein.": "Couldn't turn it off — check your internet and try again.",
+  "Location share band ho gaya — aap ka pin map se hat gaya.": "Location sharing is off — your pin is removed from the map.",
+  "Location share karne ke liye pehle login karein.": "Login first to share your location.",
+  "Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).": "Location didn't save — the map table isn't created yet (the SQL still needs to be run).",
+  "Tiles load ho rahi hain…": "Loading map tiles…",
+  "OpenStreetMap tiles nahi mil rahe — doosra map load ho raha hai…": "OpenStreetMap tiles aren't loading — trying another map…",
+  "Meri location": "My location",
+  "Aap yahan hain": "You are here",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -7470,6 +7614,7 @@
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText();
     renderAcctLang(); // v123: Account Language row ki value update karein (header button hata diya gaya)
     renderOffline(); // v136: badge ka text wapas sahi state par lao (data-i18n ne "Offline" likh diya hota hai)
+    if (typeof lastMapPinCount === "number" && lastMapPinCount >= 0) renderMapCount(lastMapPinCount); // v142: map count bhi nayi zaban mein
   }
   // v123: Account Language row ki value — zaban ka naam (proper name, translate nahi hota).
   function renderAcctLang() {
@@ -8348,6 +8493,7 @@
   $("mapLoginBtn").addEventListener("click", function () { showAuth(); }); // v141: guest empty state -> login screen
   $("mapShareBtn").addEventListener("click", function () { shareMyLocation(setMapMsg).then(function (ok) { if (ok) refreshMap(); }); }); // v141: zero-sharer CTA
   $("mapRetryBtn").addEventListener("click", retryMapTiles); // v141: tiles dobara mangwao
+  $("mapLocateBtn").addEventListener("click", locateMe); // v142: "Meri location" — map apni location par centre karo (local only, koi upload nahi)
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", openRateDialog);
   document.querySelectorAll("#rateStars .rate-star").forEach(function (b) {

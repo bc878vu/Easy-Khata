@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=104">
+<link rel="stylesheet" href="styles.css?v=105">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v141</p>
+    <p id="authVersion" class="auth-version">v142</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -621,7 +621,9 @@ window.addEventListener("error", function (e) {
         <div class="map-wrap" id="mapWrap">
           <div id="mapBox" class="map-box" role="img" aria-label="Map"></div>
           <div id="mapLoading" class="map-loading" hidden><span class="map-spinner" aria-hidden="true"></span><span data-i18n="Map load ho raha hai…">Map load ho raha hai…</span></div>
+          <button id="mapLocateBtn" class="map-locate-btn" type="button" data-i18n-title="Meri location" data-i18n-aria="Meri location" title="Meri location" aria-label="Meri location"><span aria-hidden="true">◎</span></button>
         </div>
+        <p id="mapTilesProg" class="map-prog" role="status" hidden></p>
         <div id="mapGuestBox" class="map-empty" hidden>
           <div class="map-empty-ic" aria-hidden="true">🗺️</div>
           <h3 data-i18n="Map dekhne ke liye login karein">Map dekhne ke liye login karein</h3>
@@ -923,6 +925,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=138"></script>
+<script src="app.js?v=139"></script>
 </body>
 </html>
