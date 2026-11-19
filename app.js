@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v143";
+  var APP_VERSION = "v144";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -1105,16 +1105,15 @@
   function resetTileCounters() { tileStarted = 0; tileLoaded = 0; tileFailed = 0; tilePending = 0; }
   function showMapLoading(on) { var el = $("mapLoading"); if (el) el.hidden = !on; }
   function showTilesNote(on) { var el = $("mapTilesNote"); if (el) el.hidden = !on; }
-  function showTilesProg(on, text) { var el = $("mapTilesProg"); if (!el) return; el.hidden = !on; if (on && text !== undefined) el.textContent = text; }
-  // Tile progress — kitni tiles mangi gayin, kitni aa gayin. Note sirf tab
-  // jab sab fail hon; pehli error par note dikhana ghalat hota (baaki tiles
-  // abhi load ho rahi hoti hain).
+  // v144: progress line UI se hata di (Boss order — "ye show na ho") — is liye
+  // showTilesProg ab maujood nahi. Counters (tileStarted/tileLoaded/
+  // tileFailed) ab bhi chalte hain: 45s watchdog + Esri fallback in par
+  // depend karte hain. Note sirf tab jab sab fail hon; pehli error par
+  // note dikhana ghalat hota (baaki tiles abhi load ho rahi hoti hain).
   function renderTileProgress() {
     if (tilePending > 0) {
-      showTilesProg(true, tr("Tiles load ho rahi hain…") + " (" + tileLoaded + "/" + tileStarted + ")");
       showTilesNote(false);
     } else {
-      showTilesProg(false);
       mapTilesBad = (tileLoaded === 0 && tileFailed > 0);
       if (mapTilesBad) showTilesNote(true);
       else showTilesNote(false);
@@ -1146,7 +1145,6 @@
     resetTileCounters();
     mapTileLayer = makeTileLayer();
     try { mapTileLayer.addTo(mapObj); } catch (e) {}
-    showTilesProg(true, tr("OpenStreetMap tiles nahi mil rahe — doosra map load ho raha hai…"));
     showTilesNote(false);
   }
   // Tiles dobara mangwao — layer hata kar dobara lagao taake atki hui
@@ -1156,7 +1154,6 @@
     if (!mapObj || !window.L) return;
     resetTileCounters();
     showTilesNote(false);
-    showTilesProg(false);
     try { if (mapTileLayer) mapObj.removeLayer(mapTileLayer); } catch (e) {}
     mapTileLayer = makeTileLayer();
     try { mapTileLayer.addTo(mapObj); } catch (e) {}
@@ -1183,18 +1180,63 @@
     mapTileLayer = makeTileLayer();
     try { mapTileLayer.addTo(mapObj); } catch (e) {}
   }
-  // Custom pin — naam ke pehle harf wala rang-biranga dot (default Leaflet
-  // marker ki PNG images ki zaroorat nahi — local bundle mein images nahi hain).
-  function locMarkerIcon(name) {
+  // Custom pin — profile photo ho to us ki gol pic, warna naam ke pehle
+  // harf wala rang-biranga dot (default Leaflet marker ki PNG images ki
+  // zaroorat nahi — local bundle mein images nahi hain). Tooti pic par
+  // avatarHtml ka data-fallback initials dikhata hai (document-level
+  // error listener, v24.4).
+  function locMarkerIcon(name, avatarUrl) {
     var nm = String(name || "Dost");
     var initial = (nm.trim().charAt(0) || "D").toUpperCase();
     var hue = 0;
     for (var i = 0; i < nm.length; i++) hue = (hue * 31 + nm.charCodeAt(i)) % 360;
+    var inner;
+    if (avatarUrl) inner = '<span class="map-pin-avatar">' + avatarHtml(avatarUrl, initial) + "</span>";
+    else inner = '<span class="map-pin-dot" style="background:hsl(' + hue + ',65%,45%)">' + esc(initial) + "</span>";
     return window.L.divIcon({
       className: "map-pin",
-      html: '<span class="map-pin-dot" style="background:hsl(' + hue + ',65%,45%)">' + esc(initial) + "</span>",
+      html: inner,
       iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18]
     });
+  }
+  // v144: map popup ke liye profile dhoondo (profiles loadAll mein aa chuki
+  // hoti hain — user_locations mein avatar/role/address nahi hote).
+  function profileById(id) {
+    var found = null;
+    (profiles || []).forEach(function (p) { if (p && p.id === id) found = p; });
+    return found;
+  }
+  // v144: pin tap par compact popup card — photo + naam + role badge +
+  // pata + phone (Call + WhatsApp). Jo field nahi hai, woh chhup jata hai
+  // ya halka fallback dikhta hai — card kabhi khaali ya crash nahi karta
+  // (migration na chali ho to bhi: role/address/phone undefined hote hain).
+  function mapUserPopupHtml(r) {
+    var p = (r && r.user_id) ? profileById(r.user_id) : null;
+    var nm = (p && p.name) || (r && r.display_name) || "Dost";
+    if (r && r.user_id && r.user_id === myId()) nm += " • Aap";
+    var role = p && p.business_role;
+    var addr = p && p.address;
+    var phone = (p && p.phone) || "";
+    var tel = normPhone(phone);
+    var html = '<div class="map-user-card">';
+    html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml(p && p.avatar_url, initials(nm)) + '</span>';
+    html += '<div class="map-user-id"><strong class="map-user-name">' + esc(nm) + "</strong>";
+    if (role) html += '<span class="map-user-role">' + esc(role) + "</span>";
+    else html += '<span class="map-user-role map-user-role-none">' + esc(tr("Role set nahi hai")) + "</span>";
+    html += "</div></div>";
+    if (addr) html += '<p class="map-user-addr">' + esc(addr) + "</p>";
+    if (tel) {
+      html += '<div class="map-user-actions">';
+      html += '<a class="map-user-btn" href="tel:+' + tel + '">📞 ' + esc(tr("Call karein")) + "</a>";
+      html += '<a class="map-user-btn map-user-btn-wa" href="https://wa.me/' + tel + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+      html += "</div>";
+      html += '<p class="map-user-phone">' + esc(phone) + "</p>";
+    } else {
+      html += '<p class="map-user-nophone">' + esc(tr("Phone number nahi diya")) + "</p>";
+    }
+    html += '<p class="map-user-time">' + esc(fmtRelTime(r && r.updated_at)) + "</p>";
+    html += "</div>";
+    return html;
   }
   function renderMapPins(rows) {
     if (!mapObj || !window.L) return 0;
@@ -1206,11 +1248,10 @@
       (rows || []).forEach(function (r) {
         var lat = Number(r.lat), lng = Number(r.lng);
         if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
-        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name) }).addTo(mapObj);
+        var prof = r.user_id ? profileById(r.user_id) : null;
+        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name, prof && prof.avatar_url) }).addTo(mapObj);
         try {
-          var nm = esc(r.display_name || "Dost");
-          if (r.user_id && r.user_id === myId()) nm += " • Aap";
-          marker.bindPopup("<strong>" + nm + "</strong><br>" + esc(fmtRelTime(r.updated_at)));
+          marker.bindPopup(mapUserPopupHtml(r), { maxWidth: 260 });
         } catch (e) {}
         mapMarkers.push(marker);
         bounds.push([lat, lng]);
@@ -1232,7 +1273,6 @@
       if (emptyBox) emptyBox.hidden = true;
       if (actions) actions.hidden = true;
       showTilesNote(false);
-      showTilesProg(false);
       showMapLoading(false);
       setMapMsg("");
       renderMapCount(-1);
@@ -1244,7 +1284,6 @@
     if (emptyBox) emptyBox.hidden = true;
     resetTileCounters();
     showTilesNote(false);
-    showTilesProg(false);
     setMapMsg("");
     renderMapCount(-1);
     showMapLoading(true);
@@ -1736,7 +1775,7 @@
     // save PATCH avatar_url likhta tha aur Storage upload bhi hota tha, lekin
     // ye SELECT columns hi nahi mangta tha — refresh ke baad me.avatar_url
     // undefined hota tha aur pic gayab ho jati thi (sirf initials dikhte the).
-    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal" + (withPhone ? ",phone" : "") + "&order=name.asc"); // v116: monthly_budget bhi; v117: savings_goal bhi
+    return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal" + (withPhone ? ",phone" : "") + ",business_role,address&order=name.asc"); // v116: monthly_budget bhi; v117: savings_goal bhi; v144: business_role + address bhi (map popup card)
   }
 
   function renderWorkspaceBar() {
@@ -1875,7 +1914,7 @@
     cdSync(sel);
   }
   function cdAttachStatic() {
-    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay", "txnCategory", "diaryCategory"].forEach(function (id) { // v113: category is a custom dropdown too
+    ["workspaceSelect", "txnPerson", "txnFilterPerson", "adminUserStatus", "adminUserSort", "adminCommunityStatus", "adminMemberCommunityFilter", "workspaceInviteRole", "txnRepeatFreq", "txnRepeatDay", "txnCategory", "diaryCategory", "myRole"].forEach(function (id) { // v113: category is a custom dropdown too; v144: myRole bhi
       var sel = $(id);
       if (sel) cdAttach(sel);
     });
@@ -2536,9 +2575,13 @@
     acceptInviteFromUrl().then(function (accepted) {
       if (accepted) { teardownRealtime(); loadAll(); return; }
       profilesQuery(true).then(function (res) {
-      // If a column doesn't exist yet (purana SQL), load with the minimal
-      // columns — warna 42703 retry bhi wahi columns mangta.
-      if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
+      // v144: naye columns (business_role/address) na hon to 42703 aata hai —
+      // pehle v143 wale columns se dobara try karo (avatar/phone salamat),
+      // phir bhi 42703 ho to minimal columns (purana SQL).
+      if (!res.ok && res.body && res.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at,avatar_url,username,active_workspace_id,monthly_budget,savings_goal,phone&order=name.asc").then(function (res2) {
+        if (!res2.ok && res2.body && res2.body.code === "42703") return sb("khata_profiles?select=id,name,email,created_at&order=name.asc");
+        return res2;
+      });
       return res;
     }).then(function (res) {
       if (!res.ok) {
@@ -4469,6 +4512,10 @@
     $("myUsername").value = (me && me.username) || "";
     $("myEmailView").value = (session.user && session.user.email) || "";
     if ($("myPhone") && document.activeElement !== $("myPhone")) $("myPhone").value = myPhone || (me && me.phone) || "";
+    // v144: role (custom dropdown — cdSync label taaza kare) + address.
+    var roleSel = $("myRole");
+    if (roleSel) { roleSel.value = (me && me.business_role) || ""; cdSync(roleSel); }
+    if ($("myAddress")) $("myAddress").value = (me && me.address) || "";
     pendingAvatarFile = null; removeAvatar = false;
     if ($("profilePicInput")) $("profilePicInput").value = "";
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
@@ -4578,10 +4625,15 @@
     var name = $("myNameInput").value.trim();
     var username = $("myUsername").value.trim();
     var phone = $("myPhone").value.trim();
+    var role = $("myRole") ? $("myRole").value : "";
+    var address = $("myAddress") ? $("myAddress").value.trim() : "";
+    var ROLES = ["Businessman", "Supplier", "Customer", "Dealer"]; // v144: map popup badge
     if (!name) { setPhoneMsg("Apna naam likhein.", false); return; }
     if (name.length > 80) { setPhoneMsg("Naam 80 harf se zyada nahi ho sakta.", false); return; }
     if (username && !/^[A-Za-z0-9_.]{3,30}$/.test(username)) { setPhoneMsg("Username 3–30 harf ka ho — sirf harf, number, _ aur . chalenge.", false); return; }
     if (phone && !normPhone(phone)) { setPhoneMsg("Sahi phone number likhein (example: 0300 1234567).", false); return; }
+    if (role && ROLES.indexOf(role) === -1) { setPhoneMsg("Role galat hai — list se chunein.", false); return; }
+    if (address.length > 200) { setPhoneMsg("Pata 200 harf se zyada nahi ho sakta.", false); return; }
     // v24.11: offline pre-check hata diya — navigator.onLine ka ghalat false
     // flag save rok deta tha jabke internet theek tha (yehi Toseef ke case
     // ka sab se likely cause hai: koi network call hue baghair hi "internet
@@ -4609,18 +4661,35 @@
           if (removeAvatar) return "__REMOVE__";
           return null;
         }).then(function (avatarUrl) {
-          var body = { name: name, phone: phone || null, username: username || null };
+          var body = { name: name, phone: phone || null, username: username || null, business_role: role || null, address: address || null };
           if (avatarUrl === "__REMOVE__") body.avatar_url = null;
           else if (avatarUrl) body.avatar_url = avatarUrl;
-          return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
-            method: "PATCH",
-            prefer: "return=representation",
-            body: body
+          var newColsOk = true;
+          var patchOnce = function (b) {
+            return sb("khata_profiles?id=eq." + encodeURIComponent(myId()), {
+              method: "PATCH",
+              prefer: "return=representation",
+              body: b
+            });
+          };
+          return patchOnce(body).then(function (res) {
+            // v144: migration abhi na chali ho to naye columns (business_role/
+            // address) nahi honge — PostgREST 400 deta hai; dobara try karein
+            // bina un ke taake profile save kabhi na ruke.
+            if (!res.ok && res.status === 400) {
+              newColsOk = false;
+              var body2 = { name: name, phone: phone || null, username: username || null };
+              if (avatarUrl === "__REMOVE__") body2.avatar_url = null;
+              else if (avatarUrl) body2.avatar_url = avatarUrl;
+              return patchOnce(body2);
+            }
+            return res;
           }).then(function (res) {
             if (!res.ok) throw new Error("profile-save-failed " + res.status);
             if (res.body && res.body.length) return res.body[0];
             // No profile row exists — PATCH silently does nothing, so create it.
             var up = { id: myId(), name: name, email: (session.user && session.user.email) || "", phone: phone || null, username: username || null };
+            if (newColsOk) { up.business_role = role || null; up.address = address || null; }
             if (body.avatar_url) up.avatar_url = body.avatar_url;
             return sb("khata_profiles?on_conflict=id", {
               method: "POST",
@@ -4644,6 +4713,8 @@
         me.name = name; me.phone = phone || null; me.username = username || null;
         if (saved && "avatar_url" in saved) me.avatar_url = saved.avatar_url;
         else if (removeAvatar) me.avatar_url = null;
+        if (saved && "business_role" in saved) me.business_role = saved.business_role;
+        if (saved && "address" in saved) me.address = saved.address;
       }
       myPhone = phone;
       if (session.user) {
@@ -7581,10 +7652,17 @@
   "Location share band ho gaya — aap ka pin map se hat gaya.": "Location sharing is off — your pin is removed from the map.",
   "Location share karne ke liye pehle login karein.": "Login first to share your location.",
   "Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).": "Location didn't save — the map table isn't created yet (the SQL still needs to be run).",
-  "Tiles load ho rahi hain…": "Loading map tiles…",
-  "OpenStreetMap tiles nahi mil rahe — doosra map load ho raha hai…": "OpenStreetMap tiles aren't loading — trying another map…",
   "Meri location": "My location",
   "Aap yahan hain": "You are here",
+  // ---- Map view v144 (avatar pins + popup card + profile role/address) ----
+  "Role set nahi hai": "Role not set",
+  "Phone number nahi diya": "No phone number given",
+  "Call karein": "Call",
+  "Mera kaam (role)": "My role",
+  "Mera pata (address)": "My address",
+  "Example: Lahore, Pakistan": "Example: Lahore, Pakistan",
+  "Role galat hai — list se chunein.": "Invalid role — choose from the list.",
+  "Pata 200 harf se zyada nahi ho sakta.": "Address can't be longer than 200 characters.",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local

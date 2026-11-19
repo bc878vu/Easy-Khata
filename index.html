@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=105">
+<link rel="stylesheet" href="styles.css?v=106">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v143</p>
+    <p id="authVersion" class="auth-version">v144</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -533,6 +533,20 @@ window.addEventListener("error", function (e) {
           <label for="myPhone" data-i18n="Mera WhatsApp number">Mera WhatsApp number</label>
           <input id="myPhone" type="tel" placeholder="Example: 0300 1234567" autocomplete="tel" data-i18n-ph="Example: 0300 1234567">
         </div>
+        <div class="field">
+          <label for="myRole" data-i18n="Mera kaam (role)">Mera kaam (role)</label>
+          <select id="myRole">
+            <option value="">—</option>
+            <option value="Businessman">Businessman</option>
+            <option value="Supplier">Supplier</option>
+            <option value="Customer">Customer</option>
+            <option value="Dealer">Dealer</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="myAddress" data-i18n="Mera pata (address)">Mera pata (address)</label>
+          <input id="myAddress" type="text" maxlength="200" placeholder="Example: Lahore, Pakistan" data-i18n-ph="Example: Lahore, Pakistan">
+        </div>
         <button id="savePhoneBtn" class="btn btn-primary" type="button" data-i18n="Profile save karein">Profile save karein</button>
         <p id="phoneMsg" class="msg" role="status"></p>
         <button id="changePassBtn" class="btn btn-soft" type="button" data-i18n="🔑 Password badlein">🔑 Password badlein</button>
@@ -623,7 +637,6 @@ window.addEventListener("error", function (e) {
           <div id="mapLoading" class="map-loading" hidden><span class="map-spinner" aria-hidden="true"></span><span data-i18n="Map load ho raha hai…">Map load ho raha hai…</span></div>
           <button id="mapLocateBtn" class="map-locate-btn" type="button" data-i18n-title="Meri location" data-i18n-aria="Meri location" title="Meri location" aria-label="Meri location"><span aria-hidden="true">◎</span></button>
         </div>
-        <p id="mapTilesProg" class="map-prog" role="status" hidden></p>
         <div id="mapGuestBox" class="map-empty" hidden>
           <div class="map-empty-ic" aria-hidden="true">🗺️</div>
           <h3 data-i18n="Map dekhne ke liye login karein">Map dekhne ke liye login karein</h3>
@@ -925,6 +938,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=140"></script>
+<script src="app.js?v=141"></script>
 </body>
 </html>
