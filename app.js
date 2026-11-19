@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v151";
+  var APP_VERSION = "v152";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -7780,6 +7780,8 @@
   "History — doston ki list dekhein": "History — see the friends list",
   "History": "History",
   "Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.": "Friends list — tap a friend to see their ledger.",
+  // ---- History (v152 correction: doston ki list main page par wapas; History = All Records) ----
+  "History — purane records dekhein": "History — see old records",
   "Customer dhoondhein…": "Find a customer…",
   "Name A–Z": "Name A–Z",
   "From": "From",
@@ -9286,8 +9288,8 @@
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain
   $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
-  // v150: History — doston ki list kholo (taaza render) / wapas Khata par jao.
-  $("historyJumpBtn").addEventListener("click", function () { renderPeople(); showView("history"); });
+  // v152: History — All Records kholo (taaza render) / wapas Khata par jao. (v150 correction: doston ki list main page par wapas, History mein sirf records.)
+  $("historyJumpBtn").addEventListener("click", function () { renderTxns(); showView("history"); });
   $("historyBackBtn").addEventListener("click", function () { showView("khata"); });
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });

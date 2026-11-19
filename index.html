@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v151</p>
+    <p id="authVersion" class="auth-version">v152</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -243,16 +243,32 @@ window.addEventListener("error", function (e) {
         </div>
       </div>
 
-      <!-- v150: tools toolbar — Diary + Ghar + Due + Budget + Goal + History (v125 se; History doston ki list kholta hai, baaki modal card kholte hain). -->
+      <div class="people-search-wrap search-wrap">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein…" data-i18n-ph="Dost dhoondhein…">
+      </div>
+
+      <div class="people-head-row">
+        <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
+        <button id="dukaanToggleBtn" class="btn btn-ghost dukaan-pill" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
+      </div>
+      <!-- v150: tools toolbar — Diary + Ghar + Due + Budget + Goal + History (v125 se; History All Records kholta hai, baaki modal card kholte hain). v152: doston ki list wapas main page par (v150 correction). -->
       <div class="tools-row" role="toolbar" aria-label="Tools">
         <button id="diaryJumpBtn" class="btn btn-soft tool-btn" type="button" title="Diary — calendar kholein" data-i18n="📅 Diary" data-i18n-title="Diary — calendar kholein">📅 Diary</button>
         <button id="householdJumpBtn" class="btn btn-soft tool-btn" type="button" title="Ghar ka kharcha dekhein" data-i18n="🏠 Ghar" data-i18n-title="Ghar ka kharcha dekhein">🏠 Ghar</button>
         <button id="dueJumpBtn" class="btn btn-soft tool-btn" type="button" title="Due-soon udhaar dekhein" data-i18n="⏰ Due" data-i18n-title="Due-soon udhaar dekhein">⏰ Due</button>
         <button id="budgetJumpBtn" class="btn btn-soft tool-btn" type="button" title="Monthly Budget dekhein" data-i18n="💰 Budget" data-i18n-title="Monthly Budget dekhein">💰 Budget</button>
         <button id="goalJumpBtn" class="btn btn-soft tool-btn" type="button" title="Bachat Goal dekhein" data-i18n="🎯 Goal" data-i18n-title="Bachat Goal dekhein">🎯 Goal</button>
-        <button id="historyJumpBtn" class="btn btn-soft tool-btn" type="button" title="History — doston ki list dekhein" data-i18n="🕐 History" data-i18n-title="History — doston ki list dekhein">🕐 History</button>
+        <button id="historyJumpBtn" class="btn btn-soft tool-btn" type="button" title="History — purane records dekhein" data-i18n="🕐 History" data-i18n-title="History — purane records dekhein">🕐 History</button>
       </div>
 
+      <!-- v147: friend suggestions — DOST list ke upar, logged-in only (guest mein chhupa). -->
+      <div id="suggestBox" class="card suggest-box" hidden>
+        <p class="section-label" data-i18n="Aap ke liye suggestions">Aap ke liye suggestions</p>
+        <div id="suggestList"></div>
+      </div>
+      <p id="peopleMsg" class="msg" role="status"></p>
+      <div id="peopleList" class="people"></div>
       <div class="actions-row">
         <button id="shareAllBtn" class="btn btn-soft" type="button" data-i18n="📤 Apna balance share karein">📤 Apna balance share karein</button>
       </div>
@@ -382,6 +398,17 @@ window.addEventListener("error", function (e) {
         </form>
       </div>
 
+      <!-- v114: Kharcha Diary + Calendar -->
+      <!-- v115: Ghar ka kharcha -->
+    </section>
+
+    <!-- Person detail -->
+    <!-- v152: History view — CORRECTION of v150 (user 19 Nov 19:12 PKT): doston ki list main page par wapas hai, v150 ka move ghalat tha; History mein ab SIRF All Records section hai. -->
+    <section id="historyView" hidden>
+      <div class="card">
+        <button id="historyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
+        <h2 style="margin-top:10px" data-i18n="History">History</h2>
+      </div>
       <div class="card accent" id="ledgerCard">
         <div class="list-head">
           <h2 data-i18n="All Records">All Records</h2>
@@ -408,35 +435,6 @@ window.addEventListener("error", function (e) {
         </div>
         <div id="txnList" class="txns scroll-box"></div>
         <p id="txnScrollHint" class="scroll-hint" hidden data-i18n="↓ Neeche scroll karein — purane records dekhne ke liye">↓ Neeche scroll karein — purane records dekhne ke liye</p>
-      </div>
-
-      <!-- v114: Kharcha Diary + Calendar -->
-      <!-- v115: Ghar ka kharcha -->
-    </section>
-
-    <!-- Person detail -->
-    <!-- v150: History view — doston ki list yahan dikhti hai (main page se hatayi gayi). -->
-    <section id="historyView" hidden>
-      <div class="card">
-        <button id="historyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
-        <h2 style="margin-top:10px" data-i18n="History">History</h2>
-        <p class="muted" data-i18n="Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.">Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.</p>
-      <div class="people-search-wrap search-wrap">
-        <span class="search-icon" aria-hidden="true">🔍</span>
-        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein…" data-i18n-ph="Dost dhoondhein…">
-      </div>
-
-      <div class="people-head-row">
-        <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
-        <button id="dukaanToggleBtn" class="btn btn-ghost dukaan-pill" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
-      </div>
-      <!-- v147: friend suggestions — DOST list ke upar, logged-in only (guest mein chhupa). -->
-      <div id="suggestBox" class="card suggest-box" hidden>
-        <p class="section-label" data-i18n="Aap ke liye suggestions">Aap ke liye suggestions</p>
-        <div id="suggestList"></div>
-      </div>
-      <p id="peopleMsg" class="msg" role="status"></p>
-      <div id="peopleList" class="people"></div>
       </div>
     </section>
 
@@ -1004,6 +1002,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=148"></script>
+<script src="app.js?v=149"></script>
 </body>
 </html>
