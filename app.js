@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v153";
+  var APP_VERSION = "v154";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -601,9 +601,12 @@
     name = name.trim();
     if (!name) { setTxnMsg("Naam khali nahi ho sakta.", false); return; }
     if (name.length > 80) { setTxnMsg("Naam 80 haroof se chhota rakhein.", false); return; }
-    var contact = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null, manual: true, created_at: new Date().toISOString() };
+    // v154: per-workspace row — naya UUID + linked_profile_id (party id).
+    // id = party id wali purani design doosri workspace mein 409 deti thi
+    // (khata_contacts.id PRIMARY KEY — wohi bug jo Add-friend mein tha).
+    var contact = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null, linked_profile_id: id, manual: true, created_at: new Date().toISOString() };
     if (guestMode) {
-      myContacts = myContacts.filter(function (x) { return x.id !== id; });
+      myContacts = myContacts.filter(function (x) { return x.id !== id && x.linked_profile_id !== id; });
       myContacts.push(contact);
       saveGuestStore();
       renderAll();
@@ -611,13 +614,13 @@
       return;
     }
     function applyName() {
-      myContacts = myContacts.filter(function (x) { return x.id !== id; });
+      myContacts = myContacts.filter(function (x) { return x.id !== id && x.linked_profile_id !== id; });
       myContacts.push(contact);
       saveCache();
       renderAll();
       setTxnMsg("Naam save ho gaya — ab har record mein yehi naam nazar aayega.", true);
     }
-    sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null } })
+    sb("khata_contacts", { method: "POST", prefer: "return=minimal", body: { id: contact.id, owner_id: myId(), workspace_id: currentWorkspaceId, name: name, phone: null, linked_profile_id: id } })
       .then(function (res) {
         if (!res.ok) { setTxnMsg("Naam save nahi hua. Dobara try karein.", false); return; }
         applyName();
@@ -651,6 +654,24 @@
       if (p.id !== me) map[p.id] = { name: p.name || p.email, phone: p.phone || "", avatar_url: p.avatar_url || null, givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, first: null, last: null };
     });
     myContacts.forEach(function (c) {
+      // v154: per-workspace linked row (Add-friend/card add, nayi design) —
+      // row ki id aik naya UUID hai, profile linked_profile_id mein hai.
+      // Profile ki entry mein merge karo (photo/phone/role barkarar, naam
+      // override, friend=true) — bilkul waisa hi jaisa purani id=profile-id
+      // rows ke liye neeche hota hai. Profile load na hui ho to bhi profile
+      // id ki entry banao taake ledger (profile ids se) is se jur sake.
+      var linkId = c.linked_profile_id || null;
+      if (linkId) {
+        var exL = map[linkId];
+        if (exL) {
+          if (c.name) exL.name = c.name;
+          if (c.credit_limit != null && !isNaN(c.credit_limit)) exL.credit_limit = Number(c.credit_limit);
+          exL.friend = true;
+        } else {
+          map[linkId] = { name: c.name || "Unknown", phone: "", avatar_url: null, givenMinor: 0, takenMinor: 0, given: 0, taken: 0, net: 0, first: null, last: null, friend: true, credit_limit: (c.credit_limit == null ? null : Number(c.credit_limit)) };
+        }
+        return;
+      }
       if (map[c.id]) {
         // v147: contact row jis ki id kisi profile ki id hai (rename ya
         // Add-friend) — profile ka data (photo/phone/role) barkarar rakho,
@@ -682,6 +703,15 @@
       map[id].net = moneyFromMinor(map[id].givenMinor - map[id].takenMinor);
     });
     return map;
+  }
+  // v154: is shakhs ki contact row dhoondo — purani rows ki id hi profile
+  // id hai, nayi per-workspace rows ki linked_profile_id. Dono chalte hain
+  // (purani rows ko chhede baghair). deleteContact / credit limit / card /
+  // suggest "already" checks sab yahi helper use karte hain.
+  function contactForPerson(personId) {
+    var found = null;
+    (myContacts || []).forEach(function (c) { if (c.id === personId || c.linked_profile_id === personId) found = c; });
+    return found;
   }
   function personTxns(id) {
     // This person's records, newest first (txns are already sorted desc).
@@ -911,6 +941,7 @@
   /* ---------- views (bottom nav: Khata | Account) ---------- */
   var currentView = "khata";
   function showView(name) {
+    closeDrawer(); // v154: navigation par drawer band (nav/back/tools sab yahin se guzarte hain)
     closeDiaryModal(); // v124: view badle to diary modal band
     currentView = name;
     $("khataView").hidden = name !== "khata";
@@ -938,6 +969,45 @@
     if (name === "hidden") renderHiddenTxns();
     if (name === "map") refreshMap(); // v140: har dafa taaza pins
     window.scrollTo(0, 0);
+  }
+  /* ---------- v154: hamburger drawer (☰) — super-home menu ----------
+     Header ke ☰ se khulta hai; Settings (Language, Theme, Notifications,
+     Location, PIN Lock, Install) + Tools (Budget, Goal, Recurring, Backup,
+     Dukaan mode). Drawer har view se khulta hai (app shell ka hissa, kisi
+     view ke andar nahi) — is liye is ki labels renderDrawer() se taaza hoti
+     hain, renderAccount() se nahi (v153 lazy-render: Account band ho to
+     renderAccount chalta hi nahi). Navigation items showView se guzarte
+     hain (drawer khud band ho jata hai); tool modals (Budget/Goal) handler
+     mein closeDrawer() karte hain; toggles (Language/Theme/PIN/Dukaan)
+     dabane par drawer khula rehta hai taake aik se zyada setting badli ja
+     sake. Guest: Notifications + Location chhupe (Account wale rules wahi);
+     baaki settings guest ke liye bhi kaam karti hain (device-level). */
+  function isDrawerOpen() { var d = $("menuDrawer"); return !!(d && !d.hidden); }
+  function openDrawer() {
+    var d = $("menuDrawer"), b = $("menuDrawerBackdrop");
+    if (!d || !b) return;
+    renderDrawer();
+    d.hidden = false; b.hidden = false;
+    var hb = $("menuDrawerBtn"); if (hb) hb.setAttribute("aria-expanded", "true");
+  }
+  function closeDrawer() {
+    var d = $("menuDrawer"), b = $("menuDrawerBackdrop");
+    if (d) d.hidden = true;
+    if (b) b.hidden = true;
+    var hb = $("menuDrawerBtn"); if (hb) hb.setAttribute("aria-expanded", "false");
+  }
+  function renderDrawer() {
+    // Guest rules (Account se move hue — wahi shartein):
+    var pb = $("acctPushBtn"); if (pb) pb.hidden = guestMode; // Notifications sirf logged-in
+    renderLocRow(); // acctLocBtn: guest mein chhupa (v140 s9/s19 boot contract)
+    renderPinLockMenu(); // PIN label + "Abhi lock karein" visibility
+    renderInstallBtn(); // install prompt aaya ho to dikhao
+    renderAcctLang(); // Language row ki value
+    updatePushToggleLabel(); // Notifications label (On/Blocked/On karein)
+    var tv = $("drawerThemeValue");
+    if (tv) { var m = document.documentElement.getAttribute("data-theme") || "light"; tv.textContent = m === "dark" ? tr("Dark") : tr("Light"); }
+    var dv = $("drawerDukaanValue");
+    if (dv) dv.textContent = dukaanMode ? tr("On") : tr("Off");
   }
   function showAppView() {
     showView("khata");
@@ -2531,12 +2601,13 @@
       id: body.id || newUuid(),
       owner_id: body.owner_id, workspace_id: body.workspace_id || currentWorkspaceId,
       name: body.name, phone: body.phone || null,
+      linked_profile_id: body.linked_profile_id || null, // v154: linked row ka link offline bhi barkarar
       created_at: body.created_at || new Date().toISOString(), manual: true
     };
     myContacts.push(rec);
     queueOp({ key: newUuid(), op: "insert", table: "khata_contacts", id: rec.id, body: {
       id: rec.id, owner_id: rec.owner_id, workspace_id: rec.workspace_id,
-      name: rec.name, phone: rec.phone
+      name: rec.name, phone: rec.phone, linked_profile_id: rec.linked_profile_id
     }, ts: Date.now() });
     saveCache();
     return rec;
@@ -2891,6 +2962,7 @@
     renderAccount();
     renderWorkspaceBar(); // v153: workspace bar main page par hai — renderAccount se yahan, taake Account band ho to bhi taaza rahe
     renderLocRow(); // v153: location toggle row — boot par bhi state sahi honi chahiye (v140 s9/s19)
+    renderDrawer(); // v154: drawer labels har renderAll par taaza (drawer kisi bhi view se khul sakta hai)
     renderAdmin();
     renderRecurringList(); // v87: recurring page ki list taaza (chhoti list, sasti)
     openPendingCard(); // v151: ?card= link se aaya ho to Khata Card kholo (aik dafa)
@@ -3263,6 +3335,15 @@
         // (Ayaz) ke naam pehle "Private contact" dikhte the aur wahi stuck rehta
         // tha — contacts aate hi ledger dobara render karein.
         renderTxns();
+        // v154: boot race — renderAll (card) loadContacts se pehle chal jata
+        // hai; contacts aate hi card dobara render karo taake "Pehle se
+        // dost hain" sahi dikhe (warna pehle se dost ka card bhi "Dost add
+        // karein" dikhata tha).
+        if (currentView === "card" && currentCardPersonId) {
+          var cp = null;
+          (profiles || []).forEach(function (pr) { if (pr && pr.id === currentCardPersonId) cp = pr; });
+          if (cp) renderCardView(cp);
+        }
         saveCache();
         return maybeLinkContacts();
       }).catch(function () { return 0; });
@@ -3276,6 +3357,7 @@
     var jobs = [];
     myContacts.forEach(function (c) {
       if (!c.phone) return;
+      if (c.linked_profile_id) return; // v154: linked row — profile se jura hai, isay kabhi link/delete nahi karna (phone bhi null hota hai, upar wali line bhi rok deti hai — ye defence hai)
       var target = null;
       profiles.forEach(function (p) {
         if (p.id !== myId() && contactPhoneMatch(c.phone, p.phone)) target = p;
@@ -3557,9 +3639,11 @@
     });
   }
   function deleteContact(id) {
-    var c = null;
-    myContacts.forEach(function (x) { if (x.id === id) c = x; });
+    var c = contactForPerson(id); // v154: linked row bhi mile (id ya linked_profile_id)
     if (!c) return;
+    // v154: row operations (DELETE / outbox / local filter) ROW ki id (c.id)
+    // se hote hain — linked row ki id UUID hai, person id nahi. Txn wale
+    // hisaab (count/hide) person id se hi rehte hain (txns mein profile id hoti hai).
     // My own manual contact — can be deleted even with records (user request 2026-11-05).
     // If there are records, those are deleted first (only the ones I created), then the contact.
     // BUT: settled history can never be deleted — if any record is locked, refuse.
@@ -3577,7 +3661,7 @@
         // delete, koi server call, koi outbox nahi. Settled history pehle
         // hi upar rok di gayi hai (hasLocked check).
         txns = txns.filter(function (t) { return !(t.payer_id === id || t.receiver_id === id); });
-        myContacts = myContacts.filter(function (x) { return x.id !== id; });
+        myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
         saveGuestStore();
         renderAll(); // v86: poora render — khata list + detail bhi taaza (stale rows na rahein)
         setPeopleMsg("Contact remove ho gaya.", true);
@@ -3585,10 +3669,10 @@
       }
       var deleteRowOffline = function () {
         // Pending contact insert hai to use hata dein (delete op nahi chahiye).
-        if (!removePendingInsert("khata_contacts", id)) {
-          queueOp({ key: newUuid(), op: "delete", table: "khata_contacts", id: id, ts: Date.now() });
+        if (!removePendingInsert("khata_contacts", c.id)) {
+          queueOp({ key: newUuid(), op: "delete", table: "khata_contacts", id: c.id, ts: Date.now() });
         }
-        myContacts = myContacts.filter(function (x) { return x.id !== id; });
+        myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
         saveCache();
         renderSummary();
         refreshPeopleUI();
@@ -3600,10 +3684,10 @@
         mine.forEach(function (t) { offlineTxnHide(t.id); });
       };
       var deleteRow = function () {
-        sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "DELETE" })
+        sb("khata_contacts?id=eq." + encodeURIComponent(c.id), { method: "DELETE" })
           .then(function (res) {
             if (!res.ok) { setPeopleMsg("Contact delete nahi hua.", false); return; }
-            myContacts = myContacts.filter(function (x) { return x.id !== id; });
+            myContacts = myContacts.filter(function (x) { return x.id !== c.id; });
             renderSummary();
             refreshPeopleUI();
             setPeopleMsg("Contact remove ho gaya.", true);
@@ -5042,7 +5126,7 @@
   function findPerson(id) {
     var found = null;
     profiles.forEach(function (p) { if (p.id === id) found = p; });
-    if (!found) myContacts.forEach(function (c) { if (c.id === id) found = c; });
+    if (!found) myContacts.forEach(function (c) { if (c.id === id || c.linked_profile_id === id) found = c; }); // v154: linked row bhi naam deti hai
     return found;
   }
   function sharePerson(id) {
@@ -5523,7 +5607,7 @@
     var myAddr = myP.address || "";
     var map = peopleMap();
     var excluded = {};
-    myContacts.forEach(function (c) { excluded[c.id] = true; });
+    myContacts.forEach(function (c) { excluded[c.id] = true; if (c.linked_profile_id) excluded[c.linked_profile_id] = true; }); // v154: linked row bhi usi shakhs ko exclude kare
     var contactPhones = {};
     myContacts.forEach(function (c) { if (c.phone) contactPhones[normPhone(c.phone)] = true; });
     Object.keys(map).forEach(function (id) { var p = map[id]; if (p.first || p.last) excluded[id] = true; });
@@ -5600,13 +5684,15 @@
     var p = null;
     profiles.forEach(function (x) { if (x.id === id) p = x; });
     if (!p) return;
-    var already = null;
-    myContacts.forEach(function (c) { if (c.id === id) already = c; });
-    if (already) { renderSuggestions(); return; } // double-tap / race — dobara POST nahi
-    // id = profile id (rename flow jaisa), phone null — maybeLinkContacts
+    if (contactForPerson(id)) { renderSuggestions(); return; } // v154: is workspace mein pehle se dost — dobara POST nahi (double-tap / race)
+    // v154: PER-WORKSPACE row — id naya UUID, profile linked_profile_id
+    // mein. Purani design (id = profile id) doosri workspace mein 409
+    // deti thi: khata_contacts.id PRIMARY KEY hai, aik shakhs ki sirf aik
+    // row ban sakti thi (Toseef: Personal wali row ki wajah se Business
+    // mein "Couldn't add friend"). Phone null — maybeLinkContacts
     // phone-match se is row ko foran delete na kar de; profile ka phone
     // peopleMap merge se hi milta hai. Koi ledger transaction nahi banti.
-    var body = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null };
+    var body = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null, linked_profile_id: id };
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: body }).then(function (res) {
       if (!res.ok) {
         if (isTransientResponse(res)) {
@@ -5622,7 +5708,7 @@
       }
       var created = res.body && res.body[0];
       if (created) { created.manual = true; myContacts.push(created); }
-      else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null, manual: true });
+      else myContacts.push({ id: body.id, owner_id: myId(), workspace_id: currentWorkspaceId, name: p.name || "", phone: null, linked_profile_id: id, manual: true });
       saveCache();
       renderSuggestions(); refreshPeopleUI();
       setPeopleMsg((p.name || "") + " " + tr("dost ban gaya!"), true);
@@ -5701,7 +5787,8 @@
       var gn = $("guestNameInput");
       if (gn) gn.value = guestMeName || "";
     }
-    $("acctPushBtn").hidden = guestMode;
+    // v154: acctPushBtn ka guest-hide renderDrawer() mein chala gaya
+    // (drawer kisi bhi view se khulta hai — Account band ho to bhi sahi ho).
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
@@ -5801,6 +5888,7 @@
      warna seedha fetch (logged-in: khata_profiles; guest: public view
      map_public_locations — sirf safe columns, phone kabhi nahi). */
   var pendingCardId = null;
+  var currentCardPersonId = null; // v154: card view mein dikh raha shakhs — contacts aate hi card dobara render ho (boot race)
   function openPendingCard() {
     if (!pendingCardId) return;
     var id = pendingCardId;
@@ -5828,14 +5916,14 @@
     return html;
   }
   function renderCardView(p) {
+    currentCardPersonId = (p && p.id) || null; // v154: contacts aate hi dobara render ke liye yaad rakho
     var body = $("cardViewBody");
     if (body) body.innerHTML = cardViewHtml(p);
     var btn = $("cardAddFriendBtn");
     if (!btn) return;
     if (!p || !p.id) { btn.hidden = true; return; }
     if (p.id === myId()) { btn.hidden = true; setCardMsg(tr("Ye aap ka apna card hai"), true); return; }
-    var already = false;
-    (myContacts || []).forEach(function (c) { if (c.id === p.id) already = true; });
+    var already = !!contactForPerson(p.id); // v154: is workspace mein pehle se dost (id ya linked_profile_id)
     if (already) { btn.hidden = true; setCardMsg(tr("Pehle se dost hain"), true); return; }
     btn.hidden = false;
     btn.disabled = false;
@@ -5872,19 +5960,17 @@
       if (body) body.innerHTML = '<p class="empty">' + esc(tr("Card nahi mila — link ghalat ho sakta hai. Login kar ke dobara try karein.")) + "</p>";
     });
   }
-  // Card se dost add karo — addSuggestFriend jaisa POST (profile-keyed
-  // contact, phone null, koi ledger transaction nahi), lekin is ke apne
-  // card messages ke saath (v147 wala code chheda nahi — wahan ka
-  // setPeopleMsg History view par hai, yahan cardMsg chahiye).
+  // Card se dost add karo — addSuggestFriend jaisa POST (v154 per-workspace
+  // row: naya UUID + linked_profile_id, phone null, koi ledger transaction
+  // nahi), lekin is ke apne card messages ke saath (v147 wala code chheda
+  // nahi — wahan ka setPeopleMsg History view par hai, yahan cardMsg chahiye).
   function addCardFriend(id) {
     if (guestMode || !session) { setCardMsg(tr("Dost add karne ke liye pehle login karein."), false); return; }
     var p = null;
     (profiles || []).forEach(function (x) { if (x.id === id) p = x; });
     var nm = (p && p.name) || "";
-    var already = null;
-    (myContacts || []).forEach(function (c) { if (c.id === id) already = c; });
-    if (already) { setCardMsg(tr("Pehle se dost hain"), true); var b0 = $("cardAddFriendBtn"); if (b0) b0.hidden = true; return; }
-    var body = { id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null };
+    if (contactForPerson(id)) { setCardMsg(tr("Pehle se dost hain"), true); var b0 = $("cardAddFriendBtn"); if (b0) b0.hidden = true; return; } // v154: is workspace mein pehle se dost
+    var body = { id: newUuid(), owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null, linked_profile_id: id };
     sb("khata_contacts", { method: "POST", prefer: "return=representation", body: body }).then(function (res) {
       if (!res.ok) {
         if (isTransientResponse(res)) {
@@ -5900,7 +5986,7 @@
       }
       var created = res.body && res.body[0];
       if (created) { created.manual = true; myContacts.push(created); }
-      else myContacts.push({ id: id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null, manual: true });
+      else myContacts.push({ id: body.id, owner_id: myId(), workspace_id: currentWorkspaceId, name: nm, phone: null, linked_profile_id: id, manual: true });
       saveCache();
       renderSuggestions(); refreshPeopleUI();
       setCardMsg((nm || "") + " " + tr("dost ban gaya!"), true);
@@ -6065,16 +6151,14 @@
     }
     $("detailSettleBtn").hidden = !s.net;
     renderDetailPay(); // v117: JazzCash/Easypaisa settle box
-    var isManual = false;
-    myContacts.forEach(function (c) { if (c.id === id) isManual = true; });
+    var isManual = !!contactForPerson(id); // v154: linked row bhi dost hai (Remove + credit limit dikhao)
     $("detailRemoveBtn").hidden = !isManual;
     // v115: credit limit editor — sirf manual contacts (dukaan ke customers) ke liye.
     var creditBox = $("detailCreditBox");
     if (creditBox) {
       creditBox.hidden = !isManual;
       if (isManual) {
-        var cc = null;
-        myContacts.forEach(function (x) { if (x.id === id) cc = x; });
+        var cc = contactForPerson(id);
         $("detailCreditLimit").value = (cc && cc.credit_limit != null && cc.credit_limit !== "") ? String(cc.credit_limit) : "";
         setDetailCreditMsg("");
       }
@@ -6164,6 +6248,14 @@
     if (real) html += '<optgroup label="App par dost">' + real + '</optgroup>';
     var manual = "";
     myContacts.forEach(function (c) {
+      // v154: profile se jura contact (linked row, ya purani id=profile-id
+      // row) "App par dost" mein pehle se hai — manual list mein dobara
+      // nahi (warna us ki value row-UUID hoti aur record ghalat shakhs
+      // se jur jata). Sirf asal manual dost yahan aate hain.
+      if (c.linked_profile_id) return;
+      var isProfile = false;
+      profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
+      if (isProfile) return;
       manual += '<option value="' + esc(c.id) + '">' + esc(c.name || "Unknown") + '</option>';
     });
     if (manual) html += '<optgroup label="Mere contacts (manual)">' + manual + '</optgroup>';
@@ -6182,6 +6274,13 @@
       html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.email) + '</option>';
     });
     myContacts.forEach(function (c) {
+      // v154: profile se jura contact yahan dobara nahi (profile list mein
+      // pehle se hai) — warna filter ki value row-UUID hoti aur koi record
+      // match na karta.
+      if (c.linked_profile_id) return;
+      var isProfile = false;
+      profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
+      if (isProfile) return;
       html += '<option value="' + esc(c.id) + '">' + esc(c.name || "Unknown") + ' (manual)</option>';
     });
     sel.innerHTML = html;
@@ -7656,6 +7755,8 @@
     var btn = $("dukaanToggleBtn"); if (!btn) return;
     btn.textContent = tr(dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off"); // v122: tr() — warna English mode mein bhi Urdu text rehta tha
     btn.classList.toggle("is-on", dukaanMode); // v129: On par pill accent tint (state saaf dikhe)
+    // v154: drawer Dukaan row ki value bhi sync.
+    var dv = $("drawerDukaanValue"); if (dv) dv.textContent = dukaanMode ? tr("On") : tr("Off");
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText(); // v118: language ke hisaab se
     var search = $("peopleSearch"); if (search) search.placeholder = tr(dukaanMode ? "Customer dhoondhein…" : "Dost dhoondhein…"); // v122: tr() + chhota placeholder (360px par kat-ta tha)
   }
@@ -7671,8 +7772,7 @@
     var limit = raw === "" ? null : Number(raw);
     if (limit != null && (!isFinite(limit) || limit < 0)) { setDetailCreditMsg("Sahi limit likhein (0 ya zyada)."); return; }
     if (limit != null) limit = Math.round(limit);
-    var c = null;
-    myContacts.forEach(function (x) { if (x.id === id) c = x; });
+    var c = contactForPerson(id); // v154: linked row bhi mile (id ya linked_profile_id)
     if (!c) return;
     var prev = (c.credit_limit == null ? null : c.credit_limit);
     c.credit_limit = limit;
@@ -7682,7 +7782,7 @@
       setDetailCreditMsg(limit == null ? "Credit limit hata diya." : "Credit limit save ho gayi: " + fmtRs(limit)); // v115: message render ke BAAD (renderPersonDetail use saaf kar deta hai)
       return;
     }
-    sb("khata_contacts?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { credit_limit: limit } })
+    sb("khata_contacts?id=eq." + encodeURIComponent(c.id), { method: "PATCH", prefer: "return=minimal", body: { credit_limit: limit } }) // v154: PATCH row ki id (c.id) se — linked row ki id UUID hai
       .then(function (res) {
         if (!res.ok) { c.credit_limit = prev; setDetailCreditMsg("Limit save nahi ho saki. Dobara try karein."); return; }
         renderPeople(); renderPersonDetail();
@@ -8432,6 +8532,17 @@
   "iPhone par: Safari mein Share button dabayein, phir \"Add to Home Screen\" chunein.": "On iPhone: tap Share in Safari, then choose \"Add to Home Screen\".",
   "QR tayyar nahi ho saka — internet check kar ke dobara try karein.": "QR could not be created — check the internet and try again.",
   "Waqt par ada kiye gaye udhaar ki bunyaad par": "Based on loans repaid on time",
+  // ---- v154: hamburger drawer (☰) — super-home menu: Settings + Tools ----
+  "Menu": "Menu",
+  "Settings": "Settings",
+  "Tools": "Tools",
+  "Theme": "Theme",
+  "Menu kholein": "Open menu",
+  "Light": "Light",
+  "Dark": "Dark",
+  "On": "On",
+  "Off": "Off",
+  "Dukaan mode": "Shop mode",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -8620,7 +8731,7 @@
     if (!s || !s.net) { box.hidden = true; return; }
     box.hidden = false;
     var name = "";
-    myContacts.forEach(function (c) { if (c.id === detailPersonId) name = c.name || ""; });
+    myContacts.forEach(function (c) { if (c.id === detailPersonId || c.linked_profile_id === detailPersonId) name = c.name || ""; }); // v154: linked row bhi naam override deti hai
     if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) name = p.name || ""; }); }
     var amount = Math.abs(s.net);
     $("detailPayText").textContent = name + ": " + fmtRs(amount) + " " + (s.net > 0 ? tr("lene hain") : tr("dene hain")) + " — " + tr("JazzCash ya Easypaisa se settle karein.");
@@ -8629,8 +8740,8 @@
     var s = personStats(detailPersonId); // personStats (renderPersonDetail bhi yehi use karta hai)
     if (!s || !s.net) { setDetailPayMsg(tr("Hisaab barabar hai — kuch dene/lene nahi.")); return; }
     var name = "", phone = "";
-    myContacts.forEach(function (c) { if (c.id === detailPersonId) { name = c.name || ""; phone = c.phone || ""; } });
-    if (!name) { profiles.forEach(function (p) { if (p.id === detailPersonId) { name = p.name || ""; phone = p.phone || ""; } }); }
+    myContacts.forEach(function (c) { if (c.id === detailPersonId || c.linked_profile_id === detailPersonId) { name = c.name || ""; phone = c.phone || ""; } }); // v154: linked row bhi
+    profiles.forEach(function (p) { if (p.id === detailPersonId) { if (!name) name = p.name || ""; if (!phone) phone = p.phone || ""; } }); // v154: profile se khaali naam/phone bharo (linked row ka phone null hota hai)
     if (!phone) { setDetailPayMsg(tr("Is dost ka number nahi hai — pehle number add karein.")); return; }
     var fullAmount = Math.abs(s.net);
     var iOwe = s.net < 0; // main dene wala hoon — payment ki direction (confirm par record ke liye)
@@ -8715,8 +8826,8 @@
     var me = myId();
     var otherId = t.payer_id === me ? t.receiver_id : t.payer_id;
     var name = "", phone = "";
-    myContacts.forEach(function (c) { if (c.id === otherId) { name = c.name || ""; phone = c.phone || ""; } });
-    if (!name) { profiles.forEach(function (p) { if (p.id === otherId) { name = p.name || ""; phone = p.phone || ""; } }); }
+    myContacts.forEach(function (c) { if (c.id === otherId || c.linked_profile_id === otherId) { name = c.name || ""; phone = c.phone || ""; } }); // v154: linked row bhi
+    profiles.forEach(function (p) { if (p.id === otherId) { if (!name) name = p.name || ""; if (!phone) phone = p.phone || ""; } }); // v154: profile se khaali naam/phone bharo
     var text = "Assalam o Alaikum " + (name || "") + "! Easy Khata par aap ka Rs " + (Number(t.amount) || 0) + " ka udhaar " + fmtDate(t.due_date) + " ko due hai. Barah-e-karam jald ada kar dein. Shukriya!";
     if (phone) { openWaLink(waLink(phone, text)); return; }
     // v131 M2: copyText() use karo (execCommand fallback hai) — copy fail ho to
@@ -8904,6 +9015,13 @@
       html += '<label><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</label>';
     });
     myContacts.forEach(function (c) {
+      // v154: profile se jura contact yahan dobara nahi (profile list mein
+      // pehle se hai) — warna split ki value row-UUID hoti aur hissa ghalat
+      // shakhs se jur jata.
+      if (c.linked_profile_id) return;
+      var isProfile = false;
+      profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
+      if (isProfile) return;
       html += '<label><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</label>';
     });
     $("splitList").innerHTML = html || '<p class="empty">' + tr("Abhi koi dost nahi.") + '</p>';
@@ -9604,7 +9722,7 @@
   $("diaryJumpBtn").addEventListener("click", jumpToDiary); // v123: Diary button → calendar kholein
   $("diaryCloseBtn").addEventListener("click", closeDiaryModal); // v124: modal band karein
   $("diaryModal").addEventListener("click", function (e) { if (e.target === $("diaryModal")) closeDiaryModal(); }); // v124: backdrop tap = band
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDiaryModal(); }); // v124: Escape = band
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDiaryModal(); closeDrawer(); } }); // v124: Escape = band (v154: drawer bhi)
   // v125: tools toolbar + tool modals.
   $("householdJumpBtn").addEventListener("click", jumpToHousehold);
   $("dueJumpBtn").addEventListener("click", jumpToDue);
@@ -9617,6 +9735,17 @@
   // v118: language switch.
   applyLanguage();
   $("acctLangBtn").addEventListener("click", toggleLanguage); // v123: Language ab Account list mein hai
+  // v154: hamburger drawer — kholo/band karo; Theme toggle; Budget/Goal
+  // modals (drawer band kar ke kholo); Dukaan toggle (drawer khula rehta
+  // hai, value renderDrawer se sync). Recurring/Backup ke handlers pehle
+  // se showView karte hain — showView khud drawer band kar deta hai.
+  $("menuDrawerBtn").addEventListener("click", openDrawer);
+  $("menuDrawerCloseBtn").addEventListener("click", closeDrawer);
+  $("menuDrawerBackdrop").addEventListener("click", closeDrawer);
+  $("drawerThemeBtn").addEventListener("click", toggleTheme);
+  $("drawerBudgetBtn").addEventListener("click", function () { closeDrawer(); jumpToBudget(); });
+  $("drawerGoalBtn").addEventListener("click", function () { closeDrawer(); jumpToGoal(); });
+  $("drawerDukaanBtn").addEventListener("click", function () { toggleDukaanMode(); renderDrawer(); });
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   $("dukaanToggleBtn").addEventListener("click", toggleDukaanMode);
@@ -9871,6 +10000,9 @@
     // v21: themeIcon (Account row ka icon) hata diya — sirf header icon bachta hai.
     var hb = $("themeHeaderBtn");
     if (hb) hb.textContent = mode === "dark" ? "☀️" : "🌙";
+    // v154: drawer Theme row ki value bhi sync (drawer khula ho to foran dikhe).
+    var tv = $("drawerThemeValue");
+    if (tv) tv.textContent = mode === "dark" ? tr("Dark") : tr("Light");
     try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
   }
   function toggleTheme() {
