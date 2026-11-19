@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v140";
+  var APP_VERSION = "v141";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -936,16 +936,19 @@
   // (2) web/PWA app location sirf tab update kar sakta hai jab app khuli ho
   //     — background tracking nahi hoti.
   // Map: Leaflet + OpenStreetMap tiles (free, koi API key nahi). Lib pehli
-  // map kholne par lazy-load hoti hai (boot par nahi), SRI ke saath; SW
-  // CDN_LIBS use pehli dafa ke baad offline bhi cache karta hai — tiles ke
-  // liye phir bhi internet chahiye (offline par map khaali dikhega).
+  // map kholne par lazy-load hoti hai (boot par nahi).
+  // v141: Leaflet ab LOCAL bundle hai (vendor/leaflet.js + leaflet.css) —
+  // CDN par depend nahi; SW SHELL mein precache hoti hai, is liye slow
+  // internet par bhi library cache se milti hai (sirf tiles ke liye
+  // internet chahiye). Bytes CDN wale hi hain (sha384 verify kiya gaya).
+  // Tiles SW mein cache hote hain (tile.openstreetmap.org, SWR, max ~80)
+  // taake dobara kholne par tiles cache se aayein. Tiles fail bhi ho jayein
+  // to map frame, zoom controls aur pins phir bhi dikhte hain.
   // Data: user_locations table (SQL Boss ko run karna hai) — row sirf tab
   // banti hai jab user ne toggle ON kiya ho. Table na ho to map khaali
   // rehta hai, app crash nahi karta.
-  var LEAFLET_JS_URL = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
-  var LEAFLET_JS_SRI = "sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH";
-  var LEAFLET_CSS_URL = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
-  var LEAFLET_CSS_SRI = "sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H";
+  var LEAFLET_JS_URL = "vendor/leaflet.js";
+  var LEAFLET_CSS_URL = "vendor/leaflet.css";
   var LOC_GEO_TIMEOUT_MS = 10000;
   var mapObj = null;
   var mapMarkers = [];
@@ -1054,14 +1057,10 @@
       try {
         var link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = LEAFLET_CSS_URL;
-        link.setAttribute("integrity", LEAFLET_CSS_SRI);
-        link.setAttribute("crossorigin", "anonymous");
+        link.href = LEAFLET_CSS_URL; // v141: local file — SRI sirf CDN par hota hai
         document.head.appendChild(link);
         var s = document.createElement("script");
-        s.src = LEAFLET_JS_URL;
-        s.setAttribute("integrity", LEAFLET_JS_SRI);
-        s.setAttribute("crossorigin", "anonymous");
+        s.src = LEAFLET_JS_URL; // v141: local file — SW SHELL se cache se aata hai
         s.onload = function () { finish(!!(window.L && window.L.map)); };
         s.onerror = function () { finish(false); };
         document.head.appendChild(s);
@@ -1069,18 +1068,51 @@
     });
     return leafletLoadPromise;
   }
+  var mapTileLayer = null;
+  var mapTilesFailed = false;
+  function showMapLoading(on) { var el = $("mapLoading"); if (el) el.hidden = !on; }
+  function showTilesNote(on) { var el = $("mapTilesNote"); if (el) el.hidden = !on; }
+  // Tiles dobara mangwao — tileerror ke baad retry (SW tile cache se ho to foran).
+  function retryMapTiles() {
+    showTilesNote(false);
+    try { if (mapTileLayer && mapTileLayer.redraw) mapTileLayer.redraw(); } catch (e) {}
+    try { if (mapObj) mapObj.invalidateSize(); } catch (e) {}
+  }
   function initMapIfNeeded() {
     if (mapObj) return true;
     if (!window.L || !window.L.map) return false;
     if (!$("mapBox")) return false;
     try {
-      mapObj = window.L.map("mapBox").setView([30.3753, 69.3451], 6);
-      window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      // v141: pinch zoom (touchZoom) + double-tap + on-screen +/- controls
+      // sab ON; zoom limits sane (min 3, max 19 — tiles ke barabar).
+      mapObj = window.L.map("mapBox", {
+        zoomControl: true, touchZoom: true, doubleClickZoom: true,
+        scrollWheelZoom: true, minZoom: 3, maxZoom: 19, zoomSnap: 1, zoomDelta: 1
+      }).setView([30.3753, 69.3451], 5);
+      mapTileLayer = window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "© OpenStreetMap contributors"
-      }).addTo(mapObj);
+      });
+      try {
+        mapTileLayer.on("tileerror", function () { mapTilesFailed = true; showTilesNote(true); });
+        mapTileLayer.on("tileload", function () { mapTilesFailed = false; showTilesNote(false); });
+      } catch (e) {}
+      mapTileLayer.addTo(mapObj);
       return true;
     } catch (e) { mapObj = null; return false; }
+  }
+  // Custom pin — naam ke pehle harf wala rang-biranga dot (default Leaflet
+  // marker ki PNG images ki zaroorat nahi — local bundle mein images nahi hain).
+  function locMarkerIcon(name) {
+    var nm = String(name || "Dost");
+    var initial = (nm.trim().charAt(0) || "D").toUpperCase();
+    var hue = 0;
+    for (var i = 0; i < nm.length; i++) hue = (hue * 31 + nm.charCodeAt(i)) % 360;
+    return window.L.divIcon({
+      className: "map-pin",
+      html: '<span class="map-pin-dot" style="background:hsl(' + hue + ',65%,45%)">' + esc(initial) + "</span>",
+      iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18]
+    });
   }
   function renderMapPins(rows) {
     if (!mapObj || !window.L) return 0;
@@ -1092,8 +1124,12 @@
       (rows || []).forEach(function (r) {
         var lat = Number(r.lat), lng = Number(r.lng);
         if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
-        var marker = window.L.marker([lat, lng]).addTo(mapObj);
-        try { marker.bindPopup("<strong>" + esc(r.display_name || "Dost") + "</strong><br>" + esc(fmtRelTime(r.updated_at))); } catch (e) {}
+        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name) }).addTo(mapObj);
+        try {
+          var nm = esc(r.display_name || "Dost");
+          if (r.user_id && r.user_id === myId()) nm += " • Aap";
+          marker.bindPopup("<strong>" + nm + "</strong><br>" + esc(fmtRelTime(r.updated_at)));
+        } catch (e) {}
         mapMarkers.push(marker);
         bounds.push([lat, lng]);
         count++;
@@ -1105,15 +1141,32 @@
   }
   function refreshMap() {
     var cnt = $("mapCount");
+    var wrap = $("mapWrap"), guestBox = $("mapGuestBox"), emptyBox = $("mapEmptyBox"),
+        actions = $("mapActions");
     if (guestMode || !session) {
-      setMapMsg("Map dekhne ke liye login karein — guest mode mein location nahi dikhti.");
+      // v141: guest — koi grey box nahi, koi map init nahi, ZERO network.
+      // Designed empty state (login button ke saath) dikhta hai.
+      if (wrap) wrap.hidden = true;
+      if (guestBox) guestBox.hidden = false;
+      if (emptyBox) emptyBox.hidden = true;
+      if (actions) actions.hidden = true;
+      showTilesNote(false);
+      showMapLoading(false);
+      setMapMsg("");
       if (cnt) cnt.textContent = "";
       return;
     }
-    setMapMsg("Map load ho raha hai…");
+    if (wrap) wrap.hidden = false;
+    if (guestBox) guestBox.hidden = true;
+    if (actions) actions.hidden = false;
+    if (emptyBox) emptyBox.hidden = true;
+    showTilesNote(false);
+    setMapMsg("");
     if (cnt) cnt.textContent = "";
+    showMapLoading(true);
     var self = locSharingOn() ? updateMyLocation() : Promise.resolve(null);
     self.then(function () { return loadSharedLocations(); }).then(function (res) {
+      showMapLoading(false);
       if (!res.ok && res.reason === "no-table") {
         setMapMsg("Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge.");
         return;
@@ -1123,15 +1176,55 @@
         return;
       }
       return ensureLeaflet().then(function (ok) {
+        showMapLoading(false);
         if (!ok) { setMapMsg("Map load nahi hua — internet check kar ke dobara try karein."); return; }
         if (!initMapIfNeeded()) { setMapMsg("Map load nahi hua — dobara try karein."); return; }
+        // v141: tiles dobara mangwao (slow link par pehli dafa fail hue hon to).
+        try { if (mapTileLayer && mapTileLayer.redraw) mapTileLayer.redraw(); } catch (e) {}
         var n = renderMapPins(res.rows || []);
         setMapMsg("");
         if (cnt) cnt.textContent = n === 0
           ? "Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega."
           : n === 1 ? "1 dost location share kar raha hai." : n + " dost location share kar rahe hain.";
+        if (emptyBox) emptyBox.hidden = n !== 0;
         try { mapObj.invalidateSize(); } catch (e) {}
       });
+    });
+  }
+  // Apni location share karo — Account toggle aur map ke "share karein"
+  // button dono yahi use karte hain. say = message kahan likhna hai
+  // (setLocMsg ya setMapMsg). ON pehle se ho to sirf dobara update karo.
+  function shareMyLocation(say) {
+    say = say || setMapMsg;
+    if (guestMode || !session) { say("Location share karne ke liye pehle login karein."); return Promise.resolve(false); }
+    if (locSharingOn()) {
+      say("Location update ho rahi hai…");
+      return updateMyLocation().then(function (res) {
+        if (res && res.ok) { say(""); return true; }
+        say("Location save nahi hui — internet check kar ke dobara try karein.");
+        return false;
+      });
+    }
+    say("Location li ja rahi hai — phone par Allow dabayein…");
+    return getMyPosition().then(function (pos) {
+      return saveMyLocation(pos.coords.latitude, pos.coords.longitude);
+    }).then(function (res) {
+      if (!res || !res.ok) {
+        if (res && res.reason === "no-table") say("Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).");
+        else say("Location save nahi hui — internet check kar ke dobara try karein.");
+        return false;
+      }
+      setLocSharing(true);
+      renderLocToggle();
+      say("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho.");
+      return true;
+    }).catch(function (err) {
+      var r = err && err.locReason;
+      if (r === "denied") say("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein.");
+      else if (r === "timeout") say("Location waqt par nahi mili — dobara try karein.");
+      else if (r === "unsupported") say("Is browser mein location support nahi hai.");
+      else say("Location nahi mili — dobara try karein.");
+      return false;
     });
   }
   function onLocToggle() {
@@ -1148,26 +1241,8 @@
       });
       return;
     }
-    // ON karo — pehle phone se location lo (permission prompt aayega).
-    setLocMsg("Location li ja rahi hai — phone par Allow dabayein…");
-    getMyPosition().then(function (pos) {
-      return saveMyLocation(pos.coords.latitude, pos.coords.longitude);
-    }).then(function (res) {
-      if (!res || !res.ok) {
-        if (res && res.reason === "no-table") setLocMsg("Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).");
-        else setLocMsg("Location save nahi hui — internet check kar ke dobara try karein.");
-        return;
-      }
-      setLocSharing(true);
-      renderLocToggle();
-      setLocMsg("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho.");
-    }).catch(function (err) {
-      var r = err && err.locReason;
-      if (r === "denied") setLocMsg("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein.");
-      else if (r === "timeout") setLocMsg("Location waqt par nahi mili — dobara try karein.");
-      else if (r === "unsupported") setLocMsg("Is browser mein location support nahi hai.");
-      else setLocMsg("Location nahi mili — dobara try karein.");
-    });
+    // ON karo — shareMyLocation (map wala button bhi yahi use karta hai).
+    shareMyLocation(setLocMsg);
   }
 
   function ensureProfile() {
@@ -6740,7 +6815,7 @@
   // Urdu mode ke liye en-only entries kaafi hain; ur dict mein sirf v118 keys.
   var I18N = {
     ur: {
-      subtitle: "Aapka rozmarra ka hisaab", nav_khata: "Khata", nav_account: "Account",
+      subtitle: "Aapka rozmarra ka hisaab", nav_khata: "Khata", nav_map: "Map", nav_account: "Account",
       friends: "DOST", customers: "CUSTOMERS", lenden: "LEN-DEN",
       diary: "\uD83D\uDCC5 Kharcha Diary", household: "\uD83C\uDFE0 Ghar ka kharcha",
       due: "\u23F0 Due-soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Bachat Goal",
@@ -6748,7 +6823,7 @@
       TIME: "WAQT", DIYE: "DIYE", LIYE: "LIYE", Food: "Khana"
     },
     en: {
-      subtitle: "Your daily ledger", nav_khata: "Ledger", nav_account: "Account",
+      subtitle: "Your daily ledger", nav_khata: "Ledger", nav_map: "Map", nav_account: "Account",
       friends: "FRIENDS", customers: "CUSTOMERS", lenden: "TRANSACTIONS",
       diary: "\uD83D\uDCC5 Expense Diary", household: "\uD83C\uDFE0 Household Expenses",
       due: "\u23F0 Due Soon", budget: "\uD83D\uDCB0 Monthly Budget", goal: "\uD83C\uDFAF Savings Goal",
@@ -7340,6 +7415,21 @@
   "aap ka hissa": "your share",
   "PIN Lock — change / band karein": "PIN Lock — change / turn off",
   "records": "records",
+  // ---- Map view (v140 + v141) ----
+  "Meri location map par dikhayein": "Show my location on the map",
+  "Map — Naqsha": "Map",
+  "Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.": "Only friends who allowed sharing their location appear on the map. Location updates only while the app is open — it does not update when the app is closed.",
+  "Location update karein": "Update location",
+  "Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.": "The map tiles need internet — on slow or offline connections tiles may not load, but pins and zoom buttons stay visible.",
+  "Map load ho raha hai…": "Loading map…",
+  "Map dekhne ke liye login karein": "Login to view the map",
+  "Guest mode mein location nahi dikhti — login karein taake doston ki location map par dekhein.": "Locations don't show in guest mode — login to see your friends' locations on the map.",
+  "Abhi koi dost location share nahi kar raha": "No friend is sharing their location yet",
+  "Account se apni location share karein — aap ka pin map par dikhega.": "Share your location from Account — your pin will appear on the map.",
+  "Apni location share karein": "Share my location",
+  "Map ke tiles nahi load ho rahe — internet slow hai.": "Map tiles are not loading — internet is slow.",
+  "Dobara try karein": "Try again",
+  "Map ke baare mein": "About the map",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -8255,6 +8345,9 @@
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
   $("acctLocBtn").addEventListener("click", onLocToggle); // v140: location sharing toggle
   $("mapRefreshBtn").addEventListener("click", refreshMap); // v140: map refresh
+  $("mapLoginBtn").addEventListener("click", function () { showAuth(); }); // v141: guest empty state -> login screen
+  $("mapShareBtn").addEventListener("click", function () { shareMyLocation(setMapMsg).then(function (ok) { if (ok) refreshMap(); }); }); // v141: zero-sharer CTA
+  $("mapRetryBtn").addEventListener("click", retryMapTiles); // v141: tiles dobara mangwao
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", openRateDialog);
   document.querySelectorAll("#rateStars .rate-star").forEach(function (b) {

@@ -1833,6 +1833,29 @@ input,select,textarea,button{max-width:100%}
 /* v140: Map — Naqsha. Leaflet container ko fixed height chahiye (warna 0px
    rehta hai); tiles ke liye internet chahiye — offline par halka grey box
    + honest message dikhta hai. */
-.map-box{height:380px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface,#e8e8e8);margin:10px 0;z-index:0}
-.map-box .leaflet-container{font:inherit}
-@media(max-width:420px){.map-box{height:320px}}
+/* v141: Map redesign — compact header + count, responsive map, loading + empty states */
+.map-head{display:flex;align-items:baseline;justify-content:space-between;gap:4px 10px;flex-wrap:wrap}
+.map-head .page-title{margin-bottom:6px}
+.map-sub{font-size:.82rem;color:var(--muted);margin:0 0 8px;text-align:right;flex:1;min-width:140px}
+.map-card{padding:12px}
+.map-wrap{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:0 0 10px}
+.map-box{height:clamp(300px,58vh,460px);overflow:hidden;background:var(--surface,#e8e8e8);touch-action:none;z-index:0}
+.map-box .leaflet-container{font:inherit;background:var(--surface,#e8e8e8)}
+.map-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--surface);color:var(--muted);font-size:.9rem;z-index:1000}
+.map-loading[hidden],.map-empty[hidden],.map-note-warn[hidden]{display:none}
+.map-spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:map-spin .8s linear infinite}
+@keyframes map-spin{to{transform:rotate(360deg)}}
+.map-empty{text-align:center;padding:18px 14px;border:1px dashed var(--line);border-radius:12px;margin:0 0 10px;background:var(--surface)}
+.map-empty-ic{font-size:2rem;line-height:1}
+.map-empty h3{margin:8px 0 4px;font-size:1rem}
+.map-empty p{margin:0 auto 12px;max-width:340px;color:var(--muted);font-size:.88rem}
+.map-empty .btn{min-width:200px}
+.map-note-warn{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface);background:color-mix(in srgb,#f59e0b 12%,transparent);border:1px solid var(--line);border-color:color-mix(in srgb,#f59e0b 45%,transparent);border-radius:10px;padding:8px 10px;font-size:.85rem;margin:0 0 10px}
+.map-note-warn .btn{flex:none}
+.map-actions{display:flex;margin:0 0 10px}
+.map-actions .btn{flex:1}
+.map-note{margin:0}
+.map-note summary{cursor:pointer;font-size:.85rem;color:var(--accent);font-weight:700}
+.map-note p{margin:8px 0 0;font-size:.85rem}
+.map-pin{background:none;border:none}
+.map-pin-dot{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:800;font-size:1rem;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}

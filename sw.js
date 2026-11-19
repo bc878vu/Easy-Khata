@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v140-0";
+var CACHE = "easy-khata-v141-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=103",
+  "styles.css?v=104",
   "config.js?v=4",
-  "app.js?v=137",
+  "app.js?v=138",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",
@@ -18,7 +18,11 @@ var SHELL = [
   "vendor/jspdf.umd.min.js",
   "vendor/xlsx.bundle.js",
   // v108: share QR (barcode) lib — share sheet kholne par lazy-load, offline bhi chale.
-  "vendor/qrcode.js"
+  "vendor/qrcode.js",
+  // v141: Leaflet map lib LOCAL (vendor/) — CDN par depend nahi; install
+  // par cache ho jaye, slow/offline par bhi map library cache se mile.
+  "vendor/leaflet.js",
+  "vendor/leaflet.css"
 ];
 // v24.8: boot + PDF ke liye zaroori CDN libs (index.html mein pinned versions).
 // Ye cross-origin hain — pehle SW inhein bilkul intercept nahi karta tha,
@@ -28,17 +32,31 @@ var SHELL = [
 var CDN_LIBS = [
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
-  // v140: Leaflet map lib (lazy-load, pehli map kholne par) — pehli use ke
-  // baad offline bhi cache se chalegi; tiles (tile.openstreetmap.org) is
-  // list mein nahi — tiles ke liye internet chahiye.
-  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
-  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"
+  // v141: Leaflet ab CDN_LIBS mein nahi — local bundle (vendor/) SHELL mein
+  // precache hota hai (upar). Tiles ke liye alag TILE_CACHE hai (neeche).
 ];
 // v91: jsPDF + xlsx ab CDN_LIBS mein nahi — self-hosted (vendor/) hain, is
 // liye woh same-origin SHELL/cache-first path se aate hain, CDN handler se
 // nahi. Boot libs (Supabase/Firebase) ab bhi CDN se hain.
 var API_HOST = "bewxefxjbvbumajflhfw.supabase.co";
+// v141: map tiles cache — tile.openstreetmap.org, stale-while-revalidate.
+// Pehli dafa tiles internet se aati hain aur cache hoti hain; dobara
+// kholne par cache se foran dikhti hain (slow link par farq padta hai).
+// Alag cache naam hai (version se bandha nahi) taake tiles app update par
+// bhi mehfooz rahein. Cap ~80 tiles — purani tiles khud delete hoti hain.
+var TILE_CACHE = "easy-khata-tiles-v1";
+var TILE_CACHE_MAX = 80;
+function trimTileCache() {
+  caches.open(TILE_CACHE).then(function (c) {
+    c.keys().then(function (keys) {
+      if (keys.length > TILE_CACHE_MAX) {
+        var extra = keys.slice(0, keys.length - TILE_CACHE_MAX);
+        extra.forEach(function (k) { c.delete(k); });
+      }
+    });
+  }).catch(function () {});
+}
 
 self.addEventListener("install", function (e) {
   // v131 M6: per-entry cache — aik file 404 ho to bhi baaki 10 cache hon aur
@@ -124,6 +142,22 @@ self.addEventListener("fetch", function (e) {
       if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
       return res;
     }).catch(function () { return caches.match(req); }));
+    return;
+  }
+
+  if (url.host === "tile.openstreetmap.org") {
+    // v141: tiles — cache-first + background refresh (SWR). Cache mein ho to
+    // foran dikhe, peeche se taaza ho jaye; na ho to network se le kar cache
+    // kare. Tiles OSM se CORS ke saath aati hain (cacheable, opaque nahi).
+    e.respondWith(caches.open(TILE_CACHE).then(function (c) {
+      return c.match(req).then(function (cached) {
+        var net = fetch(req).then(function (res) {
+          if (res.ok) { var copy = res.clone(); c.put(req, copy).then(function () { trimTileCache(); }); }
+          return res;
+        }).catch(function () { return cached; });
+        return cached || net;
+      });
+    }));
     return;
   }
 

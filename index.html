@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=103">
+<link rel="stylesheet" href="styles.css?v=104">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v140</p>
+    <p id="authVersion" class="auth-version">v141</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -613,14 +613,40 @@ window.addEventListener("error", function (e) {
     <section id="recurringView" hidden><div class="card rec-page"><div class="rec-head"><button id="recurringBackBtn" class="btn btn-ghost rec-back" type="button" data-i18n="← Wapas">← Wapas</button><div class="rec-head-text"><h2 data-i18n="🔁 Recurring records">🔁 Recurring records</h2><p class="muted" data-i18n="Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p></div></div><div id="recurringStats" class="rec-stats" aria-live="polite"></div><div id="recurringList" class="txns"></div><div class="rec-how"><div class="rec-how-step"><span class="rec-how-num">1</span><span data-i18n="Record banayein">Record banayein</span></div><div class="rec-how-step"><span class="rec-how-num">2</span><span data-i18n="“Har dafa repeat karein” tick karein">“Har dafa repeat karein” tick karein</span></div><div class="rec-how-step"><span class="rec-how-num">3</span><span data-i18n="Agli tareekh par record khud ban jayega">Agli tareekh par record khud ban jayega</span></div></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
     <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button><h2 style="margin-top:10px" data-i18n="Monthly report">Monthly report</h2><p class="muted" data-i18n="Pichhle mahine ka hisaab — PDF mein, aik dafa mein.">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button" data-i18n="📄 Download karein">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
     <section id="mapView" hidden>
-      <h2 class="page-title" data-i18n="🗺️ Map — Naqsha">🗺️ Map — Naqsha</h2>
-      <div class="card">
-        <p class="muted" data-i18n="Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.">Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.</p>
-        <div id="mapBox" class="map-box" role="img" aria-label="Map"></div>
+      <div class="map-head">
+        <h2 class="page-title"><span aria-hidden="true">🗺️</span> <span data-i18n="Map — Naqsha">Map — Naqsha</span></h2>
+        <p id="mapCount" class="map-sub" aria-live="polite"></p>
+      </div>
+      <div class="card map-card">
+        <div class="map-wrap" id="mapWrap">
+          <div id="mapBox" class="map-box" role="img" aria-label="Map"></div>
+          <div id="mapLoading" class="map-loading" hidden><span class="map-spinner" aria-hidden="true"></span><span data-i18n="Map load ho raha hai…">Map load ho raha hai…</span></div>
+        </div>
+        <div id="mapGuestBox" class="map-empty" hidden>
+          <div class="map-empty-ic" aria-hidden="true">🗺️</div>
+          <h3 data-i18n="Map dekhne ke liye login karein">Map dekhne ke liye login karein</h3>
+          <p data-i18n="Guest mode mein location nahi dikhti — login karein taake doston ki location map par dekhein.">Guest mode mein location nahi dikhti — login karein taake doston ki location map par dekhein.</p>
+          <button id="mapLoginBtn" class="btn btn-primary" type="button"><span aria-hidden="true">🔑</span> <span data-i18n="Login karein">Login karein</span></button>
+        </div>
         <p id="mapMsg" class="msg" role="status"></p>
-        <p id="mapCount" class="muted"></p>
-        <button id="mapRefreshBtn" class="btn btn-soft" type="button" data-i18n="🔄 Location update karein">🔄 Location update karein</button>
-        <p class="muted" data-i18n="Map ke tiles ke liye internet chahiye — slow ya offline par map khaali dikh sakta hai.">Map ke tiles ke liye internet chahiye — slow ya offline par map khaali dikh sakta hai.</p>
+        <div id="mapEmptyBox" class="map-empty" hidden>
+          <div class="map-empty-ic" aria-hidden="true">📍</div>
+          <h3 data-i18n="Abhi koi dost location share nahi kar raha">Abhi koi dost location share nahi kar raha</h3>
+          <p data-i18n="Account se apni location share karein — aap ka pin map par dikhega.">Account se apni location share karein — aap ka pin map par dikhega.</p>
+          <button id="mapShareBtn" class="btn btn-primary" type="button"><span aria-hidden="true">📍</span> <span data-i18n="Apni location share karein">Apni location share karein</span></button>
+        </div>
+        <div id="mapTilesNote" class="map-note-warn" hidden>
+          <span data-i18n="Map ke tiles nahi load ho rahe — internet slow hai.">Map ke tiles nahi load ho rahe — internet slow hai.</span>
+          <button id="mapRetryBtn" class="btn btn-soft" type="button"><span aria-hidden="true">↻</span> <span data-i18n="Dobara try karein">Dobara try karein</span></button>
+        </div>
+        <div id="mapActions" class="map-actions">
+          <button id="mapRefreshBtn" class="btn btn-primary" type="button"><span aria-hidden="true">🔄</span> <span data-i18n="Location update karein">Location update karein</span></button>
+        </div>
+        <details class="map-note">
+          <summary><span aria-hidden="true">ⓘ</span> <span data-i18n="Map ke baare mein">Map ke baare mein</span></summary>
+          <p class="muted" data-i18n="Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.">Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.</p>
+          <p class="muted" data-i18n="Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.">Map ke tiles ke liye internet chahiye — slow ya offline par tiles nahi dikh sakte, lekin pins aur zoom buttons dikhte rahenge.</p>
+        </details>
       </div>
     </section>
     <section id="notifView" hidden>
@@ -897,6 +923,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=137"></script>
+<script src="app.js?v=138"></script>
 </body>
 </html>
