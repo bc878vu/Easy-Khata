@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v142";
+  var APP_VERSION = "v143";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -892,7 +892,12 @@
   // par chalta hai (auto-run nahi), taake login flow kabhi block na ho.
   // Supabase health check mein koi API key nahi bhejte — /auth/v1/health
   // bina key ke 401 deta hai, aur woh 401 hi "reachable" ka saboot hai.
-  var NET_CHECK_TIMEOUT_MS = 10000;
+  // v143: 10s se 30s — user ke link (0.07-0.61 KB/s) par TLS handshake
+  // hi 10s mein poora nahi hota, is liye check "Supabase: No response"
+  // dikhata tha jabke Supabase bilkul theek tha (health 401 <1s,
+  // REST 200 — slow link ka masla, server ka nahi). Sirf button tap
+  // par chalta hai, login flow par koi asar nahi.
+  var NET_CHECK_TIMEOUT_MS = 30000;
   function setNetCheckLine(id, text, ok) {
     var el = $(id);
     if (!el) return;
@@ -1267,10 +1272,16 @@
         addTileLayerOnce();
         if (mapTileLayer && mapTilesBad) reloadTiles();
         else if (mapTileLayer) { try { mapTileLayer.redraw(); } catch (e) {} }
-        // Tiles atki hon to 45s baad fallback check (load/error mein se
-        // kuch to hua ho — sirf hang hone par bhi doosra provider try karo).
+        // Tiles atki hon to 45s baad fallback check — sirf error par nahi,
+        // HANG par bhi. v143: <img> loads ka koi timeout nahi hota; slow
+        // link par request latki reh sakti hai aur tileerror kabhi fire
+        // nahi hota — pehle wali shart (failed>0) hang case ko kabhi
+        // pakadti hi nahi thi, jabke comment wahi kehta tha. 45s mein
+        // zero tiles load hon + kam se kam aik tile mangi gayi ho to
+        // doosra provider try karo (layer hatane se atki requests cancel
+        // hoti hain). Sirf aik dafa (tileFallbackTried guard).
         setTimeout(function () {
-          if (mapObj && tileLoaded === 0 && tileFailed > 0 && !tileFallbackTried) switchTileProvider();
+          if (mapObj && tileLoaded === 0 && (tileFailed > 0 || tileStarted > 0) && !tileFallbackTried) switchTileProvider();
         }, 45000);
         try { mapObj.invalidateSize(); } catch (e) {}
       });
