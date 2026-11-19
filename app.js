@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v139";
+  var APP_VERSION = "v140";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -840,7 +840,9 @@
     if ($("backupView")) $("backupView").hidden = name !== "backup";
     if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
     if ($("monthlyView")) $("monthlyView").hidden = name !== "monthly";
+    if ($("mapView")) $("mapView").hidden = name !== "map";
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
+    $("navMap").classList.toggle("active", name === "map");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
@@ -849,6 +851,7 @@
     var vf = $("versionFooter");
     if (vf) vf.hidden = name !== "account";
     if (name === "hidden") renderHiddenTxns();
+    if (name === "map") refreshMap(); // v140: har dafa taaza pins
     window.scrollTo(0, 0);
   }
   function showAppView() {
@@ -923,6 +926,247 @@
         else if (r.timeout) setNetCheckLine(id, "✗ " + r.label + ": waqt par jawab nahi mila (slow/timeout)", false);
         else setNetCheckLine(id, "✗ " + r.label + ": nahi mil raha", false);
       });
+    });
+  }
+
+  // v140: Map + location sharing (opt-in, ALL account holders).
+  // Do sakht limits UI mein sachhi likhi hain, waade nahi:
+  // (1) kisi ki location sirf tab dikhti hai jab us ne khud apne phone par
+  //     permission prompt par "Allow" dabaya ho — bypass nahi hai;
+  // (2) web/PWA app location sirf tab update kar sakta hai jab app khuli ho
+  //     — background tracking nahi hoti.
+  // Map: Leaflet + OpenStreetMap tiles (free, koi API key nahi). Lib pehli
+  // map kholne par lazy-load hoti hai (boot par nahi), SRI ke saath; SW
+  // CDN_LIBS use pehli dafa ke baad offline bhi cache karta hai — tiles ke
+  // liye phir bhi internet chahiye (offline par map khaali dikhega).
+  // Data: user_locations table (SQL Boss ko run karna hai) — row sirf tab
+  // banti hai jab user ne toggle ON kiya ho. Table na ho to map khaali
+  // rehta hai, app crash nahi karta.
+  var LEAFLET_JS_URL = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
+  var LEAFLET_JS_SRI = "sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH";
+  var LEAFLET_CSS_URL = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+  var LEAFLET_CSS_SRI = "sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H";
+  var LOC_GEO_TIMEOUT_MS = 10000;
+  var mapObj = null;
+  var mapMarkers = [];
+  var leafletLoadPromise = null;
+  function locShareKey() { return "easykhata_loc_share_v1_" + (myId() || "guest"); }
+  function locSharingOn() {
+    try { return window.localStorage.getItem(locShareKey()) === "1"; } catch (e) { return false; }
+  }
+  function setLocSharing(on) {
+    try {
+      if (on) window.localStorage.setItem(locShareKey(), "1");
+      else window.localStorage.removeItem(locShareKey());
+    } catch (e) {}
+  }
+  function renderLocToggle() {
+    var v = $("acctLocValue");
+    if (v) v.textContent = locSharingOn() ? "On" : "Band";
+  }
+  function setLocMsg(t) { var el = $("locMsg"); if (el) el.textContent = t || ""; }
+  function setMapMsg(t) { var el = $("mapMsg"); if (el) el.textContent = t || ""; }
+  // Geolocation — apna timer bhi hai (browser ka timeout option har jagah
+  // barabar kaam nahi karta). Reject par err.locReason: denied/timeout/
+  // unavailable/unsupported.
+  function getMyPosition() {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation || !navigator.geolocation.getCurrentPosition) {
+        var e0 = new Error("geolocation-unsupported"); e0.locReason = "unsupported"; reject(e0); return;
+      }
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return; done = true;
+        var e = new Error("geolocation-timeout"); e.locReason = "timeout"; reject(e);
+      }, LOC_GEO_TIMEOUT_MS);
+      try {
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          if (done) return; done = true; clearTimeout(timer); resolve(pos);
+        }, function (err) {
+          if (done) return; done = true; clearTimeout(timer);
+          var e = new Error("geolocation-failed");
+          e.locReason = err && err.code === 1 ? "denied" : err && err.code === 3 ? "timeout" : "unavailable";
+          reject(e);
+        }, { enableHighAccuracy: false, timeout: LOC_GEO_TIMEOUT_MS, maximumAge: 0 });
+      } catch (err2) {
+        if (done) return; done = true; clearTimeout(timer);
+        var e2 = new Error("geolocation-failed"); e2.locReason = "unavailable"; reject(e2);
+      }
+    });
+  }
+  function locTableMissing(res) {
+    return res && (res.status === 404 || (res.body && (res.body.code === "42P01" || res.body.code === "PGRST205")));
+  }
+  function saveMyLocation(lat, lng) {
+    if (guestMode || !session) return Promise.resolve({ ok: false, reason: "guest" });
+    var body = {
+      user_id: myId(), display_name: myName() || "",
+      lat: lat, lng: lng,
+      updated_at: new Date().toISOString(), sharing_enabled: true
+    };
+    return sb("user_locations?on_conflict=user_id", {
+      method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: body
+    }).then(function (res) {
+      if (res.ok) return { ok: true };
+      if (locTableMissing(res)) return { ok: false, reason: "no-table" };
+      return { ok: false, reason: "save-failed" };
+    }).catch(function () { return { ok: false, reason: "save-failed" }; });
+  }
+  // Share band karo — row delete nahi karte, sharing_enabled=false karte
+  // hain (pin foran gayab; dobara ON par wahi row dobara share hoti hai).
+  function stopSharingLocation() {
+    if (guestMode || !session) return Promise.resolve({ ok: true, reason: "guest" });
+    return sb("user_locations?user_id=eq." + encodeURIComponent(myId()), {
+      method: "PATCH", prefer: "return=minimal", body: { sharing_enabled: false }
+    }).then(function (res) {
+      if (res.ok) return { ok: true };
+      if (locTableMissing(res)) return { ok: true, reason: "no-table" };
+      return { ok: false, reason: "save-failed" };
+    }).catch(function () { return { ok: false, reason: "save-failed" }; });
+  }
+  function loadSharedLocations() {
+    // Guest mode mein ZERO network calls (v24 rule) — map ke liye login zaroori.
+    if (guestMode || !session) return Promise.resolve({ ok: false, reason: "guest" });
+    return sb("user_locations?sharing_enabled=eq.true&select=user_id,display_name,lat,lng,updated_at&order=updated_at.desc&limit=200", {})
+      .then(function (res) {
+        if (res.ok) return { ok: true, rows: Array.isArray(res.body) ? res.body : [] };
+        if (locTableMissing(res)) return { ok: false, reason: "no-table" };
+        return { ok: false, reason: "load-failed" };
+      }).catch(function () { return { ok: false, reason: "load-failed" }; });
+  }
+  // Apni location update karo (map kholne / refresh par, sirf jab sharing ON ho).
+  // Geo fail ho to bhi map aage badhta hai — purani pins dikhti hain.
+  function updateMyLocation() {
+    if (guestMode || !session) return Promise.resolve({ ok: false, reason: "guest" });
+    return getMyPosition().then(function (pos) {
+      return saveMyLocation(pos.coords.latitude, pos.coords.longitude);
+    }).catch(function (err) {
+      return { ok: false, reason: (err && err.locReason) || "geo-failed" };
+    });
+  }
+  function ensureLeaflet() {
+    if (window.L && window.L.map) return Promise.resolve(true);
+    if (leafletLoadPromise) return leafletLoadPromise;
+    leafletLoadPromise = new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(false); } }, 15000);
+      function finish(ok) { if (done) return; done = true; clearTimeout(timer); resolve(ok); }
+      try {
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = LEAFLET_CSS_URL;
+        link.setAttribute("integrity", LEAFLET_CSS_SRI);
+        link.setAttribute("crossorigin", "anonymous");
+        document.head.appendChild(link);
+        var s = document.createElement("script");
+        s.src = LEAFLET_JS_URL;
+        s.setAttribute("integrity", LEAFLET_JS_SRI);
+        s.setAttribute("crossorigin", "anonymous");
+        s.onload = function () { finish(!!(window.L && window.L.map)); };
+        s.onerror = function () { finish(false); };
+        document.head.appendChild(s);
+      } catch (e) { finish(false); }
+    });
+    return leafletLoadPromise;
+  }
+  function initMapIfNeeded() {
+    if (mapObj) return true;
+    if (!window.L || !window.L.map) return false;
+    if (!$("mapBox")) return false;
+    try {
+      mapObj = window.L.map("mapBox").setView([30.3753, 69.3451], 6);
+      window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap contributors"
+      }).addTo(mapObj);
+      return true;
+    } catch (e) { mapObj = null; return false; }
+  }
+  function renderMapPins(rows) {
+    if (!mapObj || !window.L) return 0;
+    try {
+      mapMarkers.forEach(function (m) { try { mapObj.removeLayer(m); } catch (e) {} });
+      mapMarkers = [];
+      var count = 0;
+      var bounds = [];
+      (rows || []).forEach(function (r) {
+        var lat = Number(r.lat), lng = Number(r.lng);
+        if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+        var marker = window.L.marker([lat, lng]).addTo(mapObj);
+        try { marker.bindPopup("<strong>" + esc(r.display_name || "Dost") + "</strong><br>" + esc(fmtRelTime(r.updated_at))); } catch (e) {}
+        mapMarkers.push(marker);
+        bounds.push([lat, lng]);
+        count++;
+      });
+      if (count === 1) mapObj.setView(bounds[0], 13);
+      else if (count > 1) { try { mapObj.fitBounds(window.L.latLngBounds(bounds).pad(0.2)); } catch (e) {} }
+      return count;
+    } catch (e) { return 0; }
+  }
+  function refreshMap() {
+    var cnt = $("mapCount");
+    if (guestMode || !session) {
+      setMapMsg("Map dekhne ke liye login karein — guest mode mein location nahi dikhti.");
+      if (cnt) cnt.textContent = "";
+      return;
+    }
+    setMapMsg("Map load ho raha hai…");
+    if (cnt) cnt.textContent = "";
+    var self = locSharingOn() ? updateMyLocation() : Promise.resolve(null);
+    self.then(function () { return loadSharedLocations(); }).then(function (res) {
+      if (!res.ok && res.reason === "no-table") {
+        setMapMsg("Map ka table abhi nahi bana — admin ko SQL run karna hai, phir pins dikhenge.");
+        return;
+      }
+      if (!res.ok) {
+        setMapMsg("Locations load nahi hui — internet check kar ke dobara try karein.");
+        return;
+      }
+      return ensureLeaflet().then(function (ok) {
+        if (!ok) { setMapMsg("Map load nahi hua — internet check kar ke dobara try karein."); return; }
+        if (!initMapIfNeeded()) { setMapMsg("Map load nahi hua — dobara try karein."); return; }
+        var n = renderMapPins(res.rows || []);
+        setMapMsg("");
+        if (cnt) cnt.textContent = n === 0
+          ? "Abhi koi dost location share nahi kar raha — Account se apni location on karein to aap ka pin dikhega."
+          : n === 1 ? "1 dost location share kar raha hai." : n + " dost location share kar rahe hain.";
+        try { mapObj.invalidateSize(); } catch (e) {}
+      });
+    });
+  }
+  function onLocToggle() {
+    if (guestMode || !session) { setLocMsg("Location share karne ke liye pehle login karein."); return; }
+    if (locSharingOn()) {
+      // Band karo — pehle server par sharing_enabled=false, phir local off.
+      // Server fail ho to toggle ON hi rehta hai (jhootha "band" nahi).
+      setLocMsg("Location share band ho raha hai…");
+      stopSharingLocation().then(function (res) {
+        if (!res.ok) { setLocMsg("Band nahi ho saka — internet check kar ke dobara try karein."); return; }
+        setLocSharing(false);
+        renderLocToggle();
+        setLocMsg("Location share band ho gaya — aap ka pin map se hat gaya.");
+      });
+      return;
+    }
+    // ON karo — pehle phone se location lo (permission prompt aayega).
+    setLocMsg("Location li ja rahi hai — phone par Allow dabayein…");
+    getMyPosition().then(function (pos) {
+      return saveMyLocation(pos.coords.latitude, pos.coords.longitude);
+    }).then(function (res) {
+      if (!res || !res.ok) {
+        if (res && res.reason === "no-table") setLocMsg("Location save nahi hui — map ka table abhi nahi bana (SQL run karna baaki hai).");
+        else setLocMsg("Location save nahi hui — internet check kar ke dobara try karein.");
+        return;
+      }
+      setLocSharing(true);
+      renderLocToggle();
+      setLocMsg("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho.");
+    }).catch(function (err) {
+      var r = err && err.locReason;
+      if (r === "denied") setLocMsg("Location ki ijazat nahi mili — phone ki Settings se location allow karein, phir dobara try karein.");
+      else if (r === "timeout") setLocMsg("Location waqt par nahi mili — dobara try karein.");
+      else if (r === "unsupported") setLocMsg("Is browser mein location support nahi hai.");
+      else setLocMsg("Location nahi mili — dobara try karein.");
     });
   }
 
@@ -4779,6 +5023,11 @@
     $("acctHiddenBtn").hidden = guestMode;
     $("acctPrivacyBtn").hidden = guestMode;
     $("acctEditBtn").hidden = guestMode;
+    // v140: location sharing toggle — guest mode mein nahi (guest ka koi
+    // account hi nahi, location save karne ki jagah nahi).
+    var lb2 = $("acctLocBtn");
+    if (lb2) lb2.hidden = guestMode;
+    renderLocToggle();
     // v120: Logout sirf logged-in mode mein — guest ka koi account hi nahi,
     // is liye guest menu mein Logout dikhana ghalat tha. Guest ke liye
     // "Guest mode se bahar niklein" guest box mein pehle se hai.
@@ -7969,6 +8218,7 @@
   $("authPassword").addEventListener("keydown", function (e) { if (e.key === "Enter") doAuth(); });
   $("logoutBtn").addEventListener("click", function () { if (guestMode) return; saveSession(null); showAuth(); }); // v120: guest mein Logout ka koi matlab nahi
   $("navKhata").addEventListener("click", function () { showView("khata"); });
+  $("navMap").addEventListener("click", function () { showView("map"); }); // v140
   $("navAccount").addEventListener("click", function () { showView("account"); });
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
@@ -8003,6 +8253,8 @@
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
+  $("acctLocBtn").addEventListener("click", onLocToggle); // v140: location sharing toggle
+  $("mapRefreshBtn").addEventListener("click", refreshMap); // v140: map refresh
   $("acctPrivacyBtn").addEventListener("click", function () { var b = $("privacyBox"); b.hidden = !b.hidden; });
   $("acctRateBtn").addEventListener("click", openRateDialog);
   document.querySelectorAll("#rateStars .rate-star").forEach(function (b) {

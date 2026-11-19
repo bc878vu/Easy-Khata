@@ -3,13 +3,13 @@
    cache fallback (last-synced balance is visible offline too). Auth, POST and
    DELETE are always network-only — a record written offline is queued in the
    app's outbox (localStorage) and syncs automatically when back online. */
-var CACHE = "easy-khata-v139-0";
+var CACHE = "easy-khata-v140-0";
 var SHELL = [
   "./",
   "index.html",
-  "styles.css?v=102",
+  "styles.css?v=103",
   "config.js?v=4",
-  "app.js?v=136",
+  "app.js?v=137",
   "firebase-messaging-sw.js",
   "manifest.webmanifest",
   "icons/icon.svg",
@@ -28,7 +28,12 @@ var SHELL = [
 var CDN_LIBS = [
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
+  // v140: Leaflet map lib (lazy-load, pehli map kholne par) — pehli use ke
+  // baad offline bhi cache se chalegi; tiles (tile.openstreetmap.org) is
+  // list mein nahi — tiles ke liye internet chahiye.
+  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
+  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
 ];
 // v91: jsPDF + xlsx ab CDN_LIBS mein nahi — self-hosted (vendor/) hain, is
 // liye woh same-origin SHELL/cache-first path se aate hain, CDN handler se

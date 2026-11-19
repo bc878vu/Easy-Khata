@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=102">
+<link rel="stylesheet" href="styles.css?v=103">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v139</p>
+    <p id="authVersion" class="auth-version">v140</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -564,6 +564,8 @@ window.addEventListener("error", function (e) {
       <div class="menu-list">
         <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
         <p id="pushMsg" class="msg" role="status"></p>
+        <button id="acctLocBtn" class="menu-item" type="button"><span class="mi-ico">📍</span><span id="acctLocLabel" data-i18n="Meri location map par dikhayein">Meri location map par dikhayein</span><span class="menu-right" id="acctLocValue">Band</span></button>
+        <p id="locMsg" class="msg" role="status"></p>
         <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
         <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
         <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
@@ -610,6 +612,17 @@ window.addEventListener("error", function (e) {
     </div></div></section>
     <section id="recurringView" hidden><div class="card rec-page"><div class="rec-head"><button id="recurringBackBtn" class="btn btn-ghost rec-back" type="button" data-i18n="← Wapas">← Wapas</button><div class="rec-head-text"><h2 data-i18n="🔁 Recurring records">🔁 Recurring records</h2><p class="muted" data-i18n="Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.">Har mahina ya har hafta khud record ban jayega — dobara likhne ki zaroorat nahi.</p></div></div><div id="recurringStats" class="rec-stats" aria-live="polite"></div><div id="recurringList" class="txns"></div><div class="rec-how"><div class="rec-how-step"><span class="rec-how-num">1</span><span data-i18n="Record banayein">Record banayein</span></div><div class="rec-how-step"><span class="rec-how-num">2</span><span data-i18n="“Har dafa repeat karein” tick karein">“Har dafa repeat karein” tick karein</span></div><div class="rec-how-step"><span class="rec-how-num">3</span><span data-i18n="Agli tareekh par record khud ban jayega">Agli tareekh par record khud ban jayega</span></div></div><p id="recurringMsg" class="msg" role="status"></p></div></section>
     <section id="monthlyView" hidden><div class="card"><button id="monthlyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button><h2 style="margin-top:10px" data-i18n="Monthly report">Monthly report</h2><p class="muted" data-i18n="Pichhle mahine ka hisaab — PDF mein, aik dafa mein.">Pichhle mahine ka hisaab — PDF mein, aik dafa mein.</p><div id="monthlyInfo"></div><button id="monthlyDownloadBtn" class="btn btn-primary" type="button" data-i18n="📄 Download karein">📄 Download karein</button><p id="monthlyMsg" class="msg" role="status"></p></div></section>
+    <section id="mapView" hidden>
+      <h2 class="page-title" data-i18n="🗺️ Map — Naqsha">🗺️ Map — Naqsha</h2>
+      <div class="card">
+        <p class="muted" data-i18n="Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.">Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.</p>
+        <div id="mapBox" class="map-box" role="img" aria-label="Map"></div>
+        <p id="mapMsg" class="msg" role="status"></p>
+        <p id="mapCount" class="muted"></p>
+        <button id="mapRefreshBtn" class="btn btn-soft" type="button" data-i18n="🔄 Location update karein">🔄 Location update karein</button>
+        <p class="muted" data-i18n="Map ke tiles ke liye internet chahiye — slow ya offline par map khaali dikh sakta hai.">Map ke tiles ke liye internet chahiye — slow ya offline par map khaali dikh sakta hai.</p>
+      </div>
+    </section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
@@ -777,6 +790,7 @@ window.addEventListener("error", function (e) {
 
   <nav class="bottomnav">
     <button id="navKhata" class="nav-btn active" type="button"><span class="nav-ico">📒</span><span data-i18n="nav_khata">Khata</span></button>
+    <button id="navMap" class="nav-btn" type="button"><span class="nav-ico">🗺️</span><span data-i18n="nav_map">Map</span></button>
     <button id="navAccount" class="nav-btn" type="button"><span class="nav-ico">👤</span><span data-i18n="nav_account">Account</span></button>
   </nav>
 </div>
@@ -883,6 +897,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=136"></script>
+<script src="app.js?v=137"></script>
 </body>
 </html>
