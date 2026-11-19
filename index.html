@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v149</p>
+    <p id="authVersion" class="auth-version">v150</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -119,19 +119,19 @@ window.addEventListener("error", function (e) {
       </div>
       <div id="forgotRow" class="forgot-row"><button id="forgotLink" class="linklike" type="button" data-i18n="Password bhool gaye?">Password bhool gaye?</button></div>
     </div>
-    <section id="signupCommunityBox" class="community-onboarding" hidden aria-label="Community options" data-i18n-aria="Community options">
-      <h3 data-i18n="Community">Community <span class="muted" data-i18n="(optional)">(optional)</span></h3>
-      <p class="muted" data-i18n="Apni community dhoondhein ya account banane ke baad nayi community banayein.">Apni community dhoondhein ya account banane ke baad nayi community banayein.</p>
+    <section id="signupCommunityBox" class="community-onboarding" hidden aria-label="Group options" data-i18n-aria="Group options">
+      <h3 data-i18n="Group">Group <span class="muted" data-i18n="(optional)">(optional)</span></h3>
+      <p class="muted" data-i18n="Apna group dhoondhein ya account banane ke baad naya group banayein.">Apna group dhoondhein ya account banane ke baad naya group banayein.</p>
       <div class="community-onboarding-actions">
-        <button id="signupJoinCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupJoinCommunityPanel" data-i18n="Find Community">Find Community</button>
-        <button id="signupCreateCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupCommunityCreateHint" data-i18n="Create Community">Create Community</button>
+        <button id="signupJoinCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupJoinCommunityPanel" data-i18n="Find Group">Find Group</button>
+        <button id="signupCreateCommunityBtn" class="btn btn-soft" type="button" aria-expanded="false" aria-controls="signupCommunityCreateHint" data-i18n="Create Group">Create Group</button>
       </div>
       <div id="signupJoinCommunityPanel" hidden>
-        <div class="field"><label for="signupCommunitySearch" data-i18n="Community dhoondhein">Community dhoondhein</label><input id="signupCommunitySearch" type="search" autocomplete="off" aria-label="Search public communities" placeholder="Community name ya @username" data-i18n-aria="Search public communities" data-i18n-ph="Community name ya @username"></div>
-        <div id="signupCommunityDirectory" class="community-directory" aria-live="polite"><p class="muted" data-i18n="Community list load karne ke liye search karein.">Community list load karne ke liye search karein.</p></div>
+        <div class="field"><label for="signupCommunitySearch" data-i18n="Group dhoondhein">Group dhoondhein</label><input id="signupCommunitySearch" type="search" autocomplete="off" aria-label="Search public groups" placeholder="Group name ya @username" data-i18n-aria="Search public groups" data-i18n-ph="Group name ya @username"></div>
+        <div id="signupCommunityDirectory" class="community-directory" aria-live="polite"><p class="muted" data-i18n="Group list load karne ke liye search karein.">Group list load karne ke liye search karein.</p></div>
         <p id="signupCommunityChoice" class="msg" role="status"></p>
       </div>
-      <p id="signupCommunityCreateHint" class="muted" hidden data-i18n="Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.">Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.</p>
+      <p id="signupCommunityCreateHint" class="muted" hidden data-i18n="Account banne ke baad aap apna group bana sakte hain aur us ke owner honge.">Account banne ke baad aap apna group bana sakte hain aur us ke owner honge.</p>
     </section>
     <p id="authMsg" class="msg" role="status"></p>
     <button id="authSubmitBtn" class="btn btn-primary btn-block" type="button" data-i18n="Login karein">Login karein</button>
@@ -213,12 +213,12 @@ window.addEventListener("error", function (e) {
 
   <div id="workspaceBar" class="workspace-bar" hidden>
     <span id="workspaceIcon" class="ws-icon" aria-hidden="true">🏢</span>
-    <select id="workspaceSelect" aria-label="Hisaab ya community select karein" data-i18n-aria="Hisaab ya community select karein"></select>
-    <button id="workspaceMenuBtn" class="ws-menu-btn" type="button" aria-expanded="false" aria-controls="workspaceMenu" aria-label="Community options" data-i18n-aria="Community options">⋯</button>
-    <div id="workspaceMenu" class="ws-menu" hidden role="menu" aria-label="Community options" data-i18n-aria="Community options">
-      <button id="workspaceExploreBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="🔍 Find Community">🔍 Find Community</button>
-      <button id="workspaceCreateBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="＋ Nayi Community">＋ Nayi Community</button>
-      <button id="workspaceSetupBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="🔒 Community Password">🔒 Community Password</button>
+    <select id="workspaceSelect" aria-label="Hisaab ya group select karein" data-i18n-aria="Hisaab ya group select karein"></select>
+    <button id="workspaceMenuBtn" class="ws-menu-btn" type="button" aria-expanded="false" aria-controls="workspaceMenu" aria-label="Group options" data-i18n-aria="Group options">⋯</button>
+    <div id="workspaceMenu" class="ws-menu" hidden role="menu" aria-label="Group options" data-i18n-aria="Group options">
+      <button id="workspaceExploreBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="🔍 Find Group">🔍 Find Group</button>
+      <button id="workspaceCreateBtn" class="ws-menu-item" type="button" role="menuitem" data-i18n="＋ Naya Group">＋ Naya Group</button>
+      <button id="workspaceSetupBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="🔒 Group Password">🔒 Group Password</button>
       <button id="workspaceInviteBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="✉️ Invite Member">✉️ Invite Member</button>
       <button id="workspaceMembersBtn" class="ws-menu-item" type="button" role="menuitem" hidden data-i18n="👥 Manage Members">👥 Manage Members</button>
     </div>
@@ -243,30 +243,16 @@ window.addEventListener("error", function (e) {
         </div>
       </div>
 
-      <div class="people-search-wrap search-wrap">
-        <span class="search-icon" aria-hidden="true">🔍</span>
-        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein…" data-i18n-ph="Dost dhoondhein…">
-      </div>
-
-      <div class="people-head-row">
-        <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
-        <button id="dukaanToggleBtn" class="btn btn-ghost dukaan-pill" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
-      </div>
-      <!-- v125: tools toolbar — Diary + Household + Due + Budget + Goal, har aik modal card kholta hai. -->
+      <!-- v150: tools toolbar — Diary + Ghar + Due + Budget + Goal + History (v125 se; History doston ki list kholta hai, baaki modal card kholte hain). -->
       <div class="tools-row" role="toolbar" aria-label="Tools">
         <button id="diaryJumpBtn" class="btn btn-soft tool-btn" type="button" title="Diary — calendar kholein" data-i18n="📅 Diary" data-i18n-title="Diary — calendar kholein">📅 Diary</button>
         <button id="householdJumpBtn" class="btn btn-soft tool-btn" type="button" title="Ghar ka kharcha dekhein" data-i18n="🏠 Ghar" data-i18n-title="Ghar ka kharcha dekhein">🏠 Ghar</button>
         <button id="dueJumpBtn" class="btn btn-soft tool-btn" type="button" title="Due-soon udhaar dekhein" data-i18n="⏰ Due" data-i18n-title="Due-soon udhaar dekhein">⏰ Due</button>
         <button id="budgetJumpBtn" class="btn btn-soft tool-btn" type="button" title="Monthly Budget dekhein" data-i18n="💰 Budget" data-i18n-title="Monthly Budget dekhein">💰 Budget</button>
         <button id="goalJumpBtn" class="btn btn-soft tool-btn" type="button" title="Bachat Goal dekhein" data-i18n="🎯 Goal" data-i18n-title="Bachat Goal dekhein">🎯 Goal</button>
+        <button id="historyJumpBtn" class="btn btn-soft tool-btn" type="button" title="History — doston ki list dekhein" data-i18n="🕐 History" data-i18n-title="History — doston ki list dekhein">🕐 History</button>
       </div>
-      <!-- v147: friend suggestions — DOST list ke upar, logged-in only (guest mein chhupa). -->
-      <div id="suggestBox" class="card suggest-box" hidden>
-        <p class="section-label" data-i18n="Aap ke liye suggestions">Aap ke liye suggestions</p>
-        <div id="suggestList"></div>
-      </div>
-      <p id="peopleMsg" class="msg" role="status"></p>
-      <div id="peopleList" class="people"></div>
+
       <div class="actions-row">
         <button id="shareAllBtn" class="btn btn-soft" type="button" data-i18n="📤 Apna balance share karein">📤 Apna balance share karein</button>
       </div>
@@ -429,6 +415,31 @@ window.addEventListener("error", function (e) {
     </section>
 
     <!-- Person detail -->
+    <!-- v150: History view — doston ki list yahan dikhti hai (main page se hatayi gayi). -->
+    <section id="historyView" hidden>
+      <div class="card">
+        <button id="historyBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
+        <h2 style="margin-top:10px" data-i18n="History">History</h2>
+        <p class="muted" data-i18n="Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.">Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.</p>
+      <div class="people-search-wrap search-wrap">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="peopleSearch" type="search" placeholder="Dost dhoondhein…" data-i18n-ph="Dost dhoondhein…">
+      </div>
+
+      <div class="people-head-row">
+        <p class="section-label" id="peopleSectionLabel" data-i18n="DOST">DOST</p>
+        <button id="dukaanToggleBtn" class="btn btn-ghost dukaan-pill" type="button" title="Dukaan mode: dukaan ke customers ke liye" data-i18n="🏪 Dukaan mode: Off" data-i18n-title="Dukaan mode: dukaan ke customers ke liye">🏪 Dukaan mode: Off</button>
+      </div>
+      <!-- v147: friend suggestions — DOST list ke upar, logged-in only (guest mein chhupa). -->
+      <div id="suggestBox" class="card suggest-box" hidden>
+        <p class="section-label" data-i18n="Aap ke liye suggestions">Aap ke liye suggestions</p>
+        <div id="suggestList"></div>
+      </div>
+      <p id="peopleMsg" class="msg" role="status"></p>
+      <div id="peopleList" class="people"></div>
+      </div>
+    </section>
+
     <section id="personDetailView" hidden>
       <div class="detail-head">
         <button id="detailBackBtn" class="icon-btn light" type="button" title="Back" data-i18n-title="Back">←</button>
@@ -609,10 +620,10 @@ window.addEventListener("error", function (e) {
         <button id="acctPrivacyBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span data-i18n="Privacy">Privacy</span><span class="menu-right">›</span></button>
         <div id="privacyBox" class="menu-note" hidden>
           <p><strong data-i18n="Privacy Policy — Easy Khata">Privacy Policy — Easy Khata</strong></p>
-          <p><strong data-i18n="Aap ka hisaab, aap ka data.">Aap ka hisaab, aap ka data.</strong> <span data-i18n="Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.">Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.</span></p>
+          <p><strong data-i18n="Aap ka hisaab, aap ka data.">Aap ka hisaab, aap ka data.</strong> <span data-i18n="Aap ke personal contacts private rehte hain. Group mein add kiye gaye transactions us group ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.">Aap ke personal contacts private rehte hain. Group mein add kiye gaye transactions us group ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.</span></p>
           <p><strong data-i18n="Kya save hota hai:">Kya save hota hai:</strong> <span data-i18n="aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.">aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.</span></p>
           <p><strong data-i18n="Kya share nahi hota:">Kya share nahi hota:</strong> <span data-i18n="aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.">aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.</span></p>
-          <p><strong data-i18n="Profile:">Profile:</strong> <span data-i18n="aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.">aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.</span></p>
+          <p><strong data-i18n="Profile:">Profile:</strong> <span data-i18n="aap ki profile ki maloomat group ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.">aap ki profile ki maloomat group ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.</span></p>
           <p><strong data-i18n="Account band karna:">Account band karna:</strong> <span data-i18n="account band karwane ke liye WhatsApp helpline se rabta karein.">account band karwane ke liye WhatsApp helpline se rabta karein.</span></p>
           <p><a href="privacy.html" target="_blank" rel="noopener" data-i18n="Full Privacy Policy parhein">Full Privacy Policy parhein</a></p>
         </div>
@@ -756,21 +767,21 @@ window.addEventListener("error", function (e) {
         </article>
         <article class="admin-panel admin-users-panel">
           <div class="admin-panel-head admin-users-heading">
-            <div><h2 data-i18n="Community management">Community management</h2><p data-i18n="All business communities · edit, suspend, restore and safe delete">All business communities · edit, suspend, restore and safe delete</p></div>
-            <button id="adminCreateCommunityBtn" class="btn btn-primary" type="button" data-i18n="＋ Create community">＋ Create community</button>
+            <div><h2 data-i18n="Group management">Group management</h2><p data-i18n="All business groups · edit, suspend, restore and safe delete">All business groups · edit, suspend, restore and safe delete</p></div>
+            <button id="adminCreateCommunityBtn" class="btn btn-primary" type="button" data-i18n="＋ Create group">＋ Create group</button>
           </div>
           <div id="adminCommunitySummary" class="admin-community-summary" aria-live="polite"></div>
           <div class="admin-toolbar admin-community-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search community name or username…" aria-label="Search communities" data-i18n-aria="Search communities" data-i18n-ph="Search community name or username…"></div>
+            <div class="admin-search"><span>⌕</span><input id="adminCommunitySearch" type="search" placeholder="Search group name or username…" aria-label="Search groups" data-i18n-aria="Search groups" data-i18n-ph="Search group name or username…"></div>
             <select id="adminCommunityStatus"><option value="all" data-i18n="All statuses">All statuses</option><option value="active" data-i18n="Active">Active</option><option value="suspended" data-i18n="Suspended">Suspended</option></select>
           </div>
           <div id="adminCommunityList" class="admin-user-grid"></div>
         </article>
         <article class="admin-panel admin-users-panel">
-          <div class="admin-panel-head"><div><h2 data-i18n="All community members">All community members</h2><p data-i18n="Manage roles, access and community ownership. Ledger history remains intact.">Manage roles, access and community ownership. Ledger history remains intact.</p></div></div>
+          <div class="admin-panel-head"><div><h2 data-i18n="All group members">All group members</h2><p data-i18n="Manage roles, access and group ownership. Ledger history remains intact.">Manage roles, access and group ownership. Ledger history remains intact.</p></div></div>
           <div class="admin-toolbar">
-            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or community…" aria-label="Search community members" data-i18n-aria="Search community members" data-i18n-ph="Search member, email or community…"></div>
-            <select id="adminMemberCommunityFilter" aria-label="Filter members by community" data-i18n-aria="Filter members by community"><option value="" data-i18n="All communities">All communities</option></select>
+            <div class="admin-search"><span>⌕</span><input id="adminMemberSearch" type="search" placeholder="Search member, email or group…" aria-label="Search group members" data-i18n-aria="Search group members" data-i18n-ph="Search member, email or group…"></div>
+            <select id="adminMemberCommunityFilter" aria-label="Filter members by group" data-i18n-aria="Filter members by group"><option value="" data-i18n="All groups">All groups</option></select>
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
           <div id="adminCommunityMemberCount" class="admin-result-count"></div>
@@ -855,13 +866,13 @@ window.addEventListener("error", function (e) {
 <div class="share-sheet-preview-label" data-i18n="👁 Preview — yehi jayega">👁 Preview — yehi jayega</div><pre id="shareSheetPreview" class="share-sheet-preview" aria-live="polite"></pre><div class="app-dialog-actions"><button id="shareSheetCancelBtn" class="btn btn-neutral" type="button" data-i18n="Band karein">Band karein</button><button id="shareSheetSendBtn" class="btn btn-primary" type="button" data-i18n="↗ Share karein">↗ Share karein</button></div></section></div>
 <div id="adminCommunityEditOverlay" class="overlay" hidden>
   <section class="community-modal card" role="dialog" aria-modal="true" aria-labelledby="adminCommunityEditTitle">
-    <div class="community-modal-head"><div><p class="admin-eyebrow" data-i18n="PLATFORM ADMIN">PLATFORM ADMIN</p><h2 id="adminCommunityEditTitle" data-i18n="Edit community">Edit community</h2></div><button id="adminCommunityEditClose" class="icon-btn light" type="button" aria-label="Close" data-i18n-aria="Close">✕</button></div>
-    <div class="field"><label for="adminCommunityName" data-i18n="Community name">Community name</label><input id="adminCommunityName" maxlength="100"></div>
-    <div class="field"><label for="adminCommunityUsername" data-i18n="Community username">Community username</label><input id="adminCommunityUsername" maxlength="30"></div>
+    <div class="community-modal-head"><div><p class="admin-eyebrow" data-i18n="PLATFORM ADMIN">PLATFORM ADMIN</p><h2 id="adminCommunityEditTitle" data-i18n="Edit group">Edit group</h2></div><button id="adminCommunityEditClose" class="icon-btn light" type="button" aria-label="Close" data-i18n-aria="Close">✕</button></div>
+    <div class="field"><label for="adminCommunityName" data-i18n="Group name">Group name</label><input id="adminCommunityName" maxlength="100"></div>
+    <div class="field"><label for="adminCommunityUsername" data-i18n="Group username">Group username</label><input id="adminCommunityUsername" maxlength="30"></div>
     <div class="field"><label for="adminCommunityDescription" data-i18n="Description">Description</label><textarea id="adminCommunityDescription" maxlength="240" rows="3"></textarea></div>
-    <label class="check"><input id="adminCommunityListed" type="checkbox" data-i18n="Show in public community directory"> Show in public community directory</label>
-    <div class="field"><label for="adminCommunityPassword" data-i18n="New community password">New community password <span class="optional-label" data-i18n="Leave blank to keep current">Leave blank to keep current</span></label><input id="adminCommunityPassword" type="password" minlength="10" autocomplete="new-password"></div>
-    <button id="adminCommunityEditSave" class="btn btn-primary btn-block" type="button" data-i18n="Save community changes">Save community changes</button>
+    <label class="check"><input id="adminCommunityListed" type="checkbox" data-i18n="Show in public group directory"> Show in public group directory</label>
+    <div class="field"><label for="adminCommunityPassword" data-i18n="New group password">New group password <span class="optional-label" data-i18n="Leave blank to keep current">Leave blank to keep current</span></label><input id="adminCommunityPassword" type="password" minlength="10" autocomplete="new-password"></div>
+    <button id="adminCommunityEditSave" class="btn btn-primary btn-block" type="button" data-i18n="Save group changes">Save group changes</button>
     <p id="adminCommunityEditMsg" class="msg" role="status"></p>
   </section>
 </div>
@@ -888,36 +899,36 @@ window.addEventListener("error", function (e) {
   <div id="communityOverlay" class="modal-overlay" hidden>
     <section class="community-modal" role="dialog" aria-modal="true" aria-labelledby="communityModalTitle">
       <header class="community-modal-head">
-        <div><span class="eyebrow" data-i18n="EASY KHATA COMMUNITIES">EASY KHATA COMMUNITIES</span><h2 id="communityModalTitle" data-i18n="Explore communities">Explore communities</h2></div>
+        <div><span class="eyebrow" data-i18n="EASY KHATA GROUPS">EASY KHATA GROUPS</span><h2 id="communityModalTitle" data-i18n="Explore groups">Explore groups</h2></div>
         <button id="communityModalClose" class="modal-close" type="button" aria-label="Close" data-i18n-aria="Close">×</button>
       </header>
       <div class="community-tabs">
-        <button id="communityTabCreate" type="button" data-i18n="Create community">Create community</button>
+        <button id="communityTabCreate" type="button" data-i18n="Create group">Create group</button>
         <button id="communityTabJoin" type="button">Find & join</button>
       </div>
       <div id="communityPanelCreate" class="community-panel" hidden>
-        <p class="muted" data-i18n="Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.">Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.</p>
-        <div class="field"><label for="newCommunityName" data-i18n="Community name">Community name</label><input id="newCommunityName" maxlength="100" placeholder="Example: Power House" data-i18n-ph="Example: Power House"></div>
-        <div class="field"><label for="newCommunityUsername" data-i18n="Community username">Community username</label><input id="newCommunityUsername" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="example: powerhouse" data-i18n-ph="example: powerhouse"></div>
-        <div class="field"><label for="newCommunityPassword" data-i18n="Community password">Community password</label><input id="newCommunityPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
-        <div class="field"><label for="newCommunityDescription" data-i18n="Short description (optional)">Short description (optional)</label><textarea id="newCommunityDescription" maxlength="240" rows="2" placeholder="What is this community for?" data-i18n-ph="What is this community for?"></textarea></div>
-        <button id="communityCreateSubmit" class="btn btn-primary btn-block" type="button" data-i18n="Create community">Create community</button>
+        <p class="muted" data-i18n="Apni company, office ya group ke liye private group banayein. Aik unique username aur mazboot password rakhein.">Apni company, office ya group ke liye private group banayein. Aik unique username aur mazboot password rakhein.</p>
+        <div class="field"><label for="newCommunityName" data-i18n="Group name">Group name</label><input id="newCommunityName" maxlength="100" placeholder="Example: Power House" data-i18n-ph="Example: Power House"></div>
+        <div class="field"><label for="newCommunityUsername" data-i18n="Group username">Group username</label><input id="newCommunityUsername" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="example: powerhouse" data-i18n-ph="example: powerhouse"></div>
+        <div class="field"><label for="newCommunityPassword" data-i18n="Group password">Group password</label><input id="newCommunityPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
+        <div class="field"><label for="newCommunityDescription" data-i18n="Short description (optional)">Short description (optional)</label><textarea id="newCommunityDescription" maxlength="240" rows="2" placeholder="What is this group for?" data-i18n-ph="What is this group for?"></textarea></div>
+        <button id="communityCreateSubmit" class="btn btn-primary btn-block" type="button" data-i18n="Create group">Create group</button>
       </div>
       <div id="communityPanelJoin" class="community-panel" hidden>
-        <p class="muted" data-i18n="Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.">Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.</p>
-        <div class="community-search"><input id="communitySearch" type="search" placeholder="Search community name or username" data-i18n-ph="Search community name or username"><span>⌕</span></div>
-        <div id="communityDirectory" class="community-directory"><p class="muted" data-i18n="Communities load ho rahi hain…">Communities load ho rahi hain…</p></div>
+        <p class="muted" data-i18n="Apna group dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.">Apna group dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.</p>
+        <div class="community-search"><input id="communitySearch" type="search" placeholder="Search group name or username" data-i18n-ph="Search group name or username"><span>⌕</span></div>
+        <div id="communityDirectory" class="community-directory"><p class="muted" data-i18n="Groups load ho rahe hain…">Groups load ho rahe hain…</p></div>
         <div class="community-join-form">
-          <h3 data-i18n="Join a community">Join a community</h3>
-          <div class="field"><label for="joinCommunityUsername" data-i18n="Community username">Community username</label><input id="joinCommunityUsername" autocapitalize="none" autocomplete="off" placeholder="Exact username" data-i18n-ph="Exact username"></div>
-          <div class="field"><label for="joinCommunityPassword" data-i18n="Community password">Community password</label><input id="joinCommunityPassword" type="password" autocomplete="off" placeholder="Community password" data-i18n-ph="Community password"></div>
+          <h3 data-i18n="Join a group">Join a group</h3>
+          <div class="field"><label for="joinCommunityUsername" data-i18n="Group username">Group username</label><input id="joinCommunityUsername" autocapitalize="none" autocomplete="off" placeholder="Exact username" data-i18n-ph="Exact username"></div>
+          <div class="field"><label for="joinCommunityPassword" data-i18n="Group password">Group password</label><input id="joinCommunityPassword" type="password" autocomplete="off" placeholder="Group password" data-i18n-ph="Group password"></div>
           <button id="communityJoinSubmit" class="btn btn-primary btn-block" type="button">Verify & request to join</button>
         </div>
       </div>
       <div id="communityPanelSetup" class="community-panel" hidden>
-        <p class="muted" data-i18n="Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.">Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.</p>
+        <p class="muted" data-i18n="Power House group ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.">Power House group ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.</p>
         <div class="community-username-chip" id="communitySetupUsername" data-i18n="@powerhouse">@powerhouse</div>
-        <div class="field"><label for="communitySetupPassword" data-i18n="New community password">New community password</label><input id="communitySetupPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
+        <div class="field"><label for="communitySetupPassword" data-i18n="New group password">New group password</label><input id="communitySetupPassword" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" data-i18n-ph="At least 10 characters"></div>
         <button id="communitySetupSubmit" class="btn btn-primary btn-block" type="button" data-i18n="Save password">Save password</button>
       </div>
       <p id="communityMsg" class="msg" role="status" hidden></p>
@@ -927,13 +938,13 @@ window.addEventListener("error", function (e) {
   <div id="membersOverlay" class="modal-overlay" hidden>
     <section class="community-modal members-modal" role="dialog" aria-modal="true" aria-labelledby="membersModalTitle">
       <header class="community-modal-head">
-        <div><span class="eyebrow" data-i18n="COMMUNITY MANAGEMENT">COMMUNITY MANAGEMENT</span><h2 id="membersModalTitle" data-i18n="Members">Members & requests</h2><p id="membersModalSub" class="muted"></p></div>
+        <div><span class="eyebrow" data-i18n="GROUP MANAGEMENT">GROUP MANAGEMENT</span><h2 id="membersModalTitle" data-i18n="Members">Members & requests</h2><p id="membersModalSub" class="muted"></p></div>
         <button id="membersModalClose" class="modal-close" type="button" aria-label="Close" data-i18n-aria="Close">×</button>
       </header>
       <div class="community-invite-box" id="communityInviteBox">
         <h3 data-i18n="✉️ Invite by email">✉️ Invite by email</h3>
         <p class="muted" data-i18n="Join link ya email invite share karein — naya member password verify karke join karega.">Join link ya email invite share karein — naya member password verify karke join karega.</p>
-        <button id="workspaceCopyCommunityLinkBtn" class="btn btn-soft btn-block" type="button" data-i18n="🔗 Copy community join link">🔗 Copy community join link</button>
+        <button id="workspaceCopyCommunityLinkBtn" class="btn btn-soft btn-block" type="button" data-i18n="🔗 Copy group join link">🔗 Copy group join link</button>
         <div class="community-invite-divider"><span data-i18n="ya">ya</span></div>
         <div class="community-invite-row">
           <input id="workspaceInviteEmail" type="email" autocomplete="email" placeholder="Member email address" data-i18n-ph="Member email address">
@@ -949,6 +960,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=146"></script>
+<script src="app.js?v=147"></script>
 </body>
 </html>

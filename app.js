@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v149";
+  var APP_VERSION = "v150";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -296,7 +296,7 @@
   var memberRoleFilter = ""; // v95: members modal role filter (all/owner/admin/accountant/staff/viewer)
   var adminCommunityMemberShown = 20; // v80: admin member list — pehle 20, phir Show more
   var adminUserShown = 20; // v81: admin user list — pehle 20, phir Show more
-  var adminCommunityShown = 20; // v81: admin community list — pehle 20, phir Show more
+  var adminCommunityShown = 20; // v81: admin group list — pehle 20, phir Show more
   var adminEditingWorkspace = null;
   var adminCurrentUser = null;
   var adminUserSearchText = "";
@@ -853,7 +853,8 @@
     if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
     if ($("monthlyView")) $("monthlyView").hidden = name !== "monthly";
     if ($("mapView")) $("mapView").hidden = name !== "map";
-    $("navKhata").classList.toggle("active", name === "khata" || name === "detail");
+    if ($("historyView")) $("historyView").hidden = name !== "history"; // v150
+    $("navKhata").classList.toggle("active", name === "khata" || name === "detail" || name === "history"); // v150: History bhi Khata tab ka hissa
     $("navMap").classList.toggle("active", name === "map");
     $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly");
     $("fabAdd").hidden = name !== "khata";
@@ -1519,27 +1520,27 @@
   }
   function loadSignupCommunityDirectory(search) {
     var list=$("signupCommunityDirectory"); if(!list)return;
-    list.innerHTML='<p class="muted">Communities load ho rahi hain…</p>';
+    list.innerHTML='<p class="muted">Groups load ho rahe hain…</p>';
     sb("rpc/khata_list_communities",{method:"POST",body:{p_search:search||""}}).then(function(res){
       if(!res.ok)throw new Error("directory");
       var rows=Array.isArray(res.body)?res.body:[];
       list.innerHTML="";
-      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Koi public community nahi mili. Aap apni community create kar sakte hain.";list.appendChild(empty);return;}
+      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Koi public group nahi mila. Aap apna group create kar sakte hain.";list.appendChild(empty);return;}
       rows.forEach(function(w){
         var card=document.createElement("article");card.className="community-card";
         var title=document.createElement("strong");title.textContent=w.community_name;
         var handle=document.createElement("span");handle.className="community-handle";handle.textContent="@"+w.community_username;
         var meta=document.createElement("small");meta.textContent=(w.member_count||0)+" members"+(w.description?" · "+w.description:"");
-        var pick=document.createElement("button");pick.type="button";pick.className="btn btn-primary community-join-pick";pick.textContent="Select community";
+        var pick=document.createElement("button");pick.type="button";pick.className="btn btn-primary community-join-pick";pick.textContent="Select group";
         pick.addEventListener("click",function(){
           saveSignupCommunityIntent("join",w.community_username);
-          $("signupCommunityChoice").textContent="Community select ho gayi: "+w.community_name+" (@"+w.community_username+"). Account banane ke baad password darj karke join request bhej dein.";
+          $("signupCommunityChoice").textContent="Group select ho gaya: "+w.community_name+" (@"+w.community_username+"). Account banane ke baad password darj karke join request bhej dein.";
           $("signupCommunityChoice").className="msg ok";
           $("signupCommunityChoice").className="msg ok";
         });
         card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(pick);list.appendChild(card);
       });
-    }).catch(function(){list.innerHTML='<p class="community-empty">Community list nahi khul saki. Internet check karke dobara try karein.</p>';});
+    }).catch(function(){list.innerHTML='<p class="community-empty">Group list nahi khul saki. Internet check karke dobara try karein.</p>';});
   }
 
   function afterAuth(res, isSignup) {
@@ -1550,7 +1551,7 @@
         if (isSignup) {
           try { window.localStorage.setItem(communityOnboardingKey(pendingUser.email), "1"); } catch(e) {}
         }
-        setAuthMsg("Account ban gaya! Email mein bheja gaya confirmation link khol kar account confirm karein, phir login karein. Us ke baad aap apna hisaab shuru kar sakte hain ya community bana/join kar sakte hain.", true);
+        setAuthMsg("Account ban gaya! Email mein bheja gaya confirmation link khol kar account confirm karein, phir login karein. Us ke baad aap apna hisaab shuru kar sakte hain ya group bana/join kar sakte hain.", true);
         authMode = "login";
         renderAuthMode();
         return;
@@ -1776,7 +1777,7 @@
       showApp();
       loadAll();
       maybeShowPinLock(); // v78: purani session restore — PIN set ho to lock screen
-      openPendingCommunityOnboarding(); // signup email confirmation ke baad bhi community setup khule
+      openPendingCommunityOnboarding(); // signup email confirmation ke baad bhi group setup khule
       // v74: refresh par dobara offer NAHI — sirf login/signup ke waqt (afterAuth).
     }).catch(function (e) {
       // v24.8: network fail (offline) session EXPIRE nahi hota — sirf
@@ -1834,7 +1835,7 @@
     $("workspaceSetupBtn").hidden=!active||active.type!=="business"||active.community_listed||active.current_role!=="owner";
   }
   /* ---------- Workspace menu (v70) ---------- */
-  // Bar par sirf switcher + ⋯ dikhta hai; baaki community actions menu ke
+  // Bar par sirf switcher + ⋯ dikhta hai; baaki group actions menu ke
   // andar hain (page ke andar, aik tap door). Buttons ki ids/handlers wahi
   // hain — sirf markup badla hai, is liye koi binding nahi badli.
   function openWorkspaceMenu(){var m=$("workspaceMenu");if(!m)return;m.hidden=false;$("workspaceMenuBtn").setAttribute("aria-expanded","true");}
@@ -1993,7 +1994,7 @@
     // ho kar poora switch fail ho jata tha.
     sb("rpc/khata_set_active_workspace",{method:"POST",body:{p_workspace_id:id}, timeoutMs: SLOW_TIMEOUT_MS}).then(function(res){
       $("workspaceSelect").disabled=false;
-      if(!res.ok){setTxnMsg("Community change nahi ho saki. Dobara koshish karein.",false);renderWorkspaceBar();return;}
+      if(!res.ok){setTxnMsg("Group change nahi ho saka. Dobara koshish karein.",false);renderWorkspaceBar();return;}
       currentWorkspaceId=id;
       try { window.localStorage.setItem(ACTIVE_WS_KEY,id); } catch(e) {}
       // v136: pehle target workspace ka saved hisaab foran dikhao (cache-first),
@@ -2002,7 +2003,7 @@
       if (switchedCache) { applyCacheToState(switchedCache); renderWorkspaceBar(); renderAll(); renderNotifBadge(); }
       else { profiles=[];txns=[];myContacts=[];hiddenTxnIds={}; }
       teardownRealtime();loadAll();
-    }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Community change nahi ho saki. Internet check karke dobara koshish karein.",false);});
+    }).catch(function(){$("workspaceSelect").disabled=false;renderWorkspaceBar();setTxnMsg("Group change nahi ho saka. Internet check karke dobara koshish karein.",false);});
   }
   function createBusinessWorkspace(){ openCommunityModal("create"); }
   function openCommunityModal(tab){
@@ -2011,7 +2012,7 @@
     ["create","join","setup"].forEach(function(k){$("communityPanel"+k.charAt(0).toUpperCase()+k.slice(1)).hidden=(k!==tab);});
     $("communityTabCreate").classList.toggle("active",tab==="create");
     $("communityTabJoin").classList.toggle("active",tab==="join");
-    $("communityModalTitle").textContent=tab==="create"?"Create a business community":tab==="setup"?"Secure your community":"Explore communities";
+    $("communityModalTitle").textContent=tab==="create"?"Create a business group":tab==="setup"?"Secure your group":"Explore groups";
     if(tab==="join"){loadCommunityDirectory("");var linkedUsername="";try{linkedUsername=new URLSearchParams(window.location.search).get("community")||"";}catch(e){}if(linkedUsername) $("joinCommunityUsername").value=linkedUsername.toLowerCase();}
     if(tab==="setup"){
       var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
@@ -2023,12 +2024,12 @@
     var el=$("communityMsg");el.textContent=msg;el.className="msg "+(ok?"success":"error");el.hidden=false;
   }
   function loadCommunityDirectory(search){
-    var list=$("communityDirectory");list.innerHTML='<p class="muted">Communities load ho rahi hain…</p>';
+    var list=$("communityDirectory");list.innerHTML='<p class="muted">Groups load ho rahe hain…</p>';
     sb("rpc/khata_list_communities",{method:"POST",body:{p_search:search||""}}).then(function(res){
       if(!res.ok)throw new Error("directory");
       var rows=Array.isArray(res.body)?res.body:[];
       list.innerHTML="";
-      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Abhi koi public community nahi mili. Username se search karein.";list.appendChild(empty);return;}
+      if(!rows.length){var empty=document.createElement("p");empty.className="community-empty";empty.textContent="Abhi koi public group nahi mila. Username se search karein.";list.appendChild(empty);return;}
       rows.forEach(function(w){
         var card=document.createElement("article");card.className="community-card";
         var title=document.createElement("strong");title.textContent=w.community_name;
@@ -2042,29 +2043,29 @@
         });
         card.appendChild(title);card.appendChild(handle);card.appendChild(meta);card.appendChild(btn);list.appendChild(card);
       });
-    }).catch(function(){list.innerHTML='<p class="community-empty">Community list load nahi hui. Internet check karein.</p>';});
+    }).catch(function(){list.innerHTML='<p class="community-empty">Group list load nahi hui. Internet check karein.</p>';});
   }
   function submitCommunityCreate(){
     var name=$("newCommunityName").value.trim(),username=$("newCommunityUsername").value.trim().toLowerCase(),password=$("newCommunityPassword").value,description=$("newCommunityDescription").value.trim();
-    if(name.length<2||name.length>100){showCommunityMessage("Community name 2-100 characters ka hona chahiye.",false);return;}
+    if(name.length<2||name.length>100){showCommunityMessage("Group name 2-100 characters ka hona chahiye.",false);return;}
     if(!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)){showCommunityMessage("Username 3-30 characters: a-z, 0-9, dot, underscore ya hyphen.",false);return;}
     if(password.length<10){showCommunityMessage("Password kam az kam 10 characters ka rakhein.",false);return;}
     $("communityCreateSubmit").disabled=true;
     sb("rpc/khata_create_business_community",{method:"POST",body:{p_name:name,p_username:username,p_password:password,p_description:description}}).then(function(res){
       $("communityCreateSubmit").disabled=false;
-      if(!res.ok){showCommunityMessage((res.body&&res.body.message)||"Community create nahi hui. Username availability check karein.",false);return;}
+      if(!res.ok){showCommunityMessage((res.body&&res.body.message)||"Group create nahi hua. Username availability check karein.",false);return;}
       closeCommunityModal();$("newCommunityPassword").value="";currentWorkspaceId=(typeof res.body==="string"?res.body:(Array.isArray(res.body)?res.body[0]:res.body));
       if(currentWorkspaceId&&typeof currentWorkspaceId==="object")currentWorkspaceId=currentWorkspaceId.khata_create_business_community;
       teardownRealtime();loadAll();
       if(isAdmin()){
-        setAdminMsg("Community create ho gayi. Admin community list refresh ho rahi hai…",true);
+        setAdminMsg("Group create ho gaya. Admin group list refresh ho rahi hai…",true);
         loadAdminWorkspaceManagement();
       }
-    }).catch(function(){$("communityCreateSubmit").disabled=false;showCommunityMessage("Community create nahi hui. Internet check karein.",false);});
+    }).catch(function(){$("communityCreateSubmit").disabled=false;showCommunityMessage("Group create nahi hua. Internet check karein.",false);});
   }
   function submitCommunityJoin(){
     var username=$("joinCommunityUsername").value.trim().toLowerCase(),password=$("joinCommunityPassword").value;
-    if(!username||!password){showCommunityMessage("Community username aur password dono likhein.",false);return;}
+    if(!username||!password){showCommunityMessage("Group username aur password dono likhein.",false);return;}
     $("communityJoinSubmit").disabled=true;
     sb("rpc/khata_request_community_join",{method:"POST",body:{p_username:username,p_password:password}}).then(function(res){
       $("communityJoinSubmit").disabled=false;
@@ -2072,7 +2073,7 @@
       var status=Array.isArray(res.body)?res.body[0]:res.body;
       if(status&&typeof status==="object")status=status.khata_request_community_join;
       $("joinCommunityPassword").value="";
-      showCommunityMessage(status==="already_member"?"Aap pehle se is community ke member hain.":status==="pending"?"Request owner ko bhej di gayi hai. Approval ke baad community aapki list mein aa jayegi.":"Join request submit ho gayi.",true);
+      showCommunityMessage(status==="already_member"?"Aap pehle se is group ke member hain.":status==="pending"?"Request owner ko bhej di gayi hai. Approval ke baad group aapki list mein aa jayega.":"Join request submit ho gayi.",true);
     }).catch(function(){$("communityJoinSubmit").disabled=false;showCommunityMessage("Request submit nahi hui. Internet check karein.",false);});
   }
   function submitCommunityPassword(){
@@ -2081,7 +2082,7 @@
     $("communitySetupSubmit").disabled=true;
     sb("rpc/khata_set_community_password",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_password:password,p_listed:true}}).then(function(res){
       $("communitySetupSubmit").disabled=false;
-      if(!res.ok){showCommunityMessage("Password save nahi hua. Sirf community owner change kar sakta hai.",false);return;}
+      if(!res.ok){showCommunityMessage("Password save nahi hua. Sirf group owner change kar sakta hai.",false);return;}
       $("communitySetupPassword").value="";closeCommunityModal();loadAll();
     }).catch(function(){$("communitySetupSubmit").disabled=false;showCommunityMessage("Password save nahi hua.",false);});
   }
@@ -2090,7 +2091,7 @@
     memberSearchQ="";var ms=$("workspaceMemberSearch");if(ms)ms.value="";
     memberRoleFilter="";var rf=$("workspaceMemberRoleFilter");if(rf)rf.value=""; // v95: filter reset
     var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
-    // v96: community admin (owner/admin) hi users manage karta hai — baqi
+    // v96: group admin (owner/admin) hi users manage karta hai — baqi
     // members ko sirf read-only member list dikhti hai; invite + requests
     // un ke liye chhupte hain (warna submit par server error aata).
     var myRole=active?active.current_role:"";
@@ -2099,7 +2100,7 @@
     var reqTitle=$("communityRequestsTitle");if(reqTitle)reqTitle.hidden=!canManage;
     var reqList=$("communityRequestsList");if(reqList)reqList.hidden=!canManage;
     var title=$("membersModalTitle");if(title)title.textContent=canManage?"Members & requests":"Members";
-    var sub=$("membersModalSub");if(sub)sub.textContent=active?(active.name||"Community"):"";
+    var sub=$("membersModalSub");if(sub)sub.textContent=active?(active.name||"Group"):"";
     $("membersOverlay").hidden=false;
     if(canManage)loadCommunityJoinRequests();
     loadWorkspaceMemberCards();
@@ -2193,14 +2194,14 @@
         var saveRole=document.createElement("button");saveRole.type="button";saveRole.className="btn btn-neutral";saveRole.textContent="Save role";
         saveRole.addEventListener("click",function(){saveRole.disabled=true;sb("rpc/khata_set_workspace_member_role",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_role:roleSelect.value}}).then(function(out){saveRole.disabled=false;if(out.ok){setTxnMsg("Member role update ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Role update nahi hua — owner/admin permission check karein.",false);});});
         var remove=document.createElement("button");remove.type="button";remove.className="btn btn-neutral";remove.textContent="Remove";
-        remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka community access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
-        // v96: Suspend/Restore — community admin (owner/admin) ke liye;
+        remove.addEventListener("click",async function(){if(!(await appConfirm("Is member ka group access band karein? Purana hisaab mehfooz rahega.")))return;sb("rpc/khata_remove_workspace_member",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id}}).then(function(out){if(out.ok)loadWorkspaceMemberCards();else setTxnMsg("Member remove nahi hua.",false);});});
+        // v96: Suspend/Restore — group admin (owner/admin) ke liye;
         // server: khata_set_workspace_member_status (admin owner/admin ko
         // chhu nahi sakta; last owner + platform-blocked mehfooz hain).
         var suspended=String(m.status||"").toLowerCase()==="suspended";
         var suspBtn=document.createElement("button");suspBtn.type="button";suspBtn.className="btn btn-neutral";suspBtn.textContent=suspended?"Restore":"Suspend";
         suspBtn.addEventListener("click",async function(){
-          if(!suspended&&!(await appConfirm("Is member ko temporarily suspend karein? Un ka community access ruk jayega, purana hisaab mehfooz rahega.")))return;
+          if(!suspended&&!(await appConfirm("Is member ko temporarily suspend karein? Un ka group access ruk jayega, purana hisaab mehfooz rahega.")))return;
           suspBtn.disabled=true;
           sb("rpc/khata_set_workspace_member_status",{method:"POST",body:{p_workspace_id:currentWorkspaceId,p_user_id:m.user_id,p_status:suspended?"active":"suspended"}}).then(function(out){suspBtn.disabled=false;if(out.ok){setTxnMsg(suspended?"Member restore ho gaya.":"Member suspend ho gaya.",true);loadWorkspaceMemberCards();}else setTxnMsg("Member update nahi hua — owner/admin permission check karein.",false);});
         });
@@ -2218,10 +2219,10 @@
   }
   function copyCommunityJoinLink(){
     var active=workspaces.filter(function(w){return w.id===currentWorkspaceId;})[0];
-    if(!active||active.type!=="business"||!active.community_username){setTxnMsg("Community username set nahi hai. Owner se setup complete karwayein.",false);return;}
+    if(!active||active.type!=="business"||!active.community_username){setTxnMsg("Group username set nahi hai. Owner se setup complete karwayein.",false);return;}
     var link=window.location.origin+window.location.pathname+"?community="+encodeURIComponent(active.community_username);
-    copyText(link).then(function(){setTxnMsg("Community join link copy ho gaya. Link khol kar username aur password se join request bheji ja sakti hai.",true);})
-      .catch(function(){setTxnMsg("Community join link: "+link,true);});
+    copyText(link).then(function(){setTxnMsg("Group join link copy ho gaya. Link khol kar username aur password se join request bheji ja sakti hai.",true);})
+      .catch(function(){setTxnMsg("Group join link: "+link,true);});
   }
   function submitWorkspaceInvite(){
     if(!currentWorkspaceId||workspaceInviteBusy)return;
@@ -2683,7 +2684,7 @@
         renderWorkspaceBar();
         renderAll();
         renderNotifBadge();
-        setTxnMsg("Connection nahi mil raha. Filhal aapko is community ka aakhri saved hisaab dikhaya ja raha hai.", false);
+        setTxnMsg("Connection nahi mil raha. Filhal aapko is group ka aakhri saved hisaab dikhaya ja raha hai.", false);
         renderOffline();
         runRecurringDue(); // v87: offline bhi due record queue ho jaye
         maybeMonthlyReport(); // v88: offline bhi banner dikhe, PDF online aate hi
@@ -4018,15 +4019,15 @@
       sb("rpc/admin_list_workspaces",{method:"POST",body:{}}),
       sb("rpc/admin_list_workspace_members",{method:"POST",body:{}})
     ]).then(function(results){
-      if(!results[0].ok||!results[1].ok)throw new Error("Community management data could not load");
+      if(!results[0].ok||!results[1].ok)throw new Error("Group management data could not load");
       adminWorkspaces=Array.isArray(results[0].body)?results[0].body:[];
       adminWorkspaceMembers=Array.isArray(results[1].body)?results[1].body:[];
       var memberFilter=$("adminMemberCommunityFilter"),previousCommunity=memberFilter?memberFilter.value:"";
-      if(memberFilter){memberFilter.innerHTML='<option value="">All communities</option>'+adminWorkspaces.filter(function(w){return w.type==="business";}).map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>';}).join("");if(adminWorkspaces.some(function(w){return w.id===previousCommunity;}))memberFilter.value=previousCommunity;cdSync(memberFilter);}
+      if(memberFilter){memberFilter.innerHTML='<option value="">All groups</option>'+adminWorkspaces.filter(function(w){return w.type==="business";}).map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>';}).join("");if(adminWorkspaces.some(function(w){return w.id===previousCommunity;}))memberFilter.value=previousCommunity;cdSync(memberFilter);}
       renderAdminCommunities();renderAdminCommunityMembers();
       return true;
     }).catch(function(){
-      $("adminCommunityList").innerHTML='<p class="empty">Communities load nahi ho sakin. Refresh karein.</p>';
+      $("adminCommunityList").innerHTML='<p class="empty">Groups load nahi ho sakin. Refresh karein.</p>';
       $("adminCommunityMemberList").innerHTML='<p class="empty">Members load nahi ho sake.</p>';
       return false;
     });
@@ -4035,14 +4036,14 @@
     var box=$("adminCommunityList");if(!box)return;
     var q=String($("adminCommunitySearch").value||"").trim().toLowerCase();
     var status=$("adminCommunityStatus").value||"all";
-    var communities=adminWorkspaces.filter(function(w){return w.type==="business";});
+    var groups=adminWorkspaces.filter(function(w){return w.type==="business";});
     var summary=$("adminCommunitySummary");
-    if(summary){var active=communities.filter(function(w){return w.status==="active";}).length;var listed=communities.filter(function(w){return !!w.community_listed;}).length;var members=communities.reduce(function(n,w){return n+Number(w.member_count||0);},0);summary.innerHTML=[{label:"Total communities",value:communities.length},{label:"Active",value:active},{label:"Directory listed",value:listed},{label:"Community members",value:members}].map(function(x){return '<div class="admin-community-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong></div>';}).join("");}
-    var rows=communities.filter(function(w){
+    if(summary){var active=groups.filter(function(w){return w.status==="active";}).length;var listed=groups.filter(function(w){return !!w.community_listed;}).length;var members=groups.reduce(function(n,w){return n+Number(w.member_count||0);},0);summary.innerHTML=[{label:"Total groups",value:groups.length},{label:"Active",value:active},{label:"Directory listed",value:listed},{label:"Group members",value:members}].map(function(x){return '<div class="admin-community-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong></div>';}).join("");}
+    var rows=groups.filter(function(w){
       if(status!=="all"&&w.status!==status)return false;
       return !q||[w.name,w.community_username,w.id].join(" ").toLowerCase().indexOf(q)!==-1;
     });
-    if(!rows.length){box.innerHTML='<p class="empty">Koi community nahi mili.</p>';return;}
+    if(!rows.length){box.innerHTML='<p class="empty">Koi group nahi mila.</p>';return;}
     var shown=rows.slice(0,adminCommunityShown);
     box.innerHTML=shown.map(function(w){
       var suspended=w.status!=="active";
@@ -4072,7 +4073,7 @@
     });
     var countEl=$("adminCommunityMemberCount");
     if(countEl)countEl.textContent=rows.length?rows.length+" members"+(q||communityId?" — filtered":""):"";
-    if(!rows.length){box.innerHTML='<p class="empty">Koi community member nahi mila.</p>';return;}
+    if(!rows.length){box.innerHTML='<p class="empty">Koi group member nahi mila.</p>';return;}
     var shown=rows.slice(0,adminCommunityMemberShown);
     box.innerHTML=shown.map(function(m){
       var owner=m.role==="owner";
@@ -4107,7 +4108,7 @@
     var username=$("adminCommunityUsername").value.trim().toLowerCase();
     var description=$("adminCommunityDescription").value.trim();
     var password=$("adminCommunityPassword").value;
-    if(name.length<2||name.length>100||!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)){adminSetCommunityEditMsg("Community name ya username sahi nahi.",false);return;}
+    if(name.length<2||name.length>100||!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)){adminSetCommunityEditMsg("Group name ya username sahi nahi.",false);return;}
     if(password&&password.length<10){adminSetCommunityEditMsg("Naya password kam az kam 10 characters ka ho.",false);return;}
     var btn=$("adminCommunityEditSave");btn.disabled=true;
     sb("rpc/admin_update_workspace",{method:"POST",body:{
@@ -4115,28 +4116,28 @@
       p_description:description,p_listed:$("adminCommunityListed").checked,p_password:password||null
     }}).then(function(res){
       btn.disabled=false;
-      if(!res.ok){adminSetCommunityEditMsg((res.body&&res.body.message)||"Community update nahi hui.",false);return;}
+      if(!res.ok){adminSetCommunityEditMsg((res.body&&res.body.message)||"Group update nahi hua.",false);return;}
       $("adminCommunityEditOverlay").hidden=true;adminEditingWorkspace=null;
-      setAdminMsg("Community update ho gayi.",true);loadAdminWorkspaceManagement();
+      setAdminMsg("Group update ho gaya.",true);loadAdminWorkspaceManagement();
     }).catch(function(){btn.disabled=false;adminSetCommunityEditMsg("Connection issue — changes save nahi huay.",false);});
   }
   async function setAdminCommunityStatus(id,status) {
     var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
-    if(!(await appConfirm((status==="suspended"?"Community suspend":"Community restore")+" karein? Ledger history delete nahi hogi.")))return;
+    if(!(await appConfirm((status==="suspended"?"Group suspend":"Group restore")+" karein? Ledger history delete nahi hogi.")))return;
     sb("rpc/admin_set_workspace_status",{method:"POST",body:{p_workspace_id:id,p_status:status}}).then(function(res){
-      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community status update nahi hua.",false);return;}
-      setAdminMsg("Community status update ho gaya.",true);loadAdminWorkspaceManagement();
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Group status update nahi hua.",false);return;}
+      setAdminMsg("Group status update ho gaya.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — status update nahi hua.",false);});
   }
   async function deleteAdminCommunity(id) {
     var w=adminWorkspaces.filter(function(x){return x.id===id;})[0];if(!w)return;
-    if(!(await appConfirm("'"+w.name+"' permanently delete sirf tab hoga jab is mein transactions aur contacts na hon aur sirf ek active member ho. Financial data wali community delete nahi hogi. Continue?")))return;
+    if(!(await appConfirm("'"+w.name+"' permanently delete sirf tab hoga jab is mein transactions aur contacts na hon aur sirf ek active member ho. Financial data wala group delete nahi hoga. Continue?")))return;
     sb("rpc/admin_delete_workspace",{method:"POST",body:{p_workspace_id:id}}).then(function(res){
-      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Community delete nahi hui. Data wali community ko suspend karein.",false);return;}
-      setAdminMsg("Empty community delete ho gayi.",true);loadAdminWorkspaceManagement();
-    }).catch(function(){setAdminMsg("Connection issue — community delete nahi hui.",false);});
+      if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Group delete nahi hua. Data wale group ko suspend karein.",false);return;}
+      setAdminMsg("Empty group delete ho gaya.",true);loadAdminWorkspaceManagement();
+    }).catch(function(){setAdminMsg("Connection issue — group delete nahi hua.",false);});
   }
-  // v96: community card se seedha us community ke members — filter set +
+  // v96: group card se seedha us group ke members — filter set +
   // list render + member panel tak scroll (admin panel se user manage).
   function adminShowCommunityMembers(id) {
     var f=$("adminMemberCommunityFilter");if(!f)return;
@@ -4151,7 +4152,7 @@
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAdminMsg("Registered user ka valid email likhein.",false);return;}
     sb("rpc/admin_add_workspace_member",{method:"POST",body:{p_workspace_id:id,p_email:email,p_role:role}}).then(function(res){
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Member add nahi hua. Email account registered hona chahiye.",false);return;}
-      setAdminMsg("User community mein add ho gaya.",true);loadAdminWorkspaceManagement();
+      setAdminMsg("User group mein add ho gaya.",true);loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — member add nahi hua.",false);});
   }
   function adminSaveCommunityMember(key) {
@@ -4164,7 +4165,7 @@
       // warna phone par Save kaam karta hua nazar nahi aata tha.
       adminWorkspaceMembers.forEach(function(m){if(m.workspace_id===id&&m.user_id===user){m.role=role;m.member_status=status;}});
       renderAdminCommunityMembers();
-      setAdminMsg("Community member update ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
+      setAdminMsg("Group member update ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
     }).catch(function(){setAdminMsg("Connection issue — member update nahi hua.",false);scrollAdminMsgIntoView();});
   }
   // v135: multiple owners — "Make owner" ab naya owner ADD karta hai,
@@ -4172,7 +4173,7 @@
   // confirm/success text mein "transfer" wali baat khatam.
   async function adminMakeCommunityOwner(key) {
     var parts=key.split("|");
-    if(!(await appConfirm("Is member ko community owner banayein? Baaki owners owner hi rahenge — ek community mein kayi owner ho sakte hain.")))return;
+    if(!(await appConfirm("Is member ko group owner banayein? Baaki owners owner hi rahenge — ek group mein kayi owner ho sakte hain.")))return;
     sb("rpc/admin_transfer_workspace_owner",{method:"POST",body:{p_workspace_id:parts[0],p_new_owner:parts[1]}}).then(function(res){
       if(!res.ok){setAdminMsg((res.body&&res.body.message)||"Owner add nahi hua.",false);scrollAdminMsgIntoView();return;}
       setAdminMsg("Naya owner add ho gaya.",true);scrollAdminMsgIntoView();loadAdminWorkspaceManagement();
@@ -4185,7 +4186,7 @@
     if (!p) p = findPerson(id);
     if (!p || id === myId()) return;
     // v24.8: admin kaam online-only — confirm se pehle saaf refusal.
-    if (!(await appConfirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur community ka access ruk jayega. Purane hisaab mehfooz rahenge."))) return;
+    if (!(await appConfirm("'" + (p.name || p.email) + "' — account deactivate karein?\n\nUn ka login band ho jayega aur group ka access ruk jayega. Purane hisaab mehfooz rahenge."))) return;
     sb("rpc/admin_delete_user", { method: "POST", body: { target_id: id } })
       .then(function (res) {
         if (!res.ok) { setAdminMsg("User delete nahi hua — dobara try karein.", false); return; }
@@ -6152,9 +6153,9 @@
     });
     return reportLibLoading[kind];
   }
-  // Khata screen PDF: current user's own transactions in the active community,
+  // Khata screen PDF: current user's own transactions in the active group,
   // respecting the live search, member and date filters. Never export another
-  // member's personal ledger just because the community ledger is shared.
+  // member's personal ledger just because the group ledger is shared.
   async function exportFilteredLedgerPdf() {
     var PdfCtor = await ensureReportLib("jspdf");
     if (!PdfCtor) { setTxnMsg("PDF tayyar nahi ho saki. Internet check karke dobara try karein.", false); return; }
@@ -6206,7 +6207,7 @@
       if (txnSearchText.trim()) extraFilters.push("Search: " + txnSearchText.trim());
 
       base.headerBand("Hisaab Report", fmtDateLong(todayLocal()));
-      base.metaLine("Naam: " + myName() + "  |  Community: " + spaceName);
+      base.metaLine("Naam: " + myName() + "  |  Group: " + spaceName);
       base.metaLine(rangeText + (extraFilters.length ? "  |  " + extraFilters.join("  |  ") : "") + "  |  Aap ke records: " + list.length);
       base.summaryCards([
         { label: "Aap ne diye", value: fmtRs(given), color: C.red },
@@ -6869,7 +6870,7 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
   // v24.10: Excel styling — VERIFIED AGAINST THE REAL LIBRARY (probe, not
-  // docs): SheetJS Community Edition 0.18.5 cell styles (`s`) LIKHTA HI NAHI
+  // docs): SheetJS Group Edition 0.18.5 cell styles (`s`) LIKHTA HI NAHI
   // — styles.xml mein sirf default font/fills aate hain, bold/fill/border
   // sab drop ho jate hain; sirf `z` (numFmt) aur merges/cols survive karte
   // hain. Is liye library badli: xlsx-js-style 1.2.0 (SheetJS 0.18.5 ka
@@ -7375,6 +7376,11 @@
   "Neeche scroll karein — purane records dekhne ke liye": "Scroll down — to see older records",
   "Search name, food or amount...": "Search name, food or amount...",
   "Dost dhoondhein…": "Find a friend…",
+  // ---- History (v150) ----
+  "🕐 History": "🕐 History",
+  "History — doston ki list dekhein": "History — see the friends list",
+  "History": "History",
+  "Doston ki list — kisi dost par tap karein, us ka hisaab dekhein.": "Friends list — tap a friend to see their ledger.",
   "Customer dhoondhein…": "Find a customer…",
   "Name A–Z": "Name A–Z",
   "From": "From",
@@ -7448,13 +7454,13 @@
   "Privacy Policy — Easy Khata": "Privacy Policy — Easy Khata",
   "Full Privacy Policy parhein": "Read the Full Privacy Policy",
   "Aap ka hisaab, aap ka data.": "Your ledger, your data.",
-  "Aap ke personal contacts private rehte hain. Community mein add kiye gaye transactions us community ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.": "Your personal contacts stay private. Transactions added in a community can be seen by that community's authorized members. Without login, your ledger is saved only on this device; with an account, you can see your ledger on other devices too.",
+  "Aap ke personal contacts private rehte hain. Group mein add kiye gaye transactions us group ke authorized members dekh sakte hain. Bina login ke hisaab sirf isi device par save hota hai; account ke sath aap apna hisaab doosre devices par bhi dekh sakte hain.": "Your personal contacts stay private. Transactions added in a group can be seen by that group's authorized members. Without login, your ledger is saved only on this device; with an account, you can see your ledger on other devices too.",
   "Kya save hota hai:": "What is saved:",
   "aap ka naam, phone number, contacts, transactions, profile photo aur notifications ki settings.": "your name, phone number, contacts, transactions, profile photo and notification settings.",
   "Kya share nahi hota:": "What is never shared:",
   "aap ka data kabhi kisi teesri party ko nahi becha jata aur na hi ads ke liye use hota hai. Doston ko sirf wahi dikhta hai jo aap khud share karein (WhatsApp/Share message) — poora hisaab nahi.": "your data is never sold to any third party and never used for ads. Friends only see what you share yourself (WhatsApp/Share message) — not the full ledger.",
   "Profile:": "Profile:",
-  "aap ki profile ki maloomat community ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.": "your profile information may be visible to community members. You can update your profile details yourself.",
+  "aap ki profile ki maloomat group ke members ko dikh sakti hai. Aap apni profile details khud update kar sakte hain.": "your profile information may be visible to group members. You can update your profile details yourself.",
   "Account band karna:": "Closing your account:",
   "account band karwane ke liye WhatsApp helpline se rabta karein.": "to close your account, contact the WhatsApp helpline.",
   "Hidden records": "Hidden records",
@@ -7526,7 +7532,7 @@
   "Create account": "Create account",
   "Naya Account": "New Account",
   "Account banane par:": "When you create an account:",
-  "Account banne ke baad aap apni community bana sakte hain aur us ke owner honge.": "After creating an account, you can make your own community and be its owner.",
+  "Account banne ke baad aap apna group bana sakte hain aur us ke owner honge.": "After creating an account, you can make your own group and be its owner.",
   "Barah-e-karam kuch dair baad dobara koshish karein ya support se rabta karein.": "Please try again after a while or contact support.",
   // ---- Share sheet ----
   "Kya share karein?": "What to share?",
@@ -7539,43 +7545,43 @@
   "Barcode — camera se scan kar ke app kholein": "Barcode — scan with camera to open the app",
   "Preview — yehi jayega": "Preview — this is what will be sent",
   "Copy invite link": "Copy invite link",
-  // ---- Community ----
-  "Community": "Community",
-  "Community dhoondhein": "Find community",
-  "Find Community": "Find Community",
+  // ---- Group ----
+  "Group": "Group",
+  "Group dhoondhein": "Find group",
+  "Find Group": "Find Group",
   "Find & join": "Find & join",
-  "Join a community": "Join a community",
-  "Create Community": "Create Community",
-  "Create community": "Create community",
-  "Nayi Community": "New Community",
-  "Community name": "Community name",
-  "Community username": "Community username",
-  "Community password": "Community password",
-  "New community password": "New community password",
-  "Apni company, office ya group ke liye private community banayein. Aik unique username aur mazboot password rakhein.": "Make a private community for your company, office or group. Pick a unique username and a strong password.",
-  "Apni community dhoondhein ya account banane ke baad nayi community banayein.": "Find your community, or make a new one after creating an account.",
-  "Apni community dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.": "Find your community. To join, enter its username and password. After the owner's approval, you'll be added.",
-  "Community list load karne ke liye search karein.": "Search to load the community list.",
-  "Communities load ho rahi hain…": "Communities are loading…",
-  "Explore communities": "Explore communities",
-  "All communities": "All communities",
-  "All community members": "All community members",
-  "Community management": "Community management",
-  "COMMUNITY MANAGEMENT": "COMMUNITY MANAGEMENT",
-  "EASY KHATA COMMUNITIES": "EASY KHATA COMMUNITIES",
+  "Join a group": "Join a group",
+  "Create Group": "Create Group",
+  "Create group": "Create group",
+  "Nayi Group": "New Group",
+  "Group name": "Group name",
+  "Group username": "Group username",
+  "Group password": "Group password",
+  "New group password": "New group password",
+  "Apni company, office ya group ke liye private group banayein. Aik unique username aur mazboot password rakhein.": "Make a private group for your company, office or group. Pick a unique username and a strong password.",
+  "Apna group dhoondhein ya account banane ke baad naya group banayein.": "Find your group, or make a new one after creating an account.",
+  "Apna group dhoondhein. Join karne ke liye us ka username aur password darj karein. Owner ki approval ke baad aap shamil ho jayenge.": "Find your group. To join, enter its username and password. After the owner's approval, you'll be added.",
+  "Group list load karne ke liye search karein.": "Search to load the group list.",
+  "Groups load ho rahe hain…": "Groups are loading…",
+  "Explore groups": "Explore groups",
+  "All groups": "All groups",
+  "All group members": "All group members",
+  "Group management": "Group management",
+  "GROUP MANAGEMENT": "GROUP MANAGEMENT",
+  "EASY KHATA GROUPS": "EASY KHATA GROUPS",
   "Manage Members": "Manage Members",
   "Members": "Members",
   "Members & requests": "Members & requests",
   "Pending join requests": "Pending join requests",
   "Verify & request to join": "Verify & request to join",
   "Join link ya email invite share karein — naya member password verify karke join karega.": "Share a join link or email invite — a new member joins after verifying the password.",
-  "Power House community ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.": "Set a password to make it easy for other members to find the Power House community.",
-  "Show in public community directory": "Show in public community directory",
-  "Edit community": "Edit community",
-  "Save community changes": "Save community changes",
+  "Power House group ko doosre members ke liye dhoondhna asaan banane ke liye password set karein.": "Set a password to make it easy for other members to find the Power House group.",
+  "Show in public group directory": "Show in public group directory",
+  "Edit group": "Edit group",
+  "Save group changes": "Save group changes",
   "Invite Member": "Invite Member",
   "Invite by email": "Invite by email",
-  "Copy community join link": "Copy community join link",
+  "Copy group join link": "Copy group join link",
   "Jab koi aap ke saath record save kare, to yahan message aayega.": "When someone saves a record with you, a message will appear here.",
   "Jo abhi Easy Khata par nahi hain": "Who are not on Easy Khata yet",
   "Contacts se chunein": "Choose from contacts",
@@ -7598,13 +7604,13 @@
   "All roles": "All roles",
   "All statuses": "All statuses",
   "All": "All",
-  "All business communities · edit, suspend, restore and safe delete": "All business communities · edit, suspend, restore and safe delete",
+  "All business groups · edit, suspend, restore and safe delete": "All business groups · edit, suspend, restore and safe delete",
   "EASY KHATA · CONTROL CENTER": "EASY KHATA · CONTROL CENTER",
   "PLATFORM ADMIN": "PLATFORM ADMIN",
   "Users aur account controls": "Users and account controls",
   "Users, ledger activity aur platform health — sab aik jagah.": "Users, ledger activity and platform health — all in one place.",
   "User management": "User management",
-  "Manage roles, access and community ownership. Ledger history remains intact.": "Manage roles, access and community ownership. Ledger history remains intact.",
+  "Manage roles, access and group ownership. Ledger history remains intact.": "Manage roles, access and group ownership. Ledger history remains intact.",
   "LIVE DATA": "LIVE DATA",
   "Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.": "Analytics are based on the 500 recently loaded transactions.",
   "Last 14 days · loaded ledger records": "Last 14 days · loaded ledger records",
@@ -7640,7 +7646,7 @@
   "At least 10 characters": "At least 10 characters",
   "At least 8 characters": "At least 8 characters",
   "Bachat add karein (Rs)": "Add savings (Rs)",
-  "Community name ya @username": "Community name or @username",
+  "Group name ya @username": "Group name or @username",
   "Dobara likhein": "Write again",
   "Exact username": "Exact username",
   "Example: 0300 1234567": "Example: 0300 1234567",
@@ -7657,12 +7663,12 @@
   "Member email address": "Member email address",
   "Member search karein…": "Search members…",
   "Misal: Yaseen": "Example: Yaseen",
-  "Search community name or username": "Search community name or username",
-  "Search community name or username…": "Search community name or username…",
-  "Search member, email or community…": "Search member, email or community…",
+  "Search group name or username": "Search group name or username",
+  "Search group name or username…": "Search group name or username…",
+  "Search member, email or group…": "Search member, email or group…",
   "Search name, email or phone…": "Search name, email or phone…",
   "Target (Rs)": "Target (Rs)",
-  "What is this community for?": "What is this community for?",
+  "What is this group for?": "What is this group for?",
   "ali@example.com": "ali@example.com",
   "e.g. 20000": "e.g. 20000",
   "e.g. 5000": "e.g. 5000",
@@ -7688,22 +7694,22 @@
   "3 stars": "3 stars",
   "4 stars": "4 stars",
   "5 stars": "5 stars",
-  "Community options": "Community options",
+  "Group options": "Group options",
   "Daily transaction activity chart": "Daily transaction activity chart",
   "Easy Khata app link QR code": "Easy Khata app link QR code",
-  "Filter members by community": "Filter members by community",
+  "Filter members by group": "Filter members by group",
   "Filter members by role": "Filter members by role",
   "Filter users": "Filter users",
-  "Hisaab ya community select karein": "Select a ledger or community",
+  "Hisaab ya group select karein": "Select a ledger or group",
   "Invite role": "Invite role",
   "Loading": "Loading",
   "Monthly transaction volume chart": "Monthly transaction volume chart",
   "Notifications filter": "Notifications filter",
   "Rating": "Rating",
-  "Search communities": "Search communities",
-  "Search community members": "Search community members",
+  "Search groups": "Search groups",
+  "Search group members": "Search group members",
   "Search members": "Search members",
-  "Search public communities": "Search public communities",
+  "Search public groups": "Search public groups",
   "Search users": "Search users",
   "Share options": "Share options",
   // ---- Misc UI ----
@@ -7774,8 +7780,8 @@
   "✉️ Invite Member": "✉️ Invite Member",
   "✉️ Invite by email": "✉️ Invite by email",
   "＋ Add user": "＋ Add user",
-  "＋ Create community": "＋ Create community",
-  "＋ Nayi Community": "＋ New Community",
+  "＋ Create group": "＋ Create group",
+  "＋ Naya Group": "＋ New Group",
   "🌐 EN": "🌐 EN",
   "🎯 Bachat Goal": "🎯 Savings Goal",
   "🏠 Ghar ka kharcha": "🏠 Household Expenses",
@@ -7810,11 +7816,11 @@
   "📷 Photo badlein": "📷 Change photo",
   "🔁 Har dafa repeat karein": "🔁 Repeat every time",
   "🔁 Recurring records": "🔁 Recurring records",
-  "🔍 Find Community": "🔍 Find Community",
+  "🔍 Find Group": "🔍 Find Group",
   "🔑 Login": "🔑 Login",
   "🔑 Password badlein": "🔑 Change password",
-  "🔒 Community Password": "🔒 Community Password",
-  "🔗 Copy community join link": "🔗 Copy community join link",
+  "🔒 Group Password": "🔒 Group Password",
+  "🔗 Copy group join link": "🔗 Copy group join link",
   "🟡 Easypaisa": "🟡 Easypaisa",
   "🟢 JazzCash": "🟢 JazzCash",
   // ---- v130: detail page + JazzCash/Easypaisa settle ----
@@ -8856,6 +8862,9 @@
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain
   $("detailBackBtn").addEventListener("click", function () { showView("khata"); });
+  // v150: History — doston ki list kholo (taaza render) / wapas Khata par jao.
+  $("historyJumpBtn").addEventListener("click", function () { renderPeople(); showView("history"); });
+  $("historyBackBtn").addEventListener("click", function () { showView("khata"); });
   $("detailShareBtn").addEventListener("click", function () { if (detailPersonId) sharePerson(detailPersonId); });
   $("detailWaBtn").addEventListener("click", function () { if (detailPersonId) remindPerson(detailPersonId); });
   $("detailSettleBtn").addEventListener("click", function () { if (detailPersonId) settlePerson(detailPersonId); });
