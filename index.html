@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=113">
+<link rel="stylesheet" href="styles.css?v=114">
 </head>
 <body>
 
@@ -89,7 +89,7 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- v139: version stamp — login screen par kaun sa version hai, yahi
          se pata chale (footer "Developed by Asad" mein version KABHI nahi). -->
-    <p id="authVersion" class="auth-version">v154</p>
+    <p id="authVersion" class="auth-version">v155</p>
   </div>
   <!-- Auth -->
   <section id="authBox" class="card auth accent" hidden>
@@ -701,6 +701,7 @@ window.addEventListener("error", function (e) {
       <div class="map-head">
         <h2 class="page-title"><span aria-hidden="true">🗺️</span> <span data-i18n="Map — Naqsha">Map — Naqsha</span></h2>
         <p id="mapCount" class="map-sub" aria-live="polite"></p>
+        <p id="mapLiveBadge" class="map-live" hidden><span class="map-live-dot" aria-hidden="true"></span> <span data-i18n="Live location on hai">Live location on hai</span></p>
       </div>
       <div class="card map-card">
         <!-- v151: Map / Nearby shops toggle — guest ko toggle dikhta hi nahi (refreshMap mein hidden). -->
@@ -1031,6 +1032,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=151"></script>
+<script src="app.js?v=152"></script>
 </body>
 </html>

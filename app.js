@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v154";
+  var APP_VERSION = "v155";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -441,6 +441,7 @@
     currentWorkspaceId = "";
     workspaces = [];
     teardownRealtime();
+    stopLiveWatch(); stopMapPolling(); // v155: guest mode mein live tracking kabhi nahi
     guestMode = true;
     loadGuestIntoState();
     saveGuestStore(); // pehli dafa: guest id persist ho jaye taake reload par wahi rahe
@@ -877,6 +878,7 @@
     notifs = [];
     hideSplash();
     teardownRealtime();
+    stopLiveWatch(); stopMapPolling(); // v155: live location band (logout/session khatam)
     if (notifTimer) { clearInterval(notifTimer); notifTimer = null; }
     // v24.7: auth page par na bottom nav hota hai na footer — footer sirf
     // Account view ke andar dikhta hai (in-flow, showView toggle karta hai).
@@ -924,6 +926,7 @@
     // kholo. loadAll/renderAll ke baad openPendingCard() chalega (neeche).
     try { var cardLinkId = new URLSearchParams(window.location.search).get("card") || ""; if (cardLinkId) pendingCardId = cardLinkId; } catch (e) {}
     if (guestMode) return; // v24: guest mode — no notifs, no push, no realtime, no timer
+    startLiveLocation(); // v155: boot par sharing ON ho to live location shuru
     notifFirstLoad = true;
     loadNotifs();
     refreshPushState().then(function () { maybeAskPushPermission(); autoEnablePush(); armPushGestureRetry(); });
@@ -967,7 +970,8 @@
     var vf = $("versionFooter");
     if (vf) vf.hidden = name !== "account";
     if (name === "hidden") renderHiddenTxns();
-    if (name === "map") refreshMap(); // v140: har dafa taaza pins
+    if (name === "map") { refreshMap(); startMapPolling(); } // v140: har dafa taaza pins; v155: map khula ho to pins har 15s taaza
+    else stopMapPolling(); // v155: map band ho to polling band
     window.scrollTo(0, 0);
   }
   /* ---------- v154: hamburger drawer (☰) — super-home menu ----------
@@ -1149,7 +1153,8 @@
   // Geolocation — apna timer bhi hai (browser ka timeout option har jagah
   // barabar kaam nahi karta). Reject par err.locReason: denied/timeout/
   // unavailable/unsupported.
-  function getMyPosition() {
+  function getMyPosition(opts) {
+    opts = opts || {};
     return new Promise(function (resolve, reject) {
       if (!navigator.geolocation || !navigator.geolocation.getCurrentPosition) {
         var e0 = new Error("geolocation-unsupported"); e0.locReason = "unsupported"; reject(e0); return;
@@ -1167,7 +1172,7 @@
           var e = new Error("geolocation-failed");
           e.locReason = err && err.code === 1 ? "denied" : err && err.code === 3 ? "timeout" : "unavailable";
           reject(e);
-        }, { enableHighAccuracy: false, timeout: LOC_GEO_TIMEOUT_MS, maximumAge: 0 });
+        }, { enableHighAccuracy: !!opts.highAccuracy, timeout: LOC_GEO_TIMEOUT_MS, maximumAge: 0 });
       } catch (err2) {
         if (done) return; done = true; clearTimeout(timer);
         var e2 = new Error("geolocation-failed"); e2.locReason = "unavailable"; reject(e2);
@@ -1241,6 +1246,98 @@
     }).catch(function (err) {
       return { ok: false, reason: (err && err.locReason) || "geo-failed" };
     });
+  }
+  // v155: LIVE LOCATION — high-accuracy fix pehle; timeout/unavailable par
+  // aik dafa standard-accuracy retry (pin phir bhi update ho, khamoshi se
+  // fail na ho). Denied/unsupported par retry nahi — dobara prompt nahi.
+  function getMyPositionAccurate() {
+    return getMyPosition({ highAccuracy: true }).catch(function (err) {
+      var r = err && err.locReason;
+      if (r === "timeout" || r === "unavailable") return getMyPosition();
+      throw err;
+    });
+  }
+  function updateMyLocationAccurate() {
+    if (guestMode || !session) return Promise.resolve({ ok: false, reason: "guest" });
+    return getMyPositionAccurate().then(function (pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      return saveMyLocation(lat, lng).then(function (res) {
+        if (res && res.ok) locLastSent = { lat: lat, lng: lng, at: Date.now() };
+        return res;
+      });
+    }).catch(function (err) {
+      return { ok: false, reason: (err && err.locReason) || "geo-failed" };
+    });
+  }
+  // v155: LIVE LOCATION — app khuli ho + sharing ON ho to watchPosition se
+  // pin live update hota hai (user jidhar jaye, pin udhar). Battery/data ke
+  // liye server write throttled hai: sirf jab >=10m chala ho YA >=15s guzre
+  // hon. Tab chhupa ho to watch rukta hai, wapas aate hi dobara chalta hai.
+  // Guest kabhi share nahi karta (guards wahi — v140/v71).
+  var LOC_WATCH_ID = null;
+  var locLastSent = null; // {lat, lng, at} — aakhri server write
+  var LOC_LIVE_MIN_DIST_M = 10;
+  var LOC_LIVE_MIN_INTERVAL_MS = 15000;
+  function locDistM(aLat, aLng, bLat, bLng) {
+    var R = 6371000, toRad = Math.PI / 180;
+    var dLat = (bLat - aLat) * toRad, dLng = (bLng - aLng) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(aLat * toRad) * Math.cos(bLat * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function maybeSendLiveLocation(lat, lng) {
+    if (guestMode || !session || !locSharingOn()) return Promise.resolve({ ok: false, reason: "off" });
+    var now = Date.now();
+    if (locLastSent) {
+      var moved = locDistM(locLastSent.lat, locLastSent.lng, lat, lng);
+      if (moved < LOC_LIVE_MIN_DIST_M && (now - locLastSent.at) < LOC_LIVE_MIN_INTERVAL_MS) {
+        return Promise.resolve({ ok: false, reason: "throttled" });
+      }
+    }
+    return saveMyLocation(lat, lng).then(function (res) {
+      if (res && res.ok) locLastSent = { lat: lat, lng: lng, at: now };
+      return res;
+    });
+  }
+  function onLivePosition(pos) {
+    if (!pos || !pos.coords) return;
+    maybeSendLiveLocation(pos.coords.latitude, pos.coords.longitude);
+  }
+  function onLivePositionError(err) {
+    // Permission wapas le li gayi to watch dobara fix nahi dega — band karo
+    // taake "Live" badge jhootha na dikhe. Baaki errors transient hain.
+    if (err && err.code === 1) stopLiveWatch();
+  }
+  function renderLiveBadge() {
+    var b = $("mapLiveBadge");
+    if (b) b.hidden = (LOC_WATCH_ID === null);
+  }
+  function startLiveWatch() {
+    if (guestMode || !session || !locSharingOn()) return false;
+    if (LOC_WATCH_ID !== null) return true;
+    if (!navigator.geolocation || !navigator.geolocation.watchPosition) return false;
+    try {
+      LOC_WATCH_ID = navigator.geolocation.watchPosition(onLivePosition, onLivePositionError,
+        { enableHighAccuracy: true, timeout: LOC_GEO_TIMEOUT_MS, maximumAge: 0 });
+    } catch (e) { LOC_WATCH_ID = null; return false; }
+    renderLiveBadge();
+    return true;
+  }
+  function stopLiveWatch() {
+    if (LOC_WATCH_ID !== null) {
+      try { if (navigator.geolocation && navigator.geolocation.clearWatch) navigator.geolocation.clearWatch(LOC_WATCH_ID); } catch (e) {}
+      LOC_WATCH_ID = null;
+    }
+    renderLiveBadge();
+  }
+  // Boot entry — showApp() se: sharing ON ho to foran high-accuracy update
+  // (fallback ke saath) + watch shuru. Kabhi boot block nahi karta.
+  function startLiveLocation() {
+    if (guestMode || !session || !locSharingOn()) { stopLiveWatch(); return false; }
+    updateMyLocationAccurate();
+    startLiveWatch();
+    return true;
   }
   function ensureLeaflet() {
     if (window.L && window.L.map) return Promise.resolve(true);
@@ -1423,7 +1520,9 @@
     html += "</div>";
     return html;
   }
-  function renderMapPins(rows, isGuest) {
+  function renderMapPins(rows, isGuest, keepView) {
+    // v155: keepView=true (15s poll) par map dobara centre/fit NAHI hota —
+    // warna user ke pan/zoom se map har poll par wapas khinch jata.
     if (!mapObj || !window.L) return 0;
     try {
       mapMarkers.forEach(function (m) { try { mapObj.removeLayer(m); } catch (e) {} });
@@ -1444,10 +1543,42 @@
         bounds.push([lat, lng]);
         count++;
       });
-      if (count === 1) mapObj.setView(bounds[0], 10); // v142: zoom 10 (sheher nazar aaye) — 13 par dobara tiles mangwani parti thiin
-      else if (count > 1) { try { mapObj.fitBounds(window.L.latLngBounds(bounds).pad(0.2)); } catch (e) {} }
+      if (!keepView) {
+        if (count === 1) mapObj.setView(bounds[0], 10); // v142: zoom 10 (sheher nazar aaye) — 13 par dobara tiles mangwani parti thiin
+        else if (count > 1) { try { mapObj.fitBounds(window.L.latLngBounds(bounds).pad(0.2)); } catch (e) {} }
+      }
       return count;
     } catch (e) { return 0; }
+  }
+  // v155: LIVE PINS — map khula ho to doston ke pins taaze rehte hain.
+  // (1) Realtime user_locations (publication mein table ho to foran);
+  // (2) 15s polling (guaranteed path — publication ke baghair bhi near-live).
+  var mapPollTimer = null;
+  var rtMapTimer = null;
+  function pollMapPins() {
+    if (currentView !== "map" || !mapObj || !window.L) return Promise.resolve(false);
+    var isGuest = guestMode || !session;
+    return (isGuest ? loadGuestLocations() : loadSharedLocations()).then(function (res) {
+      if (!res.ok) return false;
+      var n = renderMapPins(res.rows || [], isGuest, true);
+      mapRowsCache = { rows: res.rows || [], isGuest: isGuest };
+      renderMapCount(n);
+      var emptyBox = $("mapEmptyBox");
+      if (emptyBox) emptyBox.hidden = isGuest || n !== 0;
+      return true;
+    }).catch(function () { return false; });
+  }
+  function startMapPolling() {
+    if (currentView !== "map" || mapPollTimer) return;
+    mapPollTimer = setInterval(function () { pollMapPins(); }, 15000);
+  }
+  function stopMapPolling() {
+    if (mapPollTimer) { clearInterval(mapPollTimer); mapPollTimer = null; }
+  }
+  function scheduleMapPinsReload() {
+    if (currentView !== "map") return;
+    if (rtMapTimer) clearTimeout(rtMapTimer);
+    rtMapTimer = setTimeout(function () { rtMapTimer = null; pollMapPins(); }, 300);
   }
   function refreshMap() {
     var wrap = $("mapWrap"), emptyBox = $("mapEmptyBox"),
@@ -1527,7 +1658,7 @@
     if (locSharingOn()) {
       say(tr("Location update ho rahi hai…"));
       return updateMyLocation().then(function (res) {
-        if (res && res.ok) { say(""); return true; }
+        if (res && res.ok) { say(""); startLiveWatch(); return true; }
         say(tr("Location save nahi hui — internet check kar ke dobara try karein."));
         return false;
       });
@@ -1543,6 +1674,7 @@
       }
       setLocSharing(true);
       renderLocToggle();
+      startLiveWatch(); // v155: live tracking shuru
       say(tr("Location share on ho gaya — map par aap ka pin dikhega jab app khuli ho."));
       return true;
     }).catch(function (err) {
@@ -1564,6 +1696,7 @@
         if (!res.ok) { setLocMsg(tr("Band nahi ho saka — internet check kar ke dobara try karein.")); return; }
         setLocSharing(false);
         renderLocToggle();
+        stopLiveWatch(); // v155: live tracking band
         setLocMsg(tr("Location share band ho gaya — aap ka pin map se hat gaya."));
       });
       return;
@@ -3016,7 +3149,8 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_notifications", filter: "user_id=eq." + myId() }, scheduleLiveReload)
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_contacts", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
         .on("postgres_changes", { event: "*", schema: "public", table: "khata_recurring", filter: "workspace_id=eq." + currentWorkspaceId }, scheduleLiveReload)
-        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, scheduleLiveReload);
+        .on("postgres_changes", { event: "*", schema: "public", table: "khata_txn_hidden", filter: "user_id=eq." + myId() }, scheduleLiveReload)
+        .on("postgres_changes", { event: "*", schema: "public", table: "user_locations" }, scheduleMapPinsReload); // v155: doston ke pins live (publication mein table ho to; na ho to 15s polling hi kaafi hai)
       rtChannel = channel;
       channel.subscribe(function(status) {
         if (status === "SUBSCRIBED") { rtLastFetch = Date.now(); return; }
@@ -3055,6 +3189,10 @@
     }
     // v136: app wapas khulte hi pending changes sync karne ki koshish karein.
     if (!document.hidden && session && !guestMode && loadOutbox().length) flushOutbox();
+    // v155: LIVE LOCATION — tab chhupa ho to watch + map poll ruko (battery);
+    // wapas aate hi sharing ON ho to dobara chalao (map khula ho to poll bhi).
+    if (document.hidden) { stopLiveWatch(); stopMapPolling(); }
+    else if (session && !guestMode && locSharingOn()) { startLiveWatch(); startMapPolling(); }
   });
   window.addEventListener("online", function () {
     if (session && !guestMode) { setupRealtime(); loadAll(); }
@@ -8489,6 +8627,8 @@
   "Pata 200 harf se zyada nahi ho sakta.": "Address can't be longer than 200 characters.",
   // ---- Map view v146 (guest map — bina login ke pins, phone nahi) ----
   "Call ya WhatsApp karne ke liye login karein.": "Login to call or WhatsApp.",
+  // ---- Map view v155 (live location) ----
+  "Live location on hai": "Live location is on",
   // ---- Friend suggestions v147 (category-based, DOST list ke upar) ----
   "Aap ke liye suggestions": "Suggestions for you",
   "Aap ke kaam ka hai — faida de sakta hai": "Useful for your work — can benefit you",
