@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=117">
+<link rel="stylesheet" href="styles.css?v=118">
 </head>
 <body>
 
@@ -216,26 +216,26 @@ window.addEventListener("error", function (e) {
     </div>
     <p class="drawer-section" data-i18n="Settings">Settings</p>
     <div class="menu-list drawer-list">
-      <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
-      <button id="drawerThemeBtn" class="menu-item" type="button"><span class="mi-ico">🌙</span><span data-i18n="Theme">Theme</span><span class="menu-right" id="drawerThemeValue">Light</span></button>
-      <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
+      <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span class="menu-label" data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
+      <button id="drawerThemeBtn" class="menu-item" type="button"><span class="mi-ico">🌙</span><span class="menu-label" data-i18n="Theme">Theme</span><span class="menu-right" id="drawerThemeValue">Light</span></button>
+      <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" class="menu-label" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
       <p id="pushMsg" class="msg" role="status"></p>
-      <button id="acctLocBtn" class="menu-item" type="button"><span class="mi-ico">📍</span><span id="acctLocLabel" data-i18n="Meri location map par dikhayein">Meri location map par dikhayein</span><span class="menu-right" id="acctLocValue">Band</span></button>
+      <button id="acctLocBtn" class="menu-item" type="button"><span class="mi-ico">📍</span><span id="acctLocLabel" class="menu-label" data-i18n="Map par location">Map par location</span><span class="menu-right" id="acctLocValue">Band</span></button>
       <p id="locMsg" class="msg" role="status"></p>
-      <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
-      <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span data-i18n="Abhi lock karein">Abhi lock karein</span><span class="menu-right">›</span></button>
-      <button id="acctInstallBtn" class="menu-item" type="button" hidden><span class="mi-ico">⬇️</span><span id="acctInstallLabel" data-i18n="App install karein">App install karein</span><span class="menu-right">›</span></button>
+      <button id="acctPinLockBtn" class="menu-item" type="button"><span class="mi-ico">🔒</span><span id="acctPinLockLabel" class="menu-label" data-i18n="PIN Lock set karein">PIN Lock set karein</span><span class="menu-right">›</span></button>
+      <button id="acctLockNowBtn" class="menu-item" type="button" hidden><span class="mi-ico">🔐</span><span class="menu-label" data-i18n="Abhi lock karein">Abhi lock karein</span><span class="menu-right">›</span></button>
+      <button id="acctInstallBtn" class="menu-item" type="button" hidden><span class="mi-ico">⬇️</span><span id="acctInstallLabel" class="menu-label" data-i18n="App install karein">App install karein</span><span class="menu-right">›</span></button>
       <p id="installMsg" class="msg" role="status"></p>
     </div>
     <p class="drawer-section" data-i18n="Tools">Tools</p>
     <div class="menu-list drawer-list">
       <!-- v158: notifications inbox drawer mein (header bell ki jagah) — unread badge sath. -->
-      <button id="drawerNotifBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span data-i18n="Notifications">Notifications</span><span class="menu-right"><span id="drawerNotifBadge" class="notif-badge" hidden>0</span></span></button>
-      <button id="drawerBudgetBtn" class="menu-item" type="button"><span class="mi-ico">💰</span><span data-i18n="Monthly Budget">Monthly Budget</span><span class="menu-right">›</span></button>
-      <button id="drawerGoalBtn" class="menu-item" type="button"><span class="mi-ico">🎯</span><span data-i18n="Bachat Goal">Bachat Goal</span><span class="menu-right">›</span></button>
-      <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span data-i18n="Recurring records">Recurring records</span><span class="menu-right">›</span></button>
-      <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
-      <button id="drawerDukaanBtn" class="menu-item" type="button"><span class="mi-ico">🏪</span><span data-i18n="Dukaan mode">Dukaan mode</span><span class="menu-right" id="drawerDukaanValue">Off</span></button>
+      <button id="drawerNotifBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span class="menu-label" data-i18n="Notifications">Notifications</span><span class="menu-right"><span id="drawerNotifBadge" class="notif-badge" hidden>0</span></span></button>
+      <button id="drawerBudgetBtn" class="menu-item" type="button"><span class="mi-ico">💰</span><span class="menu-label" data-i18n="Monthly Budget">Monthly Budget</span><span class="menu-right">›</span></button>
+      <button id="drawerGoalBtn" class="menu-item" type="button"><span class="mi-ico">🎯</span><span class="menu-label" data-i18n="Bachat Goal">Bachat Goal</span><span class="menu-right">›</span></button>
+      <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span class="menu-label" data-i18n="Recurring records">Recurring records</span><span class="menu-right">›</span></button>
+      <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span class="menu-label" data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
+      <button id="drawerDukaanBtn" class="menu-item" type="button"><span class="mi-ico">🏪</span><span class="menu-label" data-i18n="Dukaan mode">Dukaan mode</span><span class="menu-right" id="drawerDukaanValue">Off</span></button>
     </div>
   </aside>
 
@@ -1029,6 +1029,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=156"></script>
+<script src="app.js?v=157"></script>
 </body>
 </html>

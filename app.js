@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v159";
+  var APP_VERSION = "v160";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8733,7 +8733,7 @@
   "PIN Lock — change / band karein": "PIN Lock — change / turn off",
   "records": "records",
   // ---- Map view (v140 + v141) ----
-  "Meri location map par dikhayein": "Show my location on the map",
+  "Map par location": "Location on map",
   "Map — Naqsha": "Map",
   "Map par sirf woh dost dikhte hain jinhon ne apni location share karne ki ijazat di hai. Location sirf tab update hoti hai jab app khuli ho — app band ho to location update nahi hoti.": "Only friends who allowed sharing their location appear on the map. Location updates only while the app is open — it does not update when the app is closed.",
   "Location update karein": "Update location",
