@@ -1402,12 +1402,21 @@ input,select,textarea,button{max-width:100%}
 /* v70: Workspace bar 2.0 — compact single row: icon + switcher + ⋯ menu.
    Sirf zaroori cheez bahar (workspace switcher); baaki community actions
    menu ke andar. Bar kabhi wrap nahi karta — har screen par aik hi row. */
-.workspace-bar{position:relative;display:flex;align-items:center;gap:10px;max-width:1180px;width:calc(100% - 24px);margin:10px auto 0;padding:8px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 8px rgba(20,30,50,.04)}
+/* v167: Workspace bar user-friendly + compact (Boss order 23 Nov 13:18 PKT,
+   screenshot — red circle): (1) switcher ab saaf control dikhta hai — pehle
+   border/background kuch nahi tha, sirf bold text + chhota chevron, pata hi
+   nahi chalta tha tap karne se workspace badalta hai. Ab soft pill (bg +
+   radius + hover border) aur chevron accent rang mein. (2) ⋯ button accent
+   tint — saaf action dikhe, decoration na lage. (3) bar chhota — padding,
+   icon aur margin kam. Behaviour waisa hi: switcher cd-menu kholta hai,
+   ⋯ group actions menu kholta hai. */
+.workspace-bar{position:relative;display:flex;align-items:center;gap:8px;max-width:1180px;width:calc(100% - 24px);margin:8px auto 0;padding:6px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 2px 8px rgba(20,30,50,.04)}
 .workspace-bar[hidden]{display:none}
-.ws-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,var(--bg));font-size:18px;line-height:1}
+.ws-icon{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,var(--bg));font-size:16px;line-height:1}
 .workspace-bar .cd-wrap{flex:1;min-width:0}
-.workspace-bar .cd-btn{border:0;background:transparent;min-height:36px;padding:0 4px;font-weight:700}
-.workspace-bar .cd-btn:hover{background:var(--bg)}
+.workspace-bar .cd-btn{border:1px solid transparent;background:var(--bg);border-radius:10px;min-height:38px;padding:0 10px;font-weight:700}
+.workspace-bar .cd-btn:hover{border-color:var(--primary);background:var(--bg)}
+.workspace-bar .cd-btn .cd-chevron{color:var(--accent)}
 .workspace-bar .cd-btn:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,transparent)}
 
 /* v73: Custom dropdowns — native <select> ka popup OS ka hota hai (dark,
@@ -1439,15 +1448,15 @@ input,select,textarea,button{max-width:100%}
 .community-invite-row .cd-wrap{flex:1;min-width:0}
 .community-request-actions .cd-wrap{flex:1;min-width:0}
 .admin-community-member-controls .cd-wrap,.admin-community-add-member .cd-wrap{flex:1;min-width:0}
-.ws-menu-btn{flex:0 0 auto;width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:20px;line-height:1;letter-spacing:1px;cursor:pointer}
-.ws-menu-btn:hover{border-color:var(--primary)}
+.ws-menu-btn{flex:0 0 auto;width:36px;height:36px;border:1px solid var(--accent-soft);border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:20px;line-height:1;letter-spacing:1px;cursor:pointer}
+.ws-menu-btn:hover{border-color:var(--accent)}
 .ws-menu-btn[aria-expanded="true"]{background:color-mix(in srgb,var(--primary) 12%,var(--bg));border-color:var(--primary)}
 .ws-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:60;min-width:230px;max-width:calc(100vw - 32px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 12px 32px rgba(10,20,40,.18)}
 .ws-menu[hidden]{display:none}
 .ws-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
 .ws-menu-item:hover{background:var(--bg)}
 .ws-menu-item[hidden]{display:none}
-@media(max-width:520px){.workspace-bar{gap:8px;padding:7px 10px}.ws-icon{width:30px;height:30px;font-size:16px}.workspace-bar .cd-btn{font-size:13px}.ws-menu-btn{width:34px;height:34px}}
+@media(max-width:520px){.workspace-bar{gap:8px;padding:6px 8px}.workspace-bar .cd-btn{font-size:13px}.ws-menu-btn{width:34px;height:34px}}
 
 
 /* Public community flow — compact responsive cards and native-feeling dialogs */
