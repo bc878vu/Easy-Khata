@@ -1914,9 +1914,18 @@ input,select,textarea,button{max-width:100%}
 .map-user-phone{margin:6px 0 0;font-size:.85rem;font-weight:700;color:var(--ink);text-align:center}
 .map-user-nophone{margin:8px 0 0;font-size:.82rem;color:var(--muted)}
 .map-user-time{margin:8px 0 0;font-size:.75rem;color:var(--muted)}
+/* v156: online status — pin par green dot + popup mein status line. */
+.map-pin-online-dot{position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#16a34a;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);z-index:2}
+.map-user-status{margin:8px 0 0;font-size:.8rem;font-weight:700;display:flex;align-items:center;gap:6px}
+.map-user-status-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.map-user-online{color:#15803d}
+.map-user-online .map-user-status-dot{background:#16a34a}
+.map-user-offline{color:var(--muted)}
+.map-user-offline .map-user-status-dot{background:#9ca3af}
 /* Leaflet overrides ko harane wale scoped guarantees (specificity (0,3,1) vs Leaflet (0,1,1)): */
 .map-box .leaflet-popup-content a.map-user-btn,.map-box .leaflet-popup-content a.map-user-btn-wa{color:#fff;text-decoration:none}
 .map-box .leaflet-popup-content p.map-user-addr,.map-box .leaflet-popup-content p.map-user-nophone,.map-box .leaflet-popup-content p.map-user-time{margin:8px 0 0}
+.map-box .leaflet-popup-content p.map-user-status{margin:8px 0 0}
 .map-box .leaflet-popup-content p.map-user-phone{margin:6px 0 0}
 
 /* ---------- Friend suggestions (v147) ----------

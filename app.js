@@ -1459,7 +1459,21 @@
   // zaroorat nahi — local bundle mein images nahi hain). Tooti pic par
   // avatarHtml ka data-fallback initials dikhata hai (document-level
   // error listener, v24.4).
-  function locMarkerIcon(name, avatarUrl) {
+  // v156: online status — location update hi heartbeat hai (app khula +
+  // sharing ON ho to updated_at har 15s–2min mein taaza hota hai). 5 min
+  // ke andar ki update = online (background throttling ki gunjaish ke
+  // saath). updated_at ghalat/ghayab ho to offline — kabhi ghalat Online
+  // nahi dikhana.
+  var ONLINE_WINDOW_MS = 5 * 60 * 1000;
+  function isUserOnline(ts) {
+    try {
+      var t = new Date(ts).getTime();
+      if (!t) return false;
+      var age = Date.now() - t;
+      return age >= 0 && age < ONLINE_WINDOW_MS;
+    } catch (e) { return false; }
+  }
+  function locMarkerIcon(name, avatarUrl, online) {
     var nm = String(name || "Dost");
     var initial = (nm.trim().charAt(0) || "D").toUpperCase();
     var hue = 0;
@@ -1467,6 +1481,7 @@
     var inner;
     if (avatarUrl) inner = '<span class="map-pin-avatar">' + avatarHtml(avatarUrl, initial) + "</span>";
     else inner = '<span class="map-pin-dot" style="background:hsl(' + hue + ',65%,45%)">' + esc(initial) + "</span>";
+    if (online) inner += '<span class="map-pin-online-dot" title="' + esc(tr("Online")) + '"></span>'; // v156: online pin par green dot
     return window.L.divIcon({
       className: "map-pin",
       html: inner,
@@ -1516,6 +1531,7 @@
     } else {
       html += '<p class="map-user-nophone">' + esc(tr("Phone number nahi diya")) + "</p>";
     }
+    html += '<p class="map-user-status ' + (isUserOnline(r && r.updated_at) ? "map-user-online" : "map-user-offline") + '"><span class="map-user-status-dot"></span>' + esc(isUserOnline(r && r.updated_at) ? tr("Online") : tr("Offline")) + "</p>"; // v156: online status
     html += '<p class="map-user-time">' + esc(fmtRelTime(r && r.updated_at)) + "</p>";
     html += "</div>";
     return html;
@@ -1535,7 +1551,7 @@
         var prof = r.user_id ? profileById(r.user_id) : null;
         // v146: guest rows mein avatar view se aata hai (r.avatar_url);
         // logged-in rows mein profiles se — dono mein se jo mile.
-        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name, (r && r.avatar_url) || (prof && prof.avatar_url)) }).addTo(mapObj);
+        var marker = window.L.marker([lat, lng], { icon: locMarkerIcon(r.display_name, (r && r.avatar_url) || (prof && prof.avatar_url), isUserOnline(r && r.updated_at)) }).addTo(mapObj); // v156: online dot
         try {
           marker.bindPopup(mapUserPopupHtml(r, isGuest), { maxWidth: 260 });
         } catch (e) {}
@@ -8025,6 +8041,11 @@
   "Wapsi ki tareekh": "Return date",
   "Udhaar ho to kab wapas milna hai — yaad-dihani ke liye.": "If it's a loan, when is it due back — for a reminder.",
   "Bill ki photo": "Bill photo",
+  "Online": "Online", // v156: map online status (donon zabanon mein yahi lafz)
+  "Offline": "Offline", // v156
+  "Ye HEIC photo hai — phone ki settings se JPG chunein ya photo dobara JPG mein save kar ke lagayein.": "This is a HEIC photo — choose JPG in your phone settings or save the photo as JPG and try again.", // v156
+  "Ye photo khaali/kaali hai — is mein kuch nazar nahi aa raha. Koi doosri photo chunein.": "This photo looks blank/black — nothing is visible in it. Please choose another photo.", // v156
+  "Photo load nahi hui — dobara try karein.": "Photo could not be loaded — please try again.", // v156
   "Dost add karein": "Add friend",
   "Dost save karein": "Save friend",
   "Naya dost": "New friend",
@@ -9033,36 +9054,77 @@
   function cleanCategory(v) { return TXN_CATEGORIES.indexOf(v) !== -1 ? v : "Khana"; }
   // v113: bill photo (downscaled JPEG data URL) — selected file ka state.
   var txnPhotoDataUrl = null;
-  // v113: bill photo — max 800px JPEG (record halka rehta hai, offline-friendly).
-  // Returns a data URL, or null (galat file / canvas na ho / bohat bari ho).
+  // v156: bill photo — (1) canvas pehle SAFED bharo: transparent PNG/WebP
+  // ki khaali jagah JPEG mein KAALI banti thi (live reproduce 23 Nov:
+  // transparent photo ke corners preview + full view dono mein kaale thay).
+  // (2) Agar result taqreeban poora kaala/khaali hai to black box kabhi na
+  // dikhayein — reject kar ke saaf message dikhayein. (3) HEIC/HEIF
+  // browser decode nahi kar sakta — alag message. Photo data URL hi rehti
+  // hai (record ki row ke andar, RLS ke saath — koi public link/bucket
+  // nahi, is liye safe; full view ephemeral same-origin blob URL hai).
+  var lastPhotoError = null; // v156: downscalePhoto ki aakhri wajah ('heic' | 'empty' | 'unreadable' | null)
   function downscalePhoto(file) {
     return new Promise(function (resolve) {
-      if (!file || !file.type || file.type.indexOf("image/") !== 0) { resolve(null); return; }
+      lastPhotoError = null;
+      var nm = String((file && file.name) || "").toLowerCase();
+      var tp = String((file && file.type) || "").toLowerCase();
+      if (tp.indexOf("heic") !== -1 || tp.indexOf("heif") !== -1 || /\.hei[cf]$/.test(nm)) { lastPhotoError = "heic"; resolve(null); return; }
+      if (!file || !file.type || file.type.indexOf("image/") !== 0) { lastPhotoError = "unreadable"; resolve(null); return; }
       var reader = new FileReader();
       reader.onload = function () {
         var img = new Image();
         img.onload = function () {
           try {
             var max = 800, w = img.width, h = img.height;
-            if (!w || !h) { resolve(null); return; }
+            if (!w || !h) { lastPhotoError = "unreadable"; resolve(null); return; }
             var scale = Math.min(1, max / Math.max(w, h));
             var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
             var canvas = document.createElement("canvas");
             canvas.width = cw; canvas.height = ch;
             var g = canvas.getContext("2d");
-            if (!g) { resolve(null); return; }
+            if (!g) { lastPhotoError = "unreadable"; resolve(null); return; }
+            g.fillStyle = "#ffffff"; g.fillRect(0, 0, cw, ch); // v156: transparency safed, kaali nahi
             g.drawImage(img, 0, 0, cw, ch);
+            if (photoCanvasLooksEmpty(g, cw, ch)) { lastPhotoError = "empty"; resolve(null); return; }
             var url = canvas.toDataURL("image/jpeg", 0.7);
             if (url.length > 270000) url = canvas.toDataURL("image/jpeg", 0.5);
-            resolve(url.length > 270000 ? null : url);
-          } catch (e) { resolve(null); }
+            if (url.length > 270000) { lastPhotoError = "unreadable"; resolve(null); return; }
+            resolve(url);
+          } catch (e) { lastPhotoError = "unreadable"; resolve(null); }
         };
-        img.onerror = function () { resolve(null); };
+        img.onerror = function () { lastPhotoError = "unreadable"; resolve(null); };
         img.src = reader.result;
       };
-      reader.onerror = function () { resolve(null); };
+      reader.onerror = function () { lastPhotoError = "unreadable"; resolve(null); };
       reader.readAsDataURL(file);
     });
+  }
+  // v156: canvas ke pixels sample karo — (a) taqreeban sab pixels kaale
+  // (<12) hon ya (b) taqreeban sab safed (>243) hon to photo khaali/kaali
+  // hai (poori transparent tasveer white-fill ke baad poori safed banti
+  // hai; kaali tasveer poori kaali). Dono sooraton mein black/blank box
+  // dikhane se behtar hai saaf message. Threshold 98% — asli raat ki photo
+  // mein bhi noise/detail hota hai, is liye ghalat reject nahi hoti.
+  function photoCanvasLooksEmpty(g, w, h) {
+    try {
+      var d = g.getImageData(0, 0, w, h).data;
+      var total = Math.floor(d.length / 4);
+      var step = Math.max(1, Math.floor(total / 400));
+      var n = 0, black = 0, white = 0;
+      for (var i = 0; i < total; i += step) {
+        var o = i * 4; n++;
+        var r = d[o], gg = d[o + 1], b = d[o + 2];
+        if (r < 12 && gg < 12 && b < 12) black++;
+        if (r > 243 && gg > 243 && b > 243) white++;
+      }
+      return n > 0 && (black / n > 0.98 || white / n > 0.98);
+    } catch (e) { return false; }
+  }
+  // v156: downscalePhoto ki wajah ke mutabiq saaf message.
+  function photoErrorMessage() {
+    if (lastPhotoError === "heic") return tr("Ye HEIC photo hai — phone ki settings se JPG chunein ya photo dobara JPG mein save kar ke lagayein.");
+    if (lastPhotoError === "empty") return tr("Ye photo khaali/kaali hai — is mein kuch nazar nahi aa raha. Koi doosri photo chunein.");
+    return tr("Photo load nahi hui — dobara try karein.");
   }
   // v126: bill-photo preview — aik jagah se show/hide (preview + hint + remove + file name).
   // Preview compact thumbnail hai (140px, object-fit cover); tap par poori photo khulti hai.
@@ -9685,7 +9747,7 @@
     downscalePhoto(f).then(function (url) {
       txnPhotoDataUrl = url;
       if (url) { setTxnPhotoPreview(url); setTxnPhotoName(f.name || ""); }
-      else { setTxnPhotoPreview(null); setTxnPhotoName(""); setTxnMsg("Photo load nahi hui — dobara try karein.", false); }
+      else { setTxnPhotoPreview(null); setTxnPhotoName(""); setTxnMsg(photoErrorMessage(), false); } // v156: wajah ke mutabiq message
     });
   });
   $("txnPhotoRemoveBtn").addEventListener("click", function () {
@@ -9693,6 +9755,15 @@
   });
   // v126: form preview par tap — poori photo kholein (thumbnail compact hai).
   $("txnPhotoPreview").addEventListener("click", function () { if (txnPhotoDataUrl) openPhotoDataUrl(txnPhotoDataUrl); });
+  // v156: preview <img> agar data URL load na kar sake (toota/corrupt
+  // stored photo) to black/broken box dikhane ke bajaye preview chhupayein
+  // aur saaf message dikhayein. txnPhotoDataUrl ko haath nahi lagate —
+  // stored photo chup-chaap delete nahi honi chahiye; user khud Remove
+  // kare ya save par wahi rehne de.
+  $("txnPhotoPreview").addEventListener("error", function () {
+    setTxnPhotoPreview(null); setTxnPhotoName("");
+    setTxnMsg(tr("Photo load nahi hui — dobara try karein."), false);
+  });
   // v113: bill-photo thumbnail par click — poori photo kholein.
   document.addEventListener("click", function (e) {
     var img = e.target && e.target.closest ? e.target.closest(".txn-photo-thumb") : null;
