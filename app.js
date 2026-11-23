@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v174";
+  var APP_VERSION = "v175";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8104,6 +8104,10 @@
     (products || []).forEach(function (p) { var c = String(p.category || "").trim(); if (c && !seen[c]) { seen[c] = true; out.push(c); } });
     return out.sort();
   }
+  function bizNowLocal() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
   var bizData = null;
   var bizTab = "dash";
   var bizEditId = null;
@@ -8250,11 +8254,11 @@
     if (errs.indexOf("skuDup") !== -1) { bizSay(tr("Ye SKU pehle se hai — koi aur SKU likhein."), "bizPMsg"); return; }
     if (bizEditId) {
       var old = bizProductById(bizEditId);
-      if (old) { var oldStock = Number(old.stock) || 0; Object.keys(p).forEach(function (k) { old[k] = p[k]; }); if (oldStock !== p.stock) bizData.moves.push({ id: newUuid(), productId: old.id, productName: old.name, type: "adjust", qty: p.stock, note: tr("Edit se stock set"), createdAt: new Date().toISOString() }); }
+      if (old) { var oldStock = Number(old.stock) || 0; Object.keys(p).forEach(function (k) { old[k] = p[k]; }); if (oldStock !== p.stock) bizData.moves.push({ id: newUuid(), productId: old.id, productName: old.name, type: "adjust", qty: p.stock, note: tr("Edit se stock set"), createdAt: bizNowLocal() }); }
       bizSay(tr("Product update ho gaya."), "bizPMsg");
     } else {
       bizData.products.push(p);
-      if (p.stock > 0) bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "in", qty: p.stock, note: tr("Opening stock"), createdAt: new Date().toISOString() });
+      if (p.stock > 0) bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "in", qty: p.stock, note: tr("Opening stock"), createdAt: bizNowLocal() });
       bizSay(tr("Product save ho gaya."), "bizPMsg");
     }
     bizSave(); bizClearProductForm(); renderBusiness();
@@ -8280,7 +8284,7 @@
     if (errs.indexOf("insufficient") !== -1) { bizSay(tr("Stock kam hai — itna stock nahi hai."), "bizMMsg"); return; }
     if (errs.indexOf("type") !== -1) { bizSay(tr("Sahi type chunein."), "bizMMsg"); return; }
     p.stock = bizApplyMove(Number(p.stock) || 0, type, qty);
-    bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: type, qty: qty, note: note, createdAt: new Date().toISOString() });
+    bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: type, qty: qty, note: note, createdAt: bizNowLocal() });
     bizSave(); renderBusiness();
     $("bizMQty").value = ""; $("bizMNote").value = "";
     bizSay(tr("Stock update ho gaya."), "bizMMsg");
@@ -10435,9 +10439,12 @@
   $("drawerBizBtn").addEventListener("click", function () { showView("business"); });
   document.querySelectorAll("[data-biz-tab]").forEach(function (b) { b.addEventListener("click", function () { bizShowTab(b.getAttribute("data-biz-tab")); }); });
   $("bizProductForm").addEventListener("submit", bizSaveProduct);
+  $("bizProductForm").addEventListener("input", function () { bizSay("", "bizPMsg"); }); // v175: type karte hi purana error saaf
   $("bizPCancelBtn").addEventListener("click", function () { bizClearProductForm(); bizSay("", "bizPMsg"); });
   $("bizMoveForm").addEventListener("submit", bizSaveMove);
+  $("bizMoveForm").addEventListener("input", function () { bizSay("", "bizMMsg"); }); // v175: type karte hi purana error saaf
   $("bizSetupForm").addEventListener("submit", bizSaveSetup);
+  $("bizSetupForm").addEventListener("input", function () { bizSay("", "bizSMsg"); }); // v175: type karte hi purana error saaf
   $("bizPSearch").addEventListener("input", bizRenderProducts);
   $("bizPCatFilter").addEventListener("change", bizRenderProducts);
   $("bizQuickAddBtn").addEventListener("click", function () { bizShowTab("products"); var el = $("bizPName"); if (el) el.focus(); });
