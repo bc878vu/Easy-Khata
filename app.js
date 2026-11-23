@@ -9099,23 +9099,33 @@
       reader.readAsDataURL(file);
     });
   }
-  // v156: canvas ke pixels sample karo — (a) taqreeban sab pixels kaale
-  // (<12) hon ya (b) taqreeban sab safed (>243) hon to photo khaali/kaali
-  // hai (poori transparent tasveer white-fill ke baad poori safed banti
-  // hai; kaali tasveer poori kaali). Dono sooraton mein black/blank box
-  // dikhane se behtar hai saaf message. Threshold 98% — asli raat ki photo
-  // mein bhi noise/detail hota hai, is liye ghalat reject nahi hoti.
+  // v157: canvas ke pixels 20x20 GRID par sample karo — poori tasveer
+  // mein phela hua. (v156 ka linear stride ghalat tha: step image ki
+  // width ka multiple ban jata tha, to saare samples aik hi column mein
+  // parte thay — transparent photo ka markazi content nazar hi nahi aata
+  // tha aur sahi photo bhi "khaali" reject ho jati thi. Live 23 Nov:
+  // laal dairay wali transparent PNG ghalat reject hui thi.)
+  // (a) taqreeban sab pixels kaale (<12) hon ya (b) taqreeban sab safed
+  // (>243) hon to photo khaali/kaali hai (poori transparent tasveer
+  // white-fill ke baad poori safed banti hai; kaali tasveer poori kaali).
+  // Dono sooraton mein black/blank box dikhane se behtar hai saaf message.
+  // Threshold 98% — asli raat ki photo mein bhi noise/detail hota hai,
+  // is liye ghalat reject nahi hoti.
   function photoCanvasLooksEmpty(g, w, h) {
     try {
       var d = g.getImageData(0, 0, w, h).data;
-      var total = Math.floor(d.length / 4);
-      var step = Math.max(1, Math.floor(total / 400));
+      var cols = 20, rows = 20;
       var n = 0, black = 0, white = 0;
-      for (var i = 0; i < total; i += step) {
-        var o = i * 4; n++;
-        var r = d[o], gg = d[o + 1], b = d[o + 2];
-        if (r < 12 && gg < 12 && b < 12) black++;
-        if (r > 243 && gg > 243 && b > 243) white++;
+      for (var y = 0; y < rows; y++) {
+        for (var x = 0; x < cols; x++) {
+          var px = Math.floor((x + 0.5) * w / cols);
+          var py = Math.floor((y + 0.5) * h / rows);
+          var o = (py * w + px) * 4;
+          n++;
+          var r = d[o], gg = d[o + 1], b = d[o + 2];
+          if (r < 12 && gg < 12 && b < 12) black++;
+          if (r > 243 && gg > 243 && b > 243) white++;
+        }
       }
       return n > 0 && (black / n > 0.98 || white / n > 0.98);
     } catch (e) { return false; }
@@ -9746,12 +9756,12 @@
     if (!f) { txnPhotoDataUrl = null; setTxnPhotoPreview(null); setTxnPhotoName(""); return; }
     downscalePhoto(f).then(function (url) {
       txnPhotoDataUrl = url;
-      if (url) { setTxnPhotoPreview(url); setTxnPhotoName(f.name || ""); }
+      if (url) { setTxnPhotoPreview(url); setTxnPhotoName(f.name || ""); setTxnMsg(""); } // v157: kamyabi par purana photo-error saaf karo (warna warning atki rehti thi)
       else { setTxnPhotoPreview(null); setTxnPhotoName(""); setTxnMsg(photoErrorMessage(), false); } // v156: wajah ke mutabiq message
     });
   });
   $("txnPhotoRemoveBtn").addEventListener("click", function () {
-    txnPhotoDataUrl = null; $("txnPhoto").value = ""; setTxnPhotoPreview(null); setTxnPhotoName("");
+    txnPhotoDataUrl = null; $("txnPhoto").value = ""; setTxnPhotoPreview(null); setTxnPhotoName(""); setTxnMsg(""); // v157: hatane par photo-error bhi saaf
   });
   // v126: form preview par tap — poori photo kholein (thumbnail compact hai).
   $("txnPhotoPreview").addEventListener("click", function () { if (txnPhotoDataUrl) openPhotoDataUrl(txnPhotoDataUrl); });
