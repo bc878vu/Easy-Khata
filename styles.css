@@ -478,7 +478,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .t-amt.settle{color:var(--accent)}
 .t-right{text-align:right}
 .t-btns{display:flex;gap:6px;flex-wrap:wrap}
-.t-btns .btn-danger{background:none;border-color:var(--line);color:var(--red-dark)}
+.t-btns .btn-danger{background:none;border-color:var(--line);color:var(--red-dark);padding:4px 10px;font-size:.78rem;min-height:0;border-radius:8px}
+.d-time .t-btns{margin-top:4px}
 .t-lock{
   display:inline-block;font-size:.78rem;font-weight:700;color:var(--muted);
   white-space:nowrap;
@@ -521,15 +522,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .da-ico{font-size:1.15rem}
 .dtable{display:grid;gap:8px}
 .dtable-head{
-  display:grid;grid-template-columns:1fr 74px 74px;gap:8px;
+  display:grid;grid-template-columns:1fr 74px 74px;gap:6px;
   font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--muted);padding:4px;
   /* LEN-DEN box ke andar scroll karte waqt header upar chipka rehta hai (v21). */
   position:sticky;top:0;background:var(--card);z-index:1;border-radius:8px;
 }
 .dtable-head span:nth-child(2),.dtable-head span:nth-child(3){text-align:right}
 .drow{
-  display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:8px;align-items:start;
-  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+  display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:6px;align-items:start;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;
   min-width:0;
 }
 .d-time{display:flex;gap:8px;min-width:0}
@@ -539,24 +540,22 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 .d-ico.up{background:var(--red-soft);color:var(--red-dark)}
 .d-ico.down{background:var(--green-soft);color:var(--green-dark)}
-.d-date{font-size:.82rem;font-weight:600;overflow-wrap:anywhere}
-.d-note{font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}
-.d-bal{font-size:.75rem;font-weight:700;margin-top:2px}
+.d-date{font-size:.8rem;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.d-note{font-size:.78rem;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.d-bal{font-size:.75rem;font-weight:700;line-height:1.35;margin-top:2px}
 .d-bal.pos{color:var(--green)}
 .d-bal.neg{color:var(--red)}
 .d-bal.zero{color:var(--muted)}
-.d-amt{font-weight:700;font-size:.92rem;text-align:right;overflow-wrap:anywhere}
+.d-amt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-weight:700;font-size:.92rem;text-align:right;overflow-wrap:anywhere}
 .d-amt.diye{color:var(--red)}
 .d-amt.liye{color:var(--green)}
-/* v161: detail row mein bill-photo RIGHT side (Boss order 23 Nov) — pehle
-   note ke neeche left mein thi. has-photo rows mein 4th column (52px);
-   photo-less rows 3 column hi rehte hain (jagah zaya nahi). Head bhi
-   has-photo hota hai jab kisi row mein photo ho (header alignment). */
-.drow.has-photo{grid-template-columns:minmax(0,1fr) 74px 74px 52px}
-.dtable-head.has-photo{grid-template-columns:minmax(0,1fr) 74px 74px 52px}
-.d-photo{display:flex;align-items:center;justify-content:flex-end;min-width:0}
-.d-photo .txn-photo-thumb{width:48px;height:48px;flex:none}
-@media(max-width:380px){.d-photo .txn-photo-thumb{width:44px;height:44px}}
+/* v163: photo amount ke NEECHE, usi column mein. v161 ka 4th column text
+   column ko daba kar date/Bal/buttons ko lapet deta tha — row 2× lambi ho
+   jati thi. Ab photo wali aur baghair-photo wali rows ki chaudai aik jaisi
+   hai (date/Bal/buttons aik line mein), photo phir bhi right side par hai. */
+.d-amt .d-photo{display:block}
+.d-photo .txn-photo-thumb{width:44px;height:44px;flex:none}
+@media(max-width:380px){.d-photo .txn-photo-thumb{width:40px;height:40px}}
 .detail-bottom{display:flex;gap:10px;margin:12px 0 8px}
 
 /* ---------- account ---------- */

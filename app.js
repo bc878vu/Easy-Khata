@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v162";
+  var APP_VERSION = "v163";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -6467,8 +6467,7 @@
       else if (t.receiver_id === me) runMinor -= a;
       balById[t.id] = moneyFromMinor(runMinor);
     });
-    var anyPhoto = sorted.some(function (x) { return !!x.photo; }); // v161: head bhi 4th column (alignment)
-    var html = '<div class="dtable-head' + (anyPhoto ? ' has-photo' : '') + '"><span>' + esc(tr("TIME")) + '</span><span>' + esc(tr("DIYE")) + '</span><span>' + esc(tr("LIYE")) + '</span>' + (anyPhoto ? '<span></span>' : '') + '</div>';
+    var html = '<div class="dtable-head"><span>' + esc(tr("TIME")) + '</span><span>' + esc(tr("DIYE")) + '</span><span>' + esc(tr("LIYE")) + '</span></div>';
     sorted.forEach(function (t) {
       var a = Number(t.amount) || 0;
       var iGave = t.payer_id === me;
@@ -6488,14 +6487,13 @@
         // normal view mein aam user hai — isAdmin() branch hata di gayi.
         btns = '<span class="t-btns"><button class="btn-danger" type="button" data-del="' + esc(t.id) + '">Delete</button></span>';
       }
-      html += '<div class="drow' + (t.photo ? ' has-photo' : '') + '">' +
+      html += '<div class="drow">' +
         '<div class="d-time"><span class="d-ico ' + (iGave ? "up" : "down") + '">' + (iGave ? "↑" : "↓") + '</span>' +
         '<div><div class="d-date">' + esc(fmtDateLong(t.txn_date)) + (timeStr ? " · " + esc(timeStr) : "") + '</div>' +
         '<div class="d-note">' + esc(t.note || tr("Food")) + txnExtraMarkup(t, false) + '</div>' +
         '<div class="d-bal ' + balCls + '">' + esc(balText) + '</div>' + btns + '</div></div>' +
-        '<div class="d-amt ' + (iGave ? "diye" : "") + '">' + (iGave ? esc(fmtRs(a)) : "") + '</div>' +
-        '<div class="d-amt ' + (!iGave ? "liye" : "") + '">' + (!iGave ? esc(fmtRs(a)) : "") + '</div>' +
-        (t.photo ? '<div class="d-photo">' + txnPhotoMarkup(t) + '</div>' : '') +
+        '<div class="d-amt ' + (iGave ? "diye" : "") + '">' + (iGave ? '<span class="d-amt-val">' + esc(fmtRs(a)) + '</span>' + (t.photo ? '<span class="d-photo">' + txnPhotoMarkup(t) + '</span>' : '') : "") + '</div>' +
+        '<div class="d-amt ' + (!iGave ? "liye" : "") + '">' + (!iGave ? '<span class="d-amt-val">' + esc(fmtRs(a)) + '</span>' + (t.photo ? '<span class="d-photo">' + txnPhotoMarkup(t) + '</span>' : '') : "") + '</div>' +
         '</div>';
     });
     $("detailTxns").innerHTML = html;
