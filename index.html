@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=131">
+<link rel="stylesheet" href="styles.css?v=132">
 </head>
 <body>
 
@@ -238,6 +238,7 @@ window.addEventListener("error", function (e) {
       <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span class="menu-label" data-i18n="Recurring records">Recurring records</span><span class="menu-right">›</span></button>
       <button id="acctBackupMenuBtn" class="menu-item" type="button"><span class="mi-ico">💾</span><span class="menu-label" data-i18n="Backup">Backup</span><span class="menu-right">›</span></button>
       <button id="drawerDukaanBtn" class="menu-item" type="button"><span class="mi-ico">🏪</span><span class="menu-label" data-i18n="Dukaan mode">Dukaan mode</span><span class="menu-right" id="drawerDukaanValue">Off</span></button>
+      <button id="drawerBizBtn" class="menu-item" type="button"><span class="mi-ico">🏢</span><span class="menu-label" data-i18n="Business">Business</span><span class="menu-right">›</span></button>
     </div>
   </aside>
 
@@ -742,6 +743,121 @@ window.addEventListener("error", function (e) {
         <p id="cardMsg" class="msg" role="status"></p>
       </div>
     </section>
+    <!-- v174: Business module Part 1 — setup + products + inventory + dashboard (local-first, per workspace). -->
+    <section id="businessView" hidden>
+      <div class="biz-head">
+        <h2 class="page-title"><span aria-hidden="true">🏢</span> <span data-i18n="Business">Business</span></h2>
+        <p class="muted" data-i18n="Dukaan ka mukammal setup — products, stock aur hisaab, aik jagah.">Dukaan ka mukammal setup — products, stock aur hisaab, aik jagah.</p>
+      </div>
+      <div class="biz-tabs" role="tablist" aria-label="Business">
+        <button id="bizTabDashBtn" type="button" class="biz-tab is-active" data-biz-tab="dash"><span aria-hidden="true">📊</span> <span data-i18n="Dashboard">Dashboard</span></button>
+        <button id="bizTabProductsBtn" type="button" class="biz-tab" data-biz-tab="products"><span aria-hidden="true">📦</span> <span data-i18n="Products">Products</span></button>
+        <button id="bizTabStockBtn" type="button" class="biz-tab" data-biz-tab="stock"><span aria-hidden="true">📥</span> <span data-i18n="Stock">Stock</span></button>
+        <button id="bizTabSetupBtn" type="button" class="biz-tab" data-biz-tab="setup"><span aria-hidden="true">⚙️</span> <span data-i18n="Setup">Setup</span></button>
+      </div>
+
+      <div id="bizTabDash" class="biz-pane">
+        <div id="bizStats" class="biz-stats" aria-live="polite"></div>
+        <div class="card biz-card">
+          <h3 data-i18n="Low stock — foran action">Low stock — foran action</h3>
+          <div id="bizLowList" class="txns"></div>
+          <p id="bizLowEmpty" class="muted" data-i18n="Koi product low stock par nahi.">Koi product low stock par nahi.</p>
+        </div>
+        <div class="biz-quick">
+          <button id="bizQuickAddBtn" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> <span data-i18n="Product add karein">Product add karein</span></button>
+          <button id="bizQuickStockBtn" class="btn btn-soft" type="button"><span aria-hidden="true">📥</span> <span data-i18n="Stock add karein">Stock add karein</span></button>
+        </div>
+      </div>
+
+      <div id="bizTabProducts" class="biz-pane" hidden>
+        <div class="card biz-card">
+          <h3 data-i18n="Product add karein">Product add karein</h3>
+          <form id="bizProductForm" class="biz-form" novalidate>
+            <label><span data-i18n="Product ka naam">Product ka naam</span><input id="bizPName" type="text" maxlength="80" data-i18n-ph="Masalan: Surf Excel 1kg" placeholder="Masalan: Surf Excel 1kg" required></label>
+            <div class="biz-form-row">
+              <label><span data-i18n="Category">Category</span><input id="bizPCat" type="text" maxlength="40" list="bizCatList" data-i18n-ph="Masalan: Karyana" placeholder="Masalan: Karyana"><datalist id="bizCatList"></datalist></label>
+              <label><span data-i18n="Unit">Unit</span><select id="bizPUnit"><option value="Piece">Piece</option><option value="Kg">Kg</option><option value="Litre">Litre</option><option value="Pack">Pack</option><option value="Dozen">Dozen</option><option value="Metre">Metre</option></select></label>
+            </div>
+            <div class="biz-form-row">
+              <label><span data-i18n="Kharid price (Rs)">Kharid price (Rs)</span><input id="bizPBuy" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+              <label><span data-i18n="Sale price (Rs)">Sale price (Rs)</span><input id="bizPSell" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <div class="biz-form-row">
+              <label><span data-i18n="SKU (khali ho to khud ban jayega)">SKU (khali ho to khud ban jayega)</span><input id="bizPSku" type="text" maxlength="30" placeholder="SKU-1001"></label>
+              <label><span data-i18n="Opening stock">Opening stock</span><input id="bizPStock" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <label><span data-i18n="Low-stock alert (is se kam ho to khabar)">Low-stock alert (is se kam ho to khabar)</span><input id="bizPReorder" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            <div class="biz-form-actions">
+              <button id="bizPSaveBtn" class="btn btn-primary" type="submit"><span data-i18n="Save karein">Save karein</span></button>
+              <button id="bizPCancelBtn" class="btn btn-ghost" type="button" hidden><span data-i18n="Cancel">Cancel</span></button>
+            </div>
+            <p id="bizPMsg" class="msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Products">Products</h3>
+          <div class="biz-filter-row">
+            <input id="bizPSearch" type="search" data-i18n-ph="Product dhoondhein…" placeholder="Product dhoondhein…">
+            <select id="bizPCatFilter" aria-label="Category"><option value="" data-i18n="Sab">Sab</option></select>
+          </div>
+          <div id="bizPList" class="txns"></div>
+          <p id="bizPEmpty" class="muted" data-i18n="Abhi koi product nahi — upar se pehla product add karein.">Abhi koi product nahi — upar se pehla product add karein.</p>
+        </div>
+      </div>
+
+      <div id="bizTabStock" class="biz-pane" hidden>
+        <div class="card biz-card">
+          <h3 data-i18n="Stock in / out">Stock in / out</h3>
+          <form id="bizMoveForm" class="biz-form" novalidate>
+            <label><span data-i18n="Product">Product</span><select id="bizMProduct"></select></label>
+            <div class="biz-form-row">
+              <label><span data-i18n="Type">Type</span><select id="bizMType"><option value="in" data-i18n="Stock in (+)">Stock in (+)</option><option value="out" data-i18n="Stock out (−)">Stock out (−)</option><option value="adjust" data-i18n="Adjust (set karein)">Adjust (set karein)</option></select></label>
+              <label><span data-i18n="Quantity">Quantity</span><input id="bizMQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <label><span data-i18n="Note (wajah)">Note (wajah)</span><input id="bizMNote" type="text" maxlength="100" data-i18n-ph="Masalan: Supplier se maal aaya" placeholder="Masalan: Supplier se maal aaya"></label>
+            <button class="btn btn-primary" type="submit"><span data-i18n="Stock update karein">Stock update karein</span></button>
+            <p id="bizMMsg" class="msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Stock ki keemat">Stock ki keemat</h3>
+          <div id="bizValuation" class="biz-stats" aria-live="polite"></div>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Stock history">Stock history</h3>
+          <div id="bizMoveList" class="txns"></div>
+          <p id="bizMoveEmpty" class="muted" data-i18n="Abhi koi stock movement nahi.">Abhi koi stock movement nahi.</p>
+        </div>
+      </div>
+
+      <div id="bizTabSetup" class="biz-pane" hidden>
+        <div class="card biz-card">
+          <h3 data-i18n="Business setup">Business setup</h3>
+          <form id="bizSetupForm" class="biz-form" novalidate>
+            <label><span data-i18n="Business / dukaan ka naam">Business / dukaan ka naam</span><input id="bizSName" type="text" maxlength="80" data-i18n-ph="Masalan: Asad General Store" placeholder="Masalan: Asad General Store" required></label>
+            <div class="biz-form-row">
+              <label><span data-i18n="Business type">Business type</span><select id="bizSType"><option value="General Store">General Store</option><option value="Karyana / Grocery">Karyana / Grocery</option><option value="Garments">Garments</option><option value="Mobile &amp; Accessories">Mobile &amp; Accessories</option><option value="Pharmacy">Pharmacy</option><option value="Wholesale">Wholesale</option><option value="Restaurant">Restaurant</option><option value="Service">Service</option><option value="Other">Other</option></select></label>
+              <label><span data-i18n="Currency">Currency</span><select id="bizSCurrency"><option value="PKR">PKR — Rs</option><option value="USD">USD — $</option></select></label>
+            </div>
+            <div class="biz-form-row">
+              <label><span data-i18n="Phone">Phone</span><input id="bizSPhone" type="tel" maxlength="20" placeholder="03xx-xxxxxxx"></label>
+              <label><span data-i18n="Tax % (0 matlab koi tax nahi)">Tax % (0 matlab koi tax nahi)</span><input id="bizSTax" type="number" min="0" max="100" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <label><span data-i18n="Address">Address</span><textarea id="bizSAddress" rows="2" maxlength="200" data-i18n-ph="Dukaan ka pata" placeholder="Dukaan ka pata"></textarea></label>
+            <button class="btn btn-primary" type="submit"><span data-i18n="Setup save karein">Setup save karein</span></button>
+            <p id="bizSMsg" class="msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Aap ka business">Aap ka business</h3>
+          <div id="bizProfileView"></div>
+        </div>
+      </div>
+      <p id="bizMsg" class="msg" role="status"></p>
+      <div class="biz-foot-note">
+        <p class="muted" data-i18n="Business data is device par mehfooz hai — offline bhi kaam karta hai. Cloud sync agle hisse mein aayega.">Business data is device par mehfooz hai — offline bhi kaam karta hai. Cloud sync agle hisse mein aayega.</p>
+      </div>
+    </section>
     <section id="notifView" hidden>
       <div class="card">
         <button id="notifBackBtn" class="btn btn-ghost" type="button" data-i18n="← Wapas">← Wapas</button>
@@ -1021,6 +1137,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=170"></script>
+<script src="app.js?v=171"></script>
 </body>
 </html>

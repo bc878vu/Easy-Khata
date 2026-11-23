@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v173";
+  var APP_VERSION = "v174";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -956,11 +956,12 @@
     if ($("recurringView")) $("recurringView").hidden = name !== "recurring";
     if ($("monthlyView")) $("monthlyView").hidden = name !== "monthly";
     if ($("mapView")) $("mapView").hidden = name !== "map";
+    if ($("businessView")) $("businessView").hidden = name !== "business"; // v174: Business module
     if ($("cardView")) $("cardView").hidden = name !== "card"; // v151: Khata Card view
     if ($("historyView")) $("historyView").hidden = name !== "history"; // v150
     $("navKhata").classList.toggle("active", name === "khata" || name === "detail" || name === "history" || name === "card"); // v150: History bhi Khata tab ka hissa; v151: Card bhi
     $("navMap").classList.toggle("active", name === "map");
-    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly");
+    $("navAccount").classList.toggle("active", name === "account" || name === "admin" || name === "adminUser" || name === "hidden" || name === "backup" || name === "recurring" || name === "monthly" || name === "business");
     $("fabAdd").hidden = name !== "khata";
     // v24.7: footer SIRF Account (settings) page par — ab in-flow hai
     // (Account view ke aakhir mein, Diesel Converter ki tarah), is liye
@@ -970,6 +971,7 @@
     if (name === "hidden") renderHiddenTxns();
     if (name === "map") { refreshMap(); startMapPolling(); } // v140: har dafa taaza pins; v155: map khula ho to pins har 15s taaza
     else stopMapPolling(); // v155: map band ho to polling band
+    if (name === "business") renderBusiness(); // v174: Business module — har dafa taaza (workspace switch bhi)
     window.scrollTo(0, 0);
   }
   /* ---------- v154: hamburger drawer (☰) — super-home menu ----------
@@ -8046,6 +8048,254 @@
       .catch(function () { c.credit_limit = prev; setDetailCreditMsg("Limit save nahi ho saki. Dobara try karein."); });
   }
 
+  /* ---------- v174: Business module Part 1 — setup + products + inventory ----------
+     Local-first, per workspace (key: easykhata_business_v1_<uid|guest>_ws_<id>).
+     Guest + logged-in dono par device-local chalta hai, offline bhi. Cloud sync
+     (Supabase biz_* tables — migrations-v174/business-module.sql) Part 2 mein.
+     Pure functions (bizValidateProduct / bizValidateMove / bizApplyMove /
+     bizStockValue / bizLowStock / bizNextSku / bizCategories) harness se
+     extract hote hain — in mein string literals ke andar braces nahi. */
+  function bizValidateProduct(p, products, excludeId) {
+    var errs = [];
+    if (!p || !String(p.name || "").trim()) errs.push("name");
+    if (p.buyPrice != null && (!isFinite(p.buyPrice) || p.buyPrice < 0)) errs.push("buyPrice");
+    if (p.sellPrice != null && (!isFinite(p.sellPrice) || p.sellPrice < 0)) errs.push("sellPrice");
+    if (p.stock != null && (!isFinite(p.stock) || p.stock < 0)) errs.push("stock");
+    if (p.reorder != null && (!isFinite(p.reorder) || p.reorder < 0)) errs.push("reorder");
+    var sku = String(p.sku || "").trim();
+    if (sku) (products || []).forEach(function (q) { if (q.id !== excludeId && String(q.sku || "").trim() === sku) errs.push("skuDup"); });
+    return errs;
+  }
+  function bizValidateMove(stock, type, qty) {
+    var errs = [];
+    if (type !== "in" && type !== "out" && type !== "adjust") errs.push("type");
+    if (type === "adjust") { if (!isFinite(qty) || qty < 0) errs.push("qty"); }
+    else if (!isFinite(qty) || qty <= 0) errs.push("qty");
+    if (type === "out" && isFinite(qty) && qty > stock) errs.push("insufficient");
+    return errs;
+  }
+  function bizApplyMove(stock, type, qty) {
+    if (type === "in") return stock + qty;
+    if (type === "out") return Math.max(0, stock - qty);
+    return qty;
+  }
+  function bizStockValue(products) {
+    var cost = 0, retail = 0;
+    (products || []).forEach(function (p) {
+      var s = Number(p.stock) || 0;
+      cost += s * (Number(p.buyPrice) || 0);
+      retail += s * (Number(p.sellPrice) || 0);
+    });
+    return { cost: Math.round(cost * 100) / 100, retail: Math.round(retail * 100) / 100 };
+  }
+  function bizLowStock(products) {
+    return (products || []).filter(function (p) { return (Number(p.stock) || 0) <= (Number(p.reorder) || 0); });
+  }
+  function bizNextSku(products) {
+    var max = 1000;
+    (products || []).forEach(function (p) {
+      var m = /^SKU-(\d+)$/.exec(String(p.sku || ""));
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return "SKU-" + (max + 1);
+  }
+  function bizCategories(products) {
+    var seen = {}, out = [];
+    (products || []).forEach(function (p) { var c = String(p.category || "").trim(); if (c && !seen[c]) { seen[c] = true; out.push(c); } });
+    return out.sort();
+  }
+  var bizData = null;
+  var bizTab = "dash";
+  var bizEditId = null;
+  var bizDeleteArm = null;
+  function bizStoreKey() { return "easykhata_business_v1_" + (guestMode ? "guest" : (myId() || "anon")) + "_ws_" + (currentWorkspaceId || "default"); }
+  function bizLoad() {
+    try {
+      var raw = window.localStorage.getItem(bizStoreKey());
+      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.products) && Array.isArray(d.moves)) { bizData = d; return; } }
+    } catch (e) {}
+    bizData = { profile: null, products: [], moves: [] };
+  }
+  function bizSave() { try { window.localStorage.setItem(bizStoreKey(), JSON.stringify(bizData)); } catch (e) {} }
+  function bizSay(msg, elId) { var el = $(elId || "bizMsg"); if (el) el.textContent = msg || ""; }
+  function bizProductById(id) { var found = null; (bizData.products || []).forEach(function (p) { if (p.id === id) found = p; }); return found; }
+  function bizShowTab(tab) {
+    bizTab = tab;
+    ["dash", "products", "stock", "setup"].forEach(function (t) {
+      var pane = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)));
+      if (pane) pane.hidden = t !== tab;
+      var btn = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)) + "Btn");
+      if (btn) btn.classList.toggle("is-active", t === tab);
+    });
+  }
+  function bizStatCard(label, value, tone) {
+    return '<div class="biz-stat' + (tone ? " biz-stat-" + tone : "") + '"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>';
+  }
+  function bizRenderStats() {
+    var v = bizStockValue(bizData.products);
+    var low = bizLowStock(bizData.products);
+    var el = $("bizStats"); if (!el) return;
+    el.innerHTML = bizStatCard(tr("Total products"), String(bizData.products.length), "") +
+      bizStatCard(tr("Stock value (kharid)"), fmtRs(v.cost), "") +
+      bizStatCard(tr("Stock value (sale)"), fmtRs(v.retail), "") +
+      bizStatCard(tr("Low stock"), String(low.length), low.length ? "bad" : "good");
+    var val = $("bizValuation"); if (val) val.innerHTML =
+      bizStatCard(tr("Kharid keemat"), fmtRs(v.cost), "") +
+      bizStatCard(tr("Sale keemat"), fmtRs(v.retail), "") +
+      bizStatCard(tr("Expected profit"), fmtRs(Math.round((v.retail - v.cost) * 100) / 100), (v.retail - v.cost) >= 0 ? "good" : "bad");
+  }
+  function bizRenderLow() {
+    var low = bizLowStock(bizData.products);
+    var list = $("bizLowList"); if (!list) return;
+    $("bizLowEmpty").hidden = low.length > 0;
+    list.innerHTML = low.map(function (p) {
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(tr("Stock") + ": " + p.stock + " " + p.unit + " · " + tr("Reorder") + ": " + p.reorder) + '</span></div><button class="btn btn-soft biz-low-add" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Stock add karein")) + '</button></div>';
+    }).join("");
+    list.querySelectorAll(".biz-low-add").forEach(function (b) { b.addEventListener("click", function () { bizShowTab("stock"); var s = $("bizMProduct"); if (s) s.value = b.getAttribute("data-id"); }); });
+  }
+  function bizRenderProducts() {
+    var q = ($("bizPSearch").value || "").trim().toLowerCase();
+    var cat = $("bizPCatFilter").value || "";
+    var cats = bizCategories(bizData.products);
+    var dl = $("bizCatList"); if (dl) dl.innerHTML = cats.map(function (c) { return "<option value=\"" + esc(c) + "\">"; }).join("");
+    var cf = $("bizPCatFilter"); if (cf) { var cur = cf.value; cf.innerHTML = '<option value="">' + esc(tr("Sab")) + '</option>' + cats.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join(""); cf.value = cur; }
+    var rows = bizData.products.filter(function (p) {
+      if (cat && String(p.category || "") !== cat) return false;
+      if (q && (String(p.name || "") + " " + String(p.sku || "") + " " + String(p.category || "")).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    var list = $("bizPList"); if (!list) return;
+    $("bizPEmpty").hidden = rows.length > 0;
+    list.innerHTML = rows.map(function (p) {
+      var low = (Number(p.stock) || 0) <= (Number(p.reorder) || 0);
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc((p.category || "—") + " · " + p.unit + " · " + p.sku) + '</span><span class="muted">' + esc(tr("Kharid") + ": " + fmtRs(p.buyPrice) + " · " + tr("Sale") + ": " + fmtRs(p.sellPrice)) + '</span></div><div class="biz-prow-side"><span class="biz-badge ' + (low ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(tr("Stock") + ": " + p.stock) + '</span><span class="biz-prow-actions"><button class="btn btn-ghost biz-p-edit" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Edit")) + '</button><button class="btn btn-ghost biz-p-del" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Delete")) + '</button></span></div></div>';
+    }).join("");
+    list.querySelectorAll(".biz-p-edit").forEach(function (b) { b.addEventListener("click", function () { bizStartEdit(b.getAttribute("data-id")); }); });
+    list.querySelectorAll(".biz-p-del").forEach(function (b) { b.addEventListener("click", function () { bizDeleteProduct(b.getAttribute("data-id"), b); }); });
+  }
+  function bizRenderMoves() {
+    var sel = $("bizMProduct"); if (sel) { var cur = sel.value; sel.innerHTML = bizData.products.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + " (" + esc(tr("Stock") + ": " + p.stock + ")") + '</option>'; }).join(""); if (cur) sel.value = cur; }
+    var form = $("bizMoveForm"); if (form) form.querySelectorAll("input,select,button").forEach(function (el) { el.disabled = bizData.products.length === 0; });
+    var list = $("bizMoveList"); if (!list) return;
+    var moves = bizData.moves.slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }).slice(0, 50);
+    $("bizMoveEmpty").hidden = moves.length > 0;
+    list.innerHTML = moves.map(function (m) {
+      var sign = m.type === "in" ? "+" : (m.type === "out" ? "−" : "→");
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(m.productName) + '</strong><span class="muted">' + esc(fmtDate(m.createdAt) + " " + String(m.createdAt || "").slice(11, 16) + (m.note ? " · " + m.note : "")) + '</span></div><span class="biz-badge ' + (m.type === "out" ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(sign + " " + m.qty) + '</span></div>';
+    }).join("");
+  }
+  function bizRenderProfile() {
+    var el = $("bizProfileView"); if (!el) return;
+    var p = bizData.profile;
+    if (!p) { el.innerHTML = '<p class="muted">' + esc(tr("Setup abhi mukammal nahi — upar form bharein.")) + '</p>'; return; }
+    el.innerHTML = '<div class="biz-profile"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(p.type + " · " + p.currency) + '</span>' +
+      (p.phone ? '<span class="muted">' + esc(p.phone) + '</span>' : "") +
+      (p.address ? '<span class="muted">' + esc(p.address) + '</span>' : "") +
+      '<span class="muted">' + esc(tr("Tax") + ": " + (p.tax || 0) + "%") + '</span></div>';
+  }
+  function bizRenderSetupForm() {
+    var p = bizData.profile || {};
+    if ($("bizSName")) $("bizSName").value = p.name || "";
+    if ($("bizSType")) $("bizSType").value = p.type || "General Store";
+    if ($("bizSCurrency")) $("bizSCurrency").value = p.currency || "PKR";
+    if ($("bizSPhone")) $("bizSPhone").value = p.phone || "";
+    if ($("bizSTax")) $("bizSTax").value = (p.tax == null ? "" : p.tax);
+    if ($("bizSAddress")) $("bizSAddress").value = p.address || "";
+  }
+  function renderBusiness() {
+    bizLoad();
+    bizShowTab(bizTab);
+    bizRenderStats(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderProfile(); bizRenderSetupForm();
+    bizSay("", "bizMsg");
+  }
+  function bizStartEdit(id) {
+    var p = bizProductById(id); if (!p) return;
+    bizEditId = id;
+    $("bizPName").value = p.name || "";
+    $("bizPCat").value = p.category || "";
+    $("bizPUnit").value = p.unit || "Piece";
+    $("bizPBuy").value = (p.buyPrice == null ? "" : p.buyPrice);
+    $("bizPSell").value = (p.sellPrice == null ? "" : p.sellPrice);
+    $("bizPSku").value = p.sku || "";
+    $("bizPStock").value = (p.stock == null ? "" : p.stock);
+    $("bizPReorder").value = (p.reorder == null ? "" : p.reorder);
+    $("bizPCancelBtn").hidden = false;
+    bizShowTab("products");
+    window.scrollTo(0, 0);
+    bizSay(tr("Edit kar rahe hain — save karte hi update ho jayega."), "bizPMsg");
+  }
+  function bizClearProductForm() {
+    bizEditId = null;
+    ["bizPName", "bizPCat", "bizPBuy", "bizPSell", "bizPSku", "bizPStock", "bizPReorder"].forEach(function (id) { var el = $(id); if (el) el.value = ""; });
+    if ($("bizPUnit")) $("bizPUnit").value = "Piece";
+    $("bizPCancelBtn").hidden = true;
+  }
+  function bizSaveProduct(e) {
+    if (e) e.preventDefault();
+    var p = {
+      id: bizEditId || newUuid(),
+      name: ($("bizPName").value || "").trim(),
+      category: ($("bizPCat").value || "").trim(),
+      unit: $("bizPUnit").value || "Piece",
+      buyPrice: $("bizPBuy").value === "" ? 0 : Number($("bizPBuy").value),
+      sellPrice: $("bizPSell").value === "" ? 0 : Number($("bizPSell").value),
+      sku: ($("bizPSku").value || "").trim() || bizNextSku(bizData.products),
+      stock: $("bizPStock").value === "" ? 0 : Number($("bizPStock").value),
+      reorder: $("bizPReorder").value === "" ? 0 : Number($("bizPReorder").value)
+    };
+    var errs = bizValidateProduct(p, bizData.products, bizEditId);
+    if (errs.indexOf("name") !== -1) { bizSay(tr("Pehle product ka naam likhein."), "bizPMsg"); return; }
+    if (errs.indexOf("buyPrice") !== -1 || errs.indexOf("sellPrice") !== -1) { bizSay(tr("Sahi price likhein (0 ya zyada)."), "bizPMsg"); return; }
+    if (errs.indexOf("stock") !== -1 || errs.indexOf("reorder") !== -1) { bizSay(tr("Sahi stock likhein (0 ya zyada)."), "bizPMsg"); return; }
+    if (errs.indexOf("skuDup") !== -1) { bizSay(tr("Ye SKU pehle se hai — koi aur SKU likhein."), "bizPMsg"); return; }
+    if (bizEditId) {
+      var old = bizProductById(bizEditId);
+      if (old) { var oldStock = Number(old.stock) || 0; Object.keys(p).forEach(function (k) { old[k] = p[k]; }); if (oldStock !== p.stock) bizData.moves.push({ id: newUuid(), productId: old.id, productName: old.name, type: "adjust", qty: p.stock, note: tr("Edit se stock set"), createdAt: new Date().toISOString() }); }
+      bizSay(tr("Product update ho gaya."), "bizPMsg");
+    } else {
+      bizData.products.push(p);
+      if (p.stock > 0) bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "in", qty: p.stock, note: tr("Opening stock"), createdAt: new Date().toISOString() });
+      bizSay(tr("Product save ho gaya."), "bizPMsg");
+    }
+    bizSave(); bizClearProductForm(); renderBusiness();
+  }
+  function bizDeleteProduct(id, btn) {
+    var p = bizProductById(id); if (!p) return;
+    if ((Number(p.stock) || 0) > 0) { bizSay(tr("Pehle stock 0 karein — Stock tab se adjust karein."), "bizPMsg"); bizShowTab("products"); return; }
+    if (bizDeleteArm !== id) { bizDeleteArm = id; if (btn) btn.textContent = tr("Pakka delete karein?"); bizSay(tr("Dobara dabayein to product delete ho jayega."), "bizPMsg"); setTimeout(function () { if (bizDeleteArm === id) { bizDeleteArm = null; renderBusiness(); } }, 4000); return; }
+    bizDeleteArm = null;
+    bizData.products = bizData.products.filter(function (q) { return q.id !== id; });
+    bizSave(); renderBusiness();
+    bizSay(tr("Product delete ho gaya."), "bizPMsg");
+  }
+  function bizSaveMove(e) {
+    if (e) e.preventDefault();
+    var id = $("bizMProduct").value;
+    var p = bizProductById(id); if (!p) { bizSay(tr("Pehle product add karein."), "bizMMsg"); return; }
+    var type = $("bizMType").value;
+    var qty = Number($("bizMQty").value);
+    var note = ($("bizMNote").value || "").trim();
+    var errs = bizValidateMove(Number(p.stock) || 0, type, qty);
+    if (errs.indexOf("qty") !== -1) { bizSay(tr(type === "adjust" ? "Sahi quantity likhein (0 ya zyada)." : "Sahi quantity likhein (0 se zyada)."), "bizMMsg"); return; }
+    if (errs.indexOf("insufficient") !== -1) { bizSay(tr("Stock kam hai — itna stock nahi hai."), "bizMMsg"); return; }
+    if (errs.indexOf("type") !== -1) { bizSay(tr("Sahi type chunein."), "bizMMsg"); return; }
+    p.stock = bizApplyMove(Number(p.stock) || 0, type, qty);
+    bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: type, qty: qty, note: note, createdAt: new Date().toISOString() });
+    bizSave(); renderBusiness();
+    $("bizMQty").value = ""; $("bizMNote").value = "";
+    bizSay(tr("Stock update ho gaya."), "bizMMsg");
+  }
+  function bizSaveSetup(e) {
+    if (e) e.preventDefault();
+    var name = ($("bizSName").value || "").trim();
+    if (!name) { bizSay(tr("Business ka naam likhein."), "bizSMsg"); return; }
+    var tax = $("bizSTax").value === "" ? 0 : Number($("bizSTax").value);
+    if (!isFinite(tax) || tax < 0 || tax > 100) { bizSay(tr("Sahi tax likhein (0–100)."), "bizSMsg"); return; }
+    bizData.profile = { name: name, type: $("bizSType").value || "General Store", currency: $("bizSCurrency").value || "PKR", phone: ($("bizSPhone").value || "").trim(), tax: tax, address: ($("bizSAddress").value || "").trim() };
+    bizSave(); renderBusiness();
+    bizSay(tr("Setup save ho gaya."), "bizSMsg");
+  }
+
   /* ---------- v115: Ghar ka kharcha (household) ---------- */
   function renderHousehold() {
     var el = $("householdBody"); if (!el) return;
@@ -8813,6 +9063,87 @@
   "On": "On",
   "Off": "Off",
   "Dukaan mode": "Shop mode",
+  // ---- Business module (v174) ----
+  "Business": "Business",
+  "Unit": "Unit",
+  "Dukaan ka mukammal setup — products, stock aur hisaab, aik jagah.": "Complete shop setup — products, stock and accounts, in one place.",
+  "Dashboard": "Dashboard",
+  "Products": "Products",
+  "Stock": "Stock",
+  "Setup": "Setup",
+  "Low stock — foran action": "Low stock — act now",
+  "Koi product low stock par nahi.": "No product is low on stock.",
+  "Product add karein": "Add product",
+  "Stock add karein": "Add stock",
+  "Product ka naam": "Product name",
+  "Kharid price (Rs)": "Purchase price (Rs)",
+  "Sale price (Rs)": "Sale price (Rs)",
+  "SKU (khali ho to khud ban jayega)": "SKU (auto-generated if left empty)",
+  "Opening stock": "Opening stock",
+  "Low-stock alert (is se kam ho to khabar)": "Low-stock alert (warn when below this)",
+  "Abhi koi product nahi — upar se pehla product add karein.": "No products yet — add your first product above.",
+  "Stock in / out": "Stock in / out",
+  "Product": "Product",
+  "Type": "Type",
+  "Stock in (+)": "Stock in (+)",
+  "Stock out (−)": "Stock out (−)",
+  "Adjust (set karein)": "Adjust (set value)",
+  "Quantity": "Quantity",
+  "Note (wajah)": "Note (reason)",
+  "Stock update karein": "Update stock",
+  "Stock ki keemat": "Stock value",
+  "Stock history": "Stock history",
+  "Abhi koi stock movement nahi.": "No stock movements yet.",
+  "Business setup": "Business setup",
+  "Business / dukaan ka naam": "Business / shop name",
+  "Business type": "Business type",
+  "Currency": "Currency",
+  "Phone": "Phone",
+  "Tax % (0 matlab koi tax nahi)": "Tax % (0 means no tax)",
+  "Address": "Address",
+  "Setup save karein": "Save setup",
+  "Aap ka business": "Your business",
+  "Business data is device par mehfooz hai — offline bhi kaam karta hai. Cloud sync agle hisse mein aayega.": "Business data stays on this device — works offline too. Cloud sync comes in the next part.",
+  "Masalan: Surf Excel 1kg": "E.g. Surf Excel 1kg",
+  "Masalan: Karyana": "E.g. Grocery",
+  "Masalan: Supplier se maal aaya": "E.g. Stock arrived from supplier",
+  "Masalan: Asad General Store": "E.g. Asad General Store",
+  "Dukaan ka pata": "Shop address",
+  "Product dhoondhein…": "Search products…",
+  "Total products": "Total products",
+  "Stock value (kharid)": "Stock value (purchase)",
+  "Stock value (sale)": "Stock value (sale)",
+  "Low stock": "Low stock",
+  "Kharid keemat": "Purchase value",
+  "Sale keemat": "Sale value",
+  "Expected profit": "Expected profit",
+  "Reorder": "Reorder",
+  "Delete": "Delete",
+  "Kharid": "Purchase",
+  "Sale": "Sale",
+  "Tax": "Tax",
+  "Pakka delete karein?": "Delete for sure?",
+  "Dobara dabayein to product delete ho jayega.": "Tap again to delete the product.",
+  "Pehle stock 0 karein — Stock tab se adjust karein.": "Set stock to 0 first — adjust it from the Stock tab.",
+  "Product delete ho gaya.": "Product deleted.",
+  "Edit kar rahe hain — save karte hi update ho jayega.": "Editing — it will update when you save.",
+  "Pehle product ka naam likhein.": "Enter the product name first.",
+  "Sahi price likhein (0 ya zyada).": "Enter a valid price (0 or more).",
+  "Sahi stock likhein (0 ya zyada).": "Enter valid stock (0 or more).",
+  "Ye SKU pehle se hai — koi aur SKU likhein.": "This SKU already exists — enter a different one.",
+  "Product update ho gaya.": "Product updated.",
+  "Product save ho gaya.": "Product saved.",
+  "Pehle product add karein.": "Add a product first.",
+  "Sahi quantity likhein (0 se zyada).": "Enter a valid quantity (more than 0).",
+  "Sahi quantity likhein (0 ya zyada).": "Enter a valid quantity (0 or more).",
+  "Stock kam hai — itna stock nahi hai.": "Not enough stock.",
+  "Sahi type chunein.": "Choose a valid type.",
+  "Stock update ho gaya.": "Stock updated.",
+  "Business ka naam likhein.": "Enter the business name.",
+  "Sahi tax likhein (0–100).": "Enter a valid tax (0–100).",
+  "Setup save ho gaya.": "Setup saved.",
+  "Setup abhi mukammal nahi — upar form bharein.": "Setup is not complete yet — fill in the form above.",
+  "Edit se stock set": "Stock set by edit",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -10100,6 +10431,17 @@
   $("drawerBudgetBtn").addEventListener("click", function () { closeDrawer(); jumpToBudget(); });
   $("drawerGoalBtn").addEventListener("click", function () { closeDrawer(); jumpToGoal(); });
   $("drawerDukaanBtn").addEventListener("click", function () { toggleDukaanMode(); renderDrawer(); });
+  // v174: Business module — drawer entry + tabs + forms + quick actions.
+  $("drawerBizBtn").addEventListener("click", function () { showView("business"); });
+  document.querySelectorAll("[data-biz-tab]").forEach(function (b) { b.addEventListener("click", function () { bizShowTab(b.getAttribute("data-biz-tab")); }); });
+  $("bizProductForm").addEventListener("submit", bizSaveProduct);
+  $("bizPCancelBtn").addEventListener("click", function () { bizClearProductForm(); bizSay("", "bizPMsg"); });
+  $("bizMoveForm").addEventListener("submit", bizSaveMove);
+  $("bizSetupForm").addEventListener("submit", bizSaveSetup);
+  $("bizPSearch").addEventListener("input", bizRenderProducts);
+  $("bizPCatFilter").addEventListener("change", bizRenderProducts);
+  $("bizQuickAddBtn").addEventListener("click", function () { bizShowTab("products"); var el = $("bizPName"); if (el) el.focus(); });
+  $("bizQuickStockBtn").addEventListener("click", function () { bizShowTab("stock"); });
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   // v166: home pill hata di — iska listener bhi gaya (element na hota to
