@@ -599,18 +599,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 
 /* ---------- account ---------- */
 .page-title{margin:4px 2px 10px}
-.acct-card{display:flex;align-items:center;gap:12px}
-.acct-info{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
-.acct-info strong{font-size:1.05rem;overflow-wrap:anywhere}
 /* v148: proper profile card — business name, category badge, address, bio.
    Rows khaali hon to hidden rehte hain (koi display rule nahi taake [hidden]
    hamesha kaam kare — styles.css line 1: [hidden]{display:none!important}). */
+/* v173: .acct-card/.acct-info hata diye — profile card khatam, identity sirf
+   Khata Card preview mein hai. .acct-biz/.acct-addr/.acct-bio preview mein
+   ab bhi use hote hain, is liye woh rahe. */
 .acct-biz{font-weight:700;font-size:.92rem;overflow-wrap:anywhere}
 .acct-addr{font-size:.85rem;overflow-wrap:anywhere}
 .acct-bio{font-size:.85rem;font-style:italic;color:var(--muted);overflow-wrap:anywhere}
-.acct-info .map-user-role{align-self:flex-start;margin-top:4px}
-/* v164: Bharosa chip bhi role chip jaisa — column mein stretch na ho. */
-.acct-info .bharosa-chip{align-self:flex-start;margin-top:4px}
 .acct-shortcuts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
 .shortcut{
   background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
@@ -2127,3 +2124,27 @@ input,select,textarea,button{max-width:100%}
 /* List ke neechay clearance — aakhri card bottom nav ke neechay na chhupe. */
 .nearby-list{padding-bottom:12px}
 #nearbyRefreshBtn{width:100%;margin-top:2px}
+
+/* ---------- v173: Account page — double identity khatam + world-standard restyle
+   (Boss order 24 Nov 02:46 PKT, screenshot — "Ye b double ku ha") ----------
+   Double kyun tha: plain profile card aur navy Khata Card preview mein wahi
+   avatar/naam/business/role/pata/bio/Bharosa — aik hi maloomat do baar. Fix:
+   profile card hata diya; navy Khata Card hi AIK identity hai (us ki khaas
+   phone · @username line + ✎ edit button usi mein aa gaye). Public ?card=
+   view (cardViewHtml, alag function) mein phone kabhi nahi tha — waisa hi.
+   Baaki page: hero band ka white-card chrome hata, QR/Copy barabar, shortcuts
+   + menu rows compact, neechay clearance. Sirf identity merge + CSS — edit
+   form, QR/link, menu, guest box waisay hi. */
+#khataCardBox{background:transparent;border:0;box-shadow:none;padding:0}
+.khata-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.khata-card-head h3{margin:0;font-size:.95rem}
+.khata-card-head .icon-btn{flex:none}
+.khata-card-preview{box-shadow:var(--shadow)}
+.khata-card-preview .khata-card-phone{display:block;font-size:.82rem;color:#A0E0EF;margin-top:2px;overflow-wrap:anywhere}
+.khata-card-actions{display:flex;gap:8px;margin-top:10px}
+.khata-card-actions .btn{flex:1}
+#accountView .acct-shortcuts{gap:8px;margin:12px 0 0}
+#accountView .shortcut{padding:10px 6px;gap:4px}
+#accountView .menu-list{margin:12px 0}
+#accountView .menu-item{padding:11px 14px;font-size:.92rem}
+#accountView{padding-bottom:8px}

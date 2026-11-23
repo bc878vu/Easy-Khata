@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v172";
+  var APP_VERSION = "v173";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -6021,49 +6021,14 @@
     renderHeader(); // header har view par dikhta hai — hamesha taaza
     // v153: Account page band ho to baaki render skip — kholte hi navAccount handler render karta hai.
     var av = $("accountView"); if (av && av.hidden) return;
-    var me = myProfile();
-    var name = (me && me.name) || myName() || "";
-    var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-    setAvatarEl($("acctAvatar"), me && me.avatar_url, initial);
-    $("acctName").textContent = name || "—";
-    var phoneTxt = myPhone || "Number nahi diya";
-    if (me && me.username) phoneTxt += " · @" + me.username;
-    $("acctPhone").textContent = phoneTxt;
-    // v148: proper profile card — business name, category badge, address, bio.
-    // Khaali fields chhup jate hain (koi "not set" line nahi — sirf role par
-    // "Role set nahi hai" dikhta hai taake user ko yaad rahe ke category
-    // set karni hai — wahi business_role jo map popup + suggestions use
-    // karte hain, koi doosra type field nahi).
-    var bizEl = $("acctBizName"), roleEl = $("acctRoleBadge"), addrEl = $("acctAddress"), bioEl = $("acctBio");
-    if (bizEl) { bizEl.textContent = (me && me.business_name) || ""; bizEl.hidden = !(me && me.business_name); }
-    if (roleEl) {
-      var r148 = (me && me.business_role) || "";
-      roleEl.textContent = r148 || tr("Role set nahi hai");
-      roleEl.className = "map-user-role" + (r148 ? "" : " map-user-role-none");
-      roleEl.hidden = false;
-    }
-    if (addrEl) { addrEl.textContent = (me && me.address) || ""; addrEl.hidden = !(me && me.address); }
-    if (bioEl) { bioEl.textContent = (me && me.bio) || ""; bioEl.hidden = !(me && me.bio); }
-    // v151: Bharosa Score — apne hisaab se compute, har render par taaza.
-    var bhEl = $("acctBharosa");
-    if (bhEl) {
-      bhEl.textContent = "🛡️ " + tr("Bharosa") + " " + bharosaLabel(bharosaStats(null));
-      bhEl.title = tr("Waqt par ada kiye gaye udhaar ki bunyaad par");
-      bhEl.hidden = false;
-    }
+    // v173: double identity khatam — plain profile card hata diya; identity
+    // sirf navy Khata Card preview mein hai (khataCardPreviewHtml — phone /
+    // username line + Bharosa usi mein). Yahan sirf mode-gating + boxes.
     // v24: guest mode mein Account sirf guest cheezein dikhata hai — profile
     // edit (server), push button aur privacy (account wali) chhup jate hain.
     var gb = $("guestAcctBox");
     if (gb) gb.hidden = !guestMode;
     if (guestMode) {
-      $("acctName").textContent = guestMeName || "Aap";
-      // v24.2: profile card ka subtitle ab "Guest mode — bina login ke" NAHI
-      // kehta — wohi jumla guest box ki heading mein bhi tha (do baar repeat).
-      // Subtitle ab mukhtalif aur chhota hai; poora notice sirf guest box mein.
-      $("acctPhone").textContent = tr("Bina login ke — personal hisaab");
-      // v148: guest ka koi profile nahi — meta rows (business/category/
-      // address/bio) chhup jayen, "Role set nahi hai" bhi nahi.
-      ["acctBizName", "acctRoleBadge", "acctAddress", "acctBio"].forEach(function (id) { var e = $(id); if (e) e.hidden = true; });
       var gn = $("guestNameInput");
       if (gn) gn.value = guestMeName || "";
     }
@@ -6111,6 +6076,14 @@
     var html = '<div class="khata-card-preview">';
     html += '<div class="map-user-top"><span class="map-user-avatar">' + avatarHtml(me && me.avatar_url, initial) + '</span>';
     html += '<div class="map-user-id"><strong class="map-user-name">' + esc(name || "—") + "</strong>";
+    // v173: profile card ki aik khaas line (phone · @username) yahan — sirf
+    // logged-in owner ke liye; public ?card= view (cardViewHtml) mein phone
+    // kabhi nahi aata, woh alag function hai.
+    if (!guestMode) {
+      var phoneTxt = myPhone || "Number nahi diya";
+      if (me && me.username) phoneTxt += " · @" + me.username;
+      html += '<span class="khata-card-phone">' + esc(phoneTxt) + "</span>";
+    }
     if (me && me.business_name) html += '<span class="acct-biz">' + esc(me.business_name) + "</span>";
     var r = (me && me.business_role) || "";
     if (r) html += '<span class="map-user-role">' + esc(r) + "</span>";

@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=130">
+<link rel="stylesheet" href="styles.css?v=131">
 </head>
 <body>
 
@@ -519,23 +519,14 @@ window.addEventListener("error", function (e) {
     <!-- Account -->
     <section id="accountView" hidden>
       <h2 class="page-title" data-i18n="Account">Account</h2>
-      <div class="card acct-card">
-        <span id="acctAvatar" class="avatar big">?</span>
-        <div class="acct-info">
-          <strong id="acctName">—</strong>
-          <span id="acctPhone" class="muted">—</span>
-          <span id="acctBizName" class="acct-biz" hidden></span>
-          <span id="acctRoleBadge" class="map-user-role" hidden></span>
-          <span id="acctAddress" class="muted acct-addr" hidden></span>
-          <span id="acctBio" class="acct-bio" hidden></span>
-          <span id="acctBharosa" class="bharosa-chip" hidden></span>
-        </div>
-        <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit" data-i18n-title="Edit">✎</button>
-      </div>
-      <!-- v151: Khata Card — shareable profile card + QR. Preview yahan
-           render hota hai (renderKhataCard); QR dabane par banta hai. -->
+      <!-- v173: double identity khatam — plain profile card hata diya; navy
+           Khata Card hi aik identity hai (phone/username line + ✎ usi mein).
+           Profile card ke saare fields preview mein pehle se the. -->
       <div id="khataCardBox" class="card">
-        <h3 style="margin-top:0"><span aria-hidden="true">🪪</span> <span data-i18n="Mera Khata Card">Mera Khata Card</span></h3>
+        <div class="khata-card-head">
+          <h3><span aria-hidden="true">🪪</span> <span data-i18n="Mera Khata Card">Mera Khata Card</span></h3>
+          <button id="acctEditBtn" class="icon-btn light" type="button" title="Edit" data-i18n-title="Edit">✎</button>
+        </div>
         <div id="khataCardPreview"></div>
         <div class="khata-card-actions">
           <button id="khataCardQrBtn" class="btn btn-primary" type="button"><span aria-hidden="true">📷</span> <span data-i18n="QR dikhayein">QR dikhayein</span></button>
@@ -1030,6 +1021,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=169"></script>
+<script src="app.js?v=170"></script>
 </body>
 </html>
