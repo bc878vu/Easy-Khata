@@ -140,6 +140,10 @@ p{margin:0 0 10px}
    nahi. Button ka apna koi rang/border nahi — avatar hi dikhta hai. */
 .header-avatar-btn{flex:none;background:none;border:0;padding:0;margin:0;cursor:pointer;border-radius:50%;line-height:0}
 .header-avatar-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* v162: header profile pic — standard navbar avatar: hamesha 40px (≤400px
+   wala 36px shrink yahan nahi lagta), navy header par 2px halki ring taake
+   pic kinare se alag dikhe (header navy DONO themes mein hai, v149). */
+.header-avatar-btn .avatar{width:40px;height:40px;flex:0 0 40px;font-size:.9rem;box-shadow:0 0 0 2px rgba(255,255,255,.4)}
 /* v158: drawer Notifications item ka unread badge — header bell wale
    .notif-badge se alag, yeh flow mein rehta hai (absolute nahi). */
 .menu-item .notif-badge{position:static;flex:none}
@@ -1810,7 +1814,7 @@ input,select,textarea,button{max-width:100%}
 /* (A) ≤400px header: avatar/buttons chhote. (v158: naam/subtitle header se
    hata diye — yeh rules ab zaroori nahi.) */
 @media(max-width:400px){
-  .app-header{padding:8px 10px;gap:8px}
+  .app-header{padding:8px 12px;gap:8px}
   .avatar{width:36px;height:36px;flex-basis:36px;font-size:.85rem}
   .icon-btn{width:34px;height:34px}
   .login-btn{padding:5px 8px;font-size:.74rem}
@@ -2016,7 +2020,7 @@ input,select,textarea,button{max-width:100%}
 .drawer-backdrop{position:fixed;inset:0;z-index:90;background:rgba(12,18,30,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
 /* v160: drawer compact — chaudai min(300px,86vw), halki padding, chhoti
    rows (10px, .9rem), tang section gap; 380px se neechay aur tang. */
-.drawer{position:fixed;top:0;left:0;bottom:0;z-index:100;width:min(300px,86vw);background:var(--card);color:var(--ink);border-right:1px solid var(--line);box-shadow:0 0 40px rgba(0,0,0,.25);overflow-y:auto;padding:12px 12px 20px;animation:drawerIn .18s ease-out}
+.drawer{position:fixed;top:0;left:0;bottom:auto;z-index:100;width:min(300px,86vw);height:auto;max-height:100vh;max-height:100dvh;background:var(--card);color:var(--ink);border-right:1px solid var(--line);border-radius:0 0 16px 0;box-shadow:0 0 40px rgba(0,0,0,.25);overflow-y:auto;padding:12px 12px 20px;animation:drawerIn .18s ease-out}
 @keyframes drawerIn{from{transform:translateX(-12px);opacity:.6}to{transform:none;opacity:1}}
 .drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
 .drawer-head strong{font-size:1rem}
@@ -2025,5 +2029,8 @@ input,select,textarea,button{max-width:100%}
 .drawer .menu-item{padding:10px 12px;font-size:.9rem;gap:8px}
 .drawer .menu-item .mi-ico{font-size:1rem}
 .drawer .menu-list .msg{margin:2px 12px 6px}
+/* v162: khaali status lines (pushMsg/locMsg/installMsg) jagah na lein — jab
+   text aaye to :empty khatam aur line dikhegi. */
+.drawer .menu-list .msg:empty{display:none}
 @media(max-width:380px){.drawer{width:min(272px,88vw);padding:10px 10px 16px}.drawer .menu-item{padding:9px 10px;font-size:.88rem}.drawer-head strong{font-size:.95rem}}
 @media(prefers-reduced-motion:reduce){.drawer{animation:none}}
