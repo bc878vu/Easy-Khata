@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v167";
+  var APP_VERSION = "v168";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -9786,6 +9786,7 @@
   $("navMap").addEventListener("click", function () { showView("map"); }); // v140
   $("navAccount").addEventListener("click", function () { showView("account"); renderAccount(); });
   $("headerAvatarBtn").addEventListener("click", function () { showView("account"); renderAccount(); }); // v158: header pic → Account (navAccount jaisa)
+  $("headerTitleBtn").addEventListener("click", function () { showView("khata"); window.scrollTo(0, 0); }); // v168: header title → Ledger home
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain

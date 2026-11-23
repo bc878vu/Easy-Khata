@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=125">
+<link rel="stylesheet" href="styles.css?v=126">
 </head>
 <body>
 
@@ -194,6 +194,8 @@ window.addEventListener("error", function (e) {
   <header class="app-header">
     <!-- v154: hamburger (☰) super-home menu — drawer kholta hai (Settings + Tools). -->
     <button id="menuDrawerBtn" class="icon-btn" type="button" aria-label="Menu kholein" aria-expanded="false" aria-controls="menuDrawer" data-i18n-aria="Menu kholein">☰</button>
+    <!-- v168: header title — app ki pehchan + home shortcut (tap → Ledger). -->
+    <button id="headerTitleBtn" class="header-title-btn" type="button" aria-label="Easy Khata — Home">Easy Khata</button>
     <div class="header-actions">
       <span id="liveUpdating" class="live-updating" hidden data-i18n="Updating…">Updating…</span>
       <span id="offlineBadge" class="offline-badge" hidden data-i18n="Offline">Offline</span>
@@ -1028,6 +1030,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=164"></script>
+<script src="app.js?v=165"></script>
 </body>
 </html>
