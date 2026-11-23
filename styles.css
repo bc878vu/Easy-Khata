@@ -34,23 +34,29 @@
 }
 [data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0f172a;
-  --card:#1e293b;
-  --ink:#f1f5f9;
-  --muted:#b3c0d1;
-  --line:#334155;
-  --input-bg:#1e293b;
-  --input-border:#475569;
-  --tab-bg:#334155;
-  --green:#4ade80;
-  --green-dark:#4ade80;
-  --green-soft:#14532d;
-  --green-tint:#052e16;
-  --red:#f87171;
-  --red-dark:#fca5a5;
-  --red-soft:#450a0a;
-  --accent:#60C1E5;
-  --primary:#60C1E5;
+  /* v169: Dark mode recolor (Boss order 23 Nov 14:03 PKT) — STANDARD modern
+     dark palette (GitHub-dark style), pehle wala navy-slate custom rang
+     (#0b1424/#18263a) hataya: bg near-black, card neutral dark, border
+     halka, muted dimmer (behtar hierarchy), accent standard blue #58a6ff.
+     Navy header #1B365D + brand blues waisay hi (pehchan barkarar). Light
+     theme chheda nahi. Dono token blocks mein aik jaisi values hain. */
+  --bg:#0d1117;
+  --card:#161b22;
+  --ink:#e6edf3;
+  --muted:#8b949e;
+  --line:#21262d;
+  --input-bg:#0d1117;
+  --input-border:#30363d;
+  --tab-bg:#21262d;
+  --green:#3fb950;
+  --green-dark:#56d364;
+  --green-soft:#12261c;
+  --green-tint:#0d1f13;
+  --red:#f85149;
+  --red-dark:#ff7b72;
+  --red-soft:#2d1215;
+  --accent:#58a6ff;
+  --primary:#58a6ff;
   --accent-soft:#1B365D;
   /* developer-credit gradient (dark theme: sky -> pale -> sky; v149 palette) */
   --credit-1:#60C1E5;
@@ -871,30 +877,33 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 }
 [data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0b1424;
-  --card:#18263a;
-  --ink:#f3f7ff;
-  --muted:#c0ccdc;
-  --line:#34465e;
-  --input-bg:#142238;
-  --input-border:#536985;
-  --tab-bg:#24364e;
-  --accent:#60C1E5;
-  --primary:#60C1E5;
+  /* v169: Dark mode recolor — standard modern dark (GitHub-dark style).
+     Pehla block wali values yahan bhi aik jaisi hain (yeh block baad mein
+     hai, is liye yahi live values hain). */
+  --bg:#0d1117;
+  --card:#161b22;
+  --ink:#e6edf3;
+  --muted:#8b949e;
+  --line:#21262d;
+  --input-bg:#0d1117;
+  --input-border:#30363d;
+  --tab-bg:#21262d;
+  --accent:#58a6ff;
+  --primary:#58a6ff;
   --accent-soft:#1B365D;
   --accent-btn:#005A9C;
-  --green:#70e0a0;
-  --green-dark:#8ceab3;
-  --green-soft:#173f31;
-  --green-tint:#102d24;
-  --red:#ff9292;
-  --red-dark:#ffaaaa;
-  --red-soft:#512b35;
-  --surface-hover:#263a54;
-  --focus-ring:rgba(96,193,229,.36);
+  --green:#3fb950;
+  --green-dark:#56d364;
+  --green-soft:#12261c;
+  --green-tint:#0d1f13;
+  --red:#f85149;
+  --red-dark:#ff7b72;
+  --red-soft:#2d1215;
+  --surface-hover:#1c2128;
+  --focus-ring:rgba(88,166,255,.35);
   --overlay:rgba(0,0,0,.68);
-  --disabled-bg:#29394e;
-  --disabled-ink:#a0aec0;
+  --disabled-bg:#21262d;
+  --disabled-ink:#6e7681;
   --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.2);
   accent-color:var(--accent);
 }
