@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v165";
+  var APP_VERSION = "v166";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8030,9 +8030,11 @@
   var dukaanMode = false;
   function loadDukaanMode() { try { dukaanMode = window.localStorage.getItem("easykhata_dukaan_mode_v1") === "1"; } catch (e) { dukaanMode = false; } }
   function applyDukaanMode() {
-    var btn = $("dukaanToggleBtn"); if (!btn) return;
-    btn.textContent = tr(dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off"); // v122: tr() — warna English mode mein bhi Urdu text rehta tha
-    btn.classList.toggle("is-on", dukaanMode); // v129: On par pill accent tint (state saaf dikhe)
+    // v166: home page ki pill hata di (Boss order 23 Nov 13:10 PKT) — toggle
+    // ab sirf drawer (☰ → Dukaan mode) se hota hai. Button na mile to bhi
+    // drawer value + label + search placeholder sync karte raho (pehle
+    // `if (!btn) return;` sab kuch rok deta tha).
+    var btn = $("dukaanToggleBtn"); if (btn) { btn.textContent = tr(dukaanMode ? "\uD83C\uDFEA Dukaan mode: On" : "\uD83C\uDFEA Dukaan mode: Off"); btn.classList.toggle("is-on", dukaanMode); } // v122: tr() — warna English mode mein bhi Urdu text rehta tha
     // v154: drawer Dukaan row ki value bhi sync.
     var dv = $("drawerDukaanValue"); if (dv) dv.textContent = dukaanMode ? tr("On") : tr("Off");
     var lbl = $("peopleSectionLabel"); if (lbl) lbl.textContent = peopleLabelText(); // v118: language ke hisaab se
@@ -10124,7 +10126,8 @@
   $("drawerDukaanBtn").addEventListener("click", function () { toggleDukaanMode(); renderDrawer(); });
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
-  $("dukaanToggleBtn").addEventListener("click", toggleDukaanMode);
+  // v166: home pill hata di — iska listener bhi gaya (element na hota to
+  // null.addEventListener par boot ruk jata). Toggle ab sirf drawer se.
   $("detailCreditSaveBtn").addEventListener("click", saveDetailCreditLimit);
   // v114: diary — month nav + category filter + din par tap.
   $("calPrevBtn").addEventListener("click", function () { diaryShiftMonth(-1); renderDiary(); });

@@ -1774,9 +1774,6 @@ input,select,textarea,button{max-width:100%}
 
 /* v115: Dukaan mode + credit limit + Ghar ka kharcha */
 .people-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-/* v129: Dukaan toggle — proper pill, On par accent tint (state saaf dikhe). */
-.dukaan-pill{border-radius:999px}
-.dukaan-pill.is-on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .people-head-row .section-label{margin:0}
 .p-limit{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 .p-limit-warn{display:block;font-size:11px;font-weight:700;color:var(--red);margin-top:2px}
@@ -1843,8 +1840,6 @@ input,select,textarea,button{max-width:100%}
   .tc-text .tc-sub{font-size:.7rem}
   /* (C) search: placeholder chhota font taake poora dikhe. */
   .search-wrap input[type="search"]{font-size:.92rem}
-  /* (D) CUSTOMERS row: buttons chhote + nowrap — wrap nahi honge. */
-  .people-head-row .btn{font-size:.82rem;padding:7px 9px;white-space:nowrap;min-height:38px}
   .people-head-row{gap:6px}
 }
 /* (F) Desktop ≥1024px: content thora chaura (640→760px) + bottom nav aur
