@@ -570,6 +570,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .acct-addr{font-size:.85rem;overflow-wrap:anywhere}
 .acct-bio{font-size:.85rem;font-style:italic;color:var(--muted);overflow-wrap:anywhere}
 .acct-info .map-user-role{align-self:flex-start;margin-top:4px}
+/* v164: Bharosa chip bhi role chip jaisa — column mein stretch na ho. */
+.acct-info .bharosa-chip{align-self:flex-start;margin-top:4px}
 .acct-shortcuts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
 .shortcut{
   background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
@@ -1986,12 +1988,22 @@ input,select,textarea,button{max-width:100%}
 /* ---------- v151: Attraction Pack — Khata Card + QR, Bharosa, Nearby shops, Install ---------- */
 /* Bharosa chip — token-driven (v149 palette), dono themes mein contrast-safe:
    halka neela bg (--accent-soft) + gehra neela text (--accent). */
-.bharosa-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 9px;font-size:.8rem;font-weight:700;line-height:1.5;white-space:nowrap}
+.bharosa-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 9px;font-size:.8rem;font-weight:700;line-height:1.5;white-space:nowrap;width:max-content}
 .suggest-main .bharosa-chip{margin-top:4px}
-/* Khata Card preview — map popup card ke classes reuse (avatar/role/addr/bio). */
+/* Khata Card preview — map popup card ke classes reuse (avatar/role/addr/bio).
+   v164: asli card jaisa navy identity band (v149 palette, header jaisi navy)
+   taake Khata Card profile card se alag dikhe, duplicate na lage. Safed
+   text navy par (white on #1B365D 12.1:1, v149) — dono themes mein waisa hi. */
+.khata-card-preview{background:linear-gradient(135deg,#1B365D,#005A9C);border-radius:12px;padding:14px;color:#fff}
 .khata-card-preview .map-user-top{margin-bottom:2px}
-.khata-card-preview .acct-biz{display:block}
-.khata-card-preview .bharosa-chip{margin-top:6px}
+.khata-card-preview .map-user-name{color:#fff}
+.khata-card-preview .acct-biz{display:block;color:#fff}
+.khata-card-preview .map-user-addr{color:#A0E0EF}
+.khata-card-preview .acct-bio{color:#A0E0EF}
+.khata-card-preview .map-user-avatar{border-color:rgba(255,255,255,.65)}
+.khata-card-preview .map-user-role{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.35)}
+.khata-card-preview .map-user-role-none{background:transparent;color:#A0E0EF;border-color:transparent}
+.khata-card-preview .bharosa-chip{margin-top:6px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35)}
 .khata-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .khata-card-qr{margin-top:12px;text-align:center}
 .khata-card-qr .share-sheet-qr-box svg{width:180px}
