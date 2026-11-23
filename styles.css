@@ -329,9 +329,18 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .total-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:4px 2px 6px}
 .total-head{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin:4px 2px 6px}
 .total-head .total-label{margin:0}
-.eye-btn{width:28px;height:28px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+/* v171: balance eye — emoji (👁️/🙈) ki jagah proper SVG eye icon, accent
+   tinted soft pill (btn-soft jaisa combo: accent-soft bg + accent icon,
+   hover par solid accent + safed icon). Chhupa ho to eye-off (slash) icon.
+   Dono themes mein readable. */
+.eye-btn{width:30px;height:30px;padding:0;border:1px solid var(--accent);border-radius:10px;background:var(--accent-soft);color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--shadow);transition:transform .12s ease,background .15s ease,color .15s ease}
+.eye-btn:hover{background:var(--accent);color:#fff}
 .eye-btn:active{transform:scale(.94)}
 .eye-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.eye-btn svg{width:18px;height:18px;display:block}
+.eye-btn .eye-off{display:none}
+.eye-btn.is-hidden .eye-off{display:block}
+.eye-btn.is-hidden .eye-open{display:none}
 .total-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .total-card{
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);

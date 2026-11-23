@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v170";
+  var APP_VERSION = "v171";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -5303,7 +5303,9 @@
     var btn = $("balanceEyeBtn");
     if (!btn) return;
     var hidden = balanceHidden();
-    btn.textContent = hidden ? "🙈" : "👁️";
+    // v171: emoji (👁️/🙈) hata diya — button mein ab SVG eye / eye-off icon
+    // hai; kaun sa dikhe, woh .is-hidden class tay karti hai (CSS).
+    btn.classList.toggle("is-hidden", hidden);
     btn.setAttribute("aria-pressed", hidden ? "true" : "false");
     btn.setAttribute("aria-label", hidden ? "Balance dikhayein" : "Balance chhupayein");
     btn.title = hidden ? "Balance dikhayein" : "Balance chhupayein";
