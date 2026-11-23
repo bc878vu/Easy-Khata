@@ -173,6 +173,19 @@ p{margin:0 0 10px}
 }
 .live-updating{font-size:.72rem;color:var(--muted);white-space:nowrap}
 
+/* ---------- v159: profile pic crop editor ---------- */
+/* Gol mask: dairay ke andar wala hissa hi avatar banta hai (wahi preview
+   hai); dairay ke bahar ka hissa halka kaala. Tasveer drag se ghaseetti
+   hai (touch + mouse, pointer events), zoom slider/buttons se. */
+.crop-dialog{width:min(440px,100%)}
+.crop-area{position:relative;width:min(78vw,300px);height:min(78vw,300px);margin:14px auto 10px;overflow:hidden;background:var(--tab-bg);border-radius:14px;touch-action:none;cursor:grab}
+.crop-area.dragging{cursor:grabbing}
+.crop-area img{position:absolute;left:50%;top:50%;transform-origin:center;max-width:none;max-height:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.crop-mask{position:absolute;inset:0;pointer-events:none;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(12,18,30,.55)}
+.crop-zoom-row{display:flex;align-items:center;gap:10px;margin:6px 0 2px}
+.crop-zoom-row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.crop-zoom-row .icon-btn{flex:none}
+
 /* ---------- bottom nav ---------- */
 .bottomnav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;

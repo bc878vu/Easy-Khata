@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v158";
+  var APP_VERSION = "v159";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -5008,6 +5008,131 @@
       });
     });
   }
+  // ---------- v159: profile pic crop editor ----------
+  // Photo chunte hi khulta hai — zoom in/out + drag + square crop, gol
+  // mask hi preview hai (andar wala hissa avatar banta hai). Save sirf
+  // crop stage karta hai (pendingAvatarFile = cropped 512px JPEG blob);
+  // asal upload "Profile save karein" se hota hai (pehle jaisa flow).
+  // Math pure hai (harness se test hoti hai): cover-fit + clamp + source rect.
+  function cropCoverScale(imgW, imgH, area) {
+    if (!imgW || !imgH || !area) return 1;
+    return Math.max(area / imgW, area / imgH);
+  }
+  function cropClampOffset(x, y, dispW, dispH, area) {
+    var mx = Math.max(0, (dispW - area) / 2), my = Math.max(0, (dispH - area) / 2);
+    return { x: Math.max(-mx, Math.min(mx, x)), y: Math.max(-my, Math.min(my, y)) };
+  }
+  function cropSourceRect(imgW, imgH, area, scale, x, y) {
+    var base = cropCoverScale(imgW, imgH, area);
+    var k = base * scale;
+    var dw = imgW * k, dh = imgH * k;
+    var c = cropClampOffset(x, y, dw, dh, area);
+    var left = (area - dw) / 2 + c.x, top = (area - dh) / 2 + c.y;
+    return { sx: (0 - left) / k, sy: (0 - top) / k, s: area / k, dw: dw, dh: dh, x: c.x, y: c.y };
+  }
+  var cropState = null; // { dataUrl, fileName, natW, natH, scale, x, y }
+  function cropAreaSize() { var a = $("cropArea"); return a ? (a.clientWidth || 300) : 300; }
+  function cropApply() {
+    if (!cropState || !cropState.natW) return;
+    var img = $("cropImg"); if (!img) return;
+    var area = cropAreaSize();
+    var base = cropCoverScale(cropState.natW, cropState.natH, area);
+    var r = cropSourceRect(cropState.natW, cropState.natH, area, cropState.scale, cropState.x, cropState.y);
+    cropState.x = r.x; cropState.y = r.y;
+    img.style.width = (cropState.natW * base) + "px";
+    img.style.height = (cropState.natH * base) + "px";
+    img.style.transform = "translate(-50%,-50%) translate(" + r.x + "px," + r.y + "px) scale(" + cropState.scale + ")";
+    var zr = $("cropZoomRange"); if (zr) zr.value = String(Math.round(cropState.scale * 100));
+  }
+  function cropSetScale(s) {
+    if (!cropState) return;
+    cropState.scale = Math.max(1, Math.min(3, s));
+    cropApply();
+  }
+  function openCropEditor(dataUrl, fileName) {
+    var ov = $("cropOverlay"), img = $("cropImg");
+    if (!ov || !img) return false;
+    cropState = { dataUrl: dataUrl, fileName: fileName || "avatar.jpg", natW: 0, natH: 0, scale: 1, x: 0, y: 0 };
+    img.onload = function () {
+      if (!cropState) return;
+      cropState.natW = img.naturalWidth || img.width || 0;
+      cropState.natH = img.naturalHeight || img.height || 0;
+      if (!cropState.natW || !cropState.natH) { closeCropEditor(); setPhoneMsg(tr("Photo load nahi hui — dobara try karein."), false); return; }
+      cropState.scale = 1; cropState.x = 0; cropState.y = 0;
+      cropApply();
+    };
+    img.onerror = function () { closeCropEditor(); setPhoneMsg(tr("Photo load nahi hui — dobara try karein."), false); };
+    try { img.removeAttribute("src"); } catch (e) {}
+    img.src = dataUrl;
+    ov.hidden = false;
+    document.body.classList.add("dialog-open");
+    var cm = $("cropMsg"); if (cm) cm.textContent = "";
+    return true;
+  }
+  function closeCropEditor() {
+    var ov = $("cropOverlay"); if (ov) ov.hidden = true;
+    document.body.classList.remove("dialog-open");
+    cropState = null;
+  }
+  function cropExportCanvas() {
+    if (!cropState || !cropState.natW) return null;
+    var area = cropAreaSize();
+    var r = cropSourceRect(cropState.natW, cropState.natH, area, cropState.scale, cropState.x, cropState.y);
+    var cv = document.createElement("canvas");
+    cv.width = 512; cv.height = 512;
+    var g = cv.getContext("2d");
+    if (!g) return null;
+    g.fillStyle = "#ffffff"; g.fillRect(0, 0, 512, 512); // v156: transparency safed, kaali nahi
+    var img = $("cropImg");
+    try { g.drawImage(img, r.sx, r.sy, r.s, r.s, 0, 0, 512, 512); } catch (e) { return null; }
+    return cv;
+  }
+  function cropSave() {
+    if (!cropState) return;
+    var fileName = cropState.fileName;
+    var cv = cropExportCanvas();
+    if (!cv) { setPhoneMsg(tr("Photo load nahi hui — dobara try karein."), false); return; }
+    var done = function (blob) {
+      if (!blob) { setPhoneMsg(tr("Photo load nahi hui — dobara try karein."), false); return; }
+      try { pendingAvatarFile = new File([blob], fileName, { type: "image/jpeg" }); }
+      catch (e) { pendingAvatarFile = blob; }
+      removeAvatar = false;
+      try {
+        var url = cv.toDataURL("image/jpeg", 0.85);
+        var prev = $("profilePicPreview"); if (prev) prev.innerHTML = '<img src="' + esc(url) + '" alt="">';
+      } catch (e) {}
+      var rb = $("removePicBtn"); if (rb) rb.hidden = false;
+      closeCropEditor();
+      setPhoneMsg(tr("Crop tayyar hai — ab 'Profile save karein' dabayein."), true);
+    };
+    if (cv.toBlob) cv.toBlob(function (b) { done(b); }, "image/jpeg", 0.85);
+    else {
+      try {
+        var parts = cv.toDataURL("image/jpeg", 0.85).split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        done(new Blob([arr], { type: "image/jpeg" }));
+      } catch (e) { done(null); }
+    }
+  }
+  function cropWireDrag() {
+    var area = $("cropArea"); if (!area) return;
+    var dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    area.addEventListener("pointerdown", function (e) {
+      if (!cropState) return;
+      dragging = true; sx = e.clientX; sy = e.clientY; ox = cropState.x; oy = cropState.y;
+      area.classList.add("dragging");
+      try { if (e.pointerId !== undefined) area.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
+    });
+    area.addEventListener("pointermove", function (e) {
+      if (!dragging || !cropState) return;
+      cropState.x = ox + (e.clientX - sx); cropState.y = oy + (e.clientY - sy);
+      cropApply();
+    });
+    var end = function () { dragging = false; area.classList.remove("dragging"); };
+    area.addEventListener("pointerup", end);
+    area.addEventListener("pointercancel", end);
+  }
   function saveProfile() {
     var name = $("myNameInput").value.trim();
     var username = $("myUsername").value.trim();
@@ -8189,6 +8314,14 @@
   "Photo badlein": "Change photo",
   "Photo hatayein": "Remove photo",
   "Photo 512px tak chhoti kar ke save hogi.": "Photo will be shrunk to 512px and saved.",
+  "Photo chunein — phir zoom aur crop karke save karein. Final pic 512px hogi.": "Pick a photo — then zoom and crop it before saving. The final picture will be 512px.",
+  "Photo adjust karein": "Adjust photo",
+  "Photo ko ghaseetein, zoom karein — gol dairay ke andar wala hissa profile pic banega.": "Drag the photo and zoom — the part inside the circle becomes your profile picture.",
+  "Crop save karein": "Save crop",
+  "Crop tayyar hai — ab 'Profile save karein' dabayein.": "Crop is ready — now tap 'Save profile'.",
+  "Zoom in": "Zoom in",
+  "Zoom out": "Zoom out",
+  "Zoom": "Zoom",
   "Password badlein": "Change password",
   "Change password": "Change password",
   "Naya password": "New password",
@@ -9816,14 +9949,19 @@
     var f = $("profilePicInput").files && $("profilePicInput").files[0];
     if (!f) return;
     if (!/^image\//.test(f.type || "")) { setPhoneMsg("Sirf photo (image) chunein.", false); $("profilePicInput").value = ""; return; }
+    // v159: HEIC yahan bhi reject (txn photos jaisa) — browser HEIC decode
+    // nahi karta, editor mein load fail hota; saaf message behtar hai.
+    var nm159 = String(f.name || "").toLowerCase(), tp159 = String(f.type || "").toLowerCase();
+    if (tp159.indexOf("heic") !== -1 || tp159.indexOf("heif") !== -1 || /\.hei[cf]$/.test(nm159)) { setPhoneMsg(tr("Ye HEIC photo hai — phone ki settings se JPG chunein ya photo dobara JPG mein save kar ke lagayein."), false); $("profilePicInput").value = ""; return; }
     if (f.size > 8 * 1024 * 1024) { setPhoneMsg("Photo 8MB se chhoti honi chahiye.", false); $("profilePicInput").value = ""; return; }
-    pendingAvatarFile = f; removeAvatar = false;
+    // v159: seedha preview nahi — crop editor khulta hai (zoom/crop);
+    // pendingAvatarFile + preview sirf editor ke Save par set hote hain.
     try {
       var rd = new FileReader();
-      rd.onload = function () { var prev = $("profilePicPreview"); if (prev) prev.innerHTML = '<img src="' + esc(String(rd.result || "")) + '" alt="">'; };
+      rd.onload = function () { openCropEditor(String(rd.result || ""), f.name || "avatar.jpg"); };
       rd.readAsDataURL(f);
     } catch (e) {}
-    $("removePicBtn").hidden = false;
+    $("profilePicInput").value = "";
     setPhoneMsg("");
   });
   $("removePicBtn").addEventListener("click", function () {
@@ -9834,6 +9972,15 @@
     setAvatarEl($("profilePicPreview"), null, initial);
     $("removePicBtn").hidden = true;
   });
+  // v159: crop editor wiring — zoom slider/buttons, Save/Cancel, backdrop tap.
+  $("cropZoomRange").addEventListener("input", function () { cropSetScale(Number($("cropZoomRange").value || 100) / 100); });
+  $("cropZoomInBtn").addEventListener("click", function () { if (cropState) cropSetScale(cropState.scale + 0.25); });
+  $("cropZoomOutBtn").addEventListener("click", function () { if (cropState) cropSetScale(cropState.scale - 0.25); });
+  $("cropSaveBtn").addEventListener("click", cropSave);
+  $("cropCancelBtn").addEventListener("click", closeCropEditor);
+  $("cropOverlay").addEventListener("click", function (e) { if (e.target === $("cropOverlay")) closeCropEditor(); });
+  cropWireDrag();
+  window.addEventListener("resize", function () { if (cropState) cropApply(); });
   $("txnSearch").addEventListener("input", function (e) { txnSearchText = e.target.value; renderTxns(); });
   $("txnFilterPerson").addEventListener("change", function (e) { txnFilterPerson = e.target.value; renderTxns(); });
   // Live date filters (v21): date chunte hi list update ho — change ke saath
