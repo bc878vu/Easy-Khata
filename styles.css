@@ -544,6 +544,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .d-amt{font-weight:700;font-size:.92rem;text-align:right;overflow-wrap:anywhere}
 .d-amt.diye{color:var(--red)}
 .d-amt.liye{color:var(--green)}
+/* v161: detail row mein bill-photo RIGHT side (Boss order 23 Nov) — pehle
+   note ke neeche left mein thi. has-photo rows mein 4th column (52px);
+   photo-less rows 3 column hi rehte hain (jagah zaya nahi). Head bhi
+   has-photo hota hai jab kisi row mein photo ho (header alignment). */
+.drow.has-photo{grid-template-columns:minmax(0,1fr) 74px 74px 52px}
+.dtable-head.has-photo{grid-template-columns:minmax(0,1fr) 74px 74px 52px}
+.d-photo{display:flex;align-items:center;justify-content:flex-end;min-width:0}
+.d-photo .txn-photo-thumb{width:48px;height:48px;flex:none}
+@media(max-width:380px){.d-photo .txn-photo-thumb{width:44px;height:44px}}
 .detail-bottom{display:flex;gap:10px;margin:12px 0 8px}
 
 /* ---------- account ---------- */
