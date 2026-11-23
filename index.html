@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=115">
+<link rel="stylesheet" href="styles.css?v=116">
 </head>
 <body>
 
@@ -194,22 +194,12 @@ window.addEventListener("error", function (e) {
   <header class="app-header">
     <!-- v154: hamburger (☰) super-home menu — drawer kholta hai (Settings + Tools). -->
     <button id="menuDrawerBtn" class="icon-btn" type="button" aria-label="Menu kholein" aria-expanded="false" aria-controls="menuDrawer" data-i18n-aria="Menu kholein">☰</button>
-    <div class="app-user">
-      <span id="headerAvatar" class="avatar">?</span>
-      <div class="app-user-text">
-        <span class="header-name-row">
-          <strong id="headerName" data-i18n="Easy Khata">Easy Khata</strong>
-          <span id="guestBadge" class="guest-badge" hidden data-i18n="👤 Guest">👤 Guest</span>
-        </span>
-        <span class="app-sub" data-i18n="subtitle">Aapka rozmarra ka hisaab</span>
-      </div>
-    </div>
     <div class="header-actions">
       <span id="liveUpdating" class="live-updating" hidden data-i18n="Updating…">Updating…</span>
       <span id="offlineBadge" class="offline-badge" hidden data-i18n="Offline">Offline</span>
-      <button id="themeHeaderBtn" class="icon-btn" type="button" title="Theme badlein" data-i18n-title="Theme badlein">🌙</button>
       <button id="loginIconBtn" class="login-btn" type="button" title="Login / Sign up" hidden data-i18n="🔑 Login" data-i18n-title="Login / Sign up">🔑 Login</button>
-      <button id="notifBtn" class="icon-btn" type="button" title="Notifications" data-i18n-title="Notifications">🔔<span id="notifBadge" class="notif-badge" hidden>0</span></button>
+      <!-- v158: profile pic header ke right end par (notification bell ki jagah) — sirf pic, naam upar nahi. Tap → Account. Theme icon (🌙) aur bell header se hata diye — theme drawer (☰ → Settings) mein hai, notifications drawer (☰ → Tools) mein. -->
+      <button id="headerAvatarBtn" class="header-avatar-btn" type="button" title="Account" data-i18n-title="Account" aria-label="Account" data-i18n-aria="Account"><span id="headerAvatar" class="avatar">?</span></button>
     </div>
   </header>
 
@@ -239,6 +229,8 @@ window.addEventListener("error", function (e) {
     </div>
     <p class="drawer-section" data-i18n="Tools">Tools</p>
     <div class="menu-list drawer-list">
+      <!-- v158: notifications inbox drawer mein (header bell ki jagah) — unread badge sath. -->
+      <button id="drawerNotifBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span data-i18n="Notifications">Notifications</span><span class="menu-right"><span id="drawerNotifBadge" class="notif-badge" hidden>0</span></span></button>
       <button id="drawerBudgetBtn" class="menu-item" type="button"><span class="mi-ico">💰</span><span data-i18n="Monthly Budget">Monthly Budget</span><span class="menu-right">›</span></button>
       <button id="drawerGoalBtn" class="menu-item" type="button"><span class="mi-ico">🎯</span><span data-i18n="Bachat Goal">Bachat Goal</span><span class="menu-right">›</span></button>
       <button id="acctRecurringBtn" class="menu-item" type="button"><span class="mi-ico">🔁</span><span data-i18n="Recurring records">Recurring records</span><span class="menu-right">›</span></button>
@@ -1032,6 +1024,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=154"></script>
+<script src="app.js?v=155"></script>
 </body>
 </html>

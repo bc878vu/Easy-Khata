@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v155";
+  var APP_VERSION = "v158";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -899,7 +899,6 @@
     $("appShell").hidden = true;
     $("authBox").hidden = false;
     $("fabAdd").hidden = true;
-    $("notifBtn").hidden = false;
     $("authForm").hidden = false;
     $("forgotBox").hidden = true;
     $("resetBox").hidden = true;
@@ -913,9 +912,8 @@
     document.body.classList.add("has-nav");
     $("authWrap").hidden = true;
     $("appShell").hidden = false;
-    // v24: guest mode mein notification bell nahi (koi push/notifs nahi).
-    // v24.1: bada banner hata diya — header mein chhota Guest badge dikhta hai (renderAccount).
-    $("notifBtn").hidden = guestMode;
+    // v158: header bell hata diya — notifications drawer (☰ → Tools) se
+    // khulti hain; guest mein drawer item chhupa hai (renderDrawer).
     renderAccount();
     renderWorkspaceBar();
     showView("khata");
@@ -1003,6 +1001,7 @@
   function renderDrawer() {
     // Guest rules (Account se move hue — wahi shartein):
     var pb = $("acctPushBtn"); if (pb) pb.hidden = guestMode; // Notifications sirf logged-in
+    var nb = $("drawerNotifBtn"); if (nb) nb.hidden = guestMode; // v158: inbox bhi sirf logged-in
     renderLocRow(); // acctLocBtn: guest mein chhupa (v140 s9/s19 boot contract)
     renderPinLockMenu(); // PIN label + "Abhi lock karein" visibility
     renderInstallBtn(); // install prompt aaya ho to dikhao
@@ -3340,10 +3339,12 @@
     return n;
   }
   function renderNotifBadge() {
+    // v158: unread badge drawer (☰ → Tools → Notifications) par — header
+    // bell hata diya; badge sirf logged-in mode mein dikhta hai (drawer item
+    // guest mein chhupa hai, renderDrawer).
     var n = unreadNotifCount();
-    var b = $("notifBadge");
-    b.textContent = n > 99 ? "99+" : String(n);
-    b.hidden = n === 0;
+    var db = $("drawerNotifBadge");
+    if (db) { db.textContent = n > 99 ? "99+" : String(n); db.hidden = n === 0; }
   }
   // v24.4: app icon badge (Badging API) — PWA install hone par home screen ke
   // app icon par unread count dikhe, taake notification bina app khole nazar
@@ -5878,16 +5879,14 @@
     if (lb2) lb2.hidden = guestMode;
     renderLocToggle();
   }
-  function renderHeader() { // v153: header (avatar + naam + Guest badge + Login icon) — har renderAll par, bina poora Account render kiye
+  function renderHeader() { // v158: header mein sirf pic (right end) + Login icon (guest) — naam/subtitle header se hata diye; pic renderHeader se taaza hoti hai
     var me = myProfile();
     var name = (me && me.name) || myName() || "";
     var initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
     setAvatarEl($("headerAvatar"), me && me.avatar_url, initial);
-    $("headerName").textContent = name || "Easy Khata";
-    // v24.1: header mein chhota Guest badge + navbar Login icon —
-    // dono sirf guest mode mein dikhte hain.
-    var gbd = $("guestBadge");
-    if (gbd) gbd.hidden = !guestMode;
+    // v158: headerName element header se hata diya — guard rakha hai taake
+    // renderHeader kabhi na toote (naam Account page par dikhta hai).
+    var hn = $("headerName"); if (hn) hn.textContent = name || "Easy Khata";
     var lb = $("loginIconBtn");
     if (lb) lb.hidden = !guestMode;
   }
@@ -9643,6 +9642,7 @@
   $("navKhata").addEventListener("click", function () { showView("khata"); });
   $("navMap").addEventListener("click", function () { showView("map"); }); // v140
   $("navAccount").addEventListener("click", function () { showView("account"); renderAccount(); });
+  $("headerAvatarBtn").addEventListener("click", function () { showView("account"); renderAccount(); }); // v158: header pic → Account (navAccount jaisa)
   $("navAdminBtn").addEventListener("click", showAdminView);
   $("adminBackBtn").addEventListener("click", function () { showView("account"); });
   $("peopleSearch").addEventListener("input", function (e) { peopleSearchText = e.target.value; renderPeople(); renderSuggestions(); }); // v147: search karte waqt suggestions chhup jati hain
@@ -10022,7 +10022,7 @@
     }
   });
   if (navigator.contacts && navigator.contacts.select) $("pickContactBtn").hidden = false;
-  $("notifBtn").addEventListener("click", showNotifView);
+  $("drawerNotifBtn").addEventListener("click", showNotifView); // v158: inbox drawer (☰ → Tools) se — header bell hata diya
   $("acctHiddenBtn").addEventListener("click", function () { showView("hidden"); renderHiddenTxns(); });
   // v74: Settings se guest hisaab transfer — wohi dohri confirmation.
   $("acctGuestTransferBtn").addEventListener("click", function () {
@@ -10212,16 +10212,13 @@
   }
 
   /* ---------- theme ---------- */
-  // Ek hi setting (localStorage "easykhata_theme") — header icon aur Account
-  // toggle dono usi ko badalte hain aur dono ke icons sync rehte hain.
-  // Icon woh dikhata hai jis par tap karne se theme badlegi: light mein 🌙
-  // (dark karo), dark mein ☀️ (light karo).
+  // Ek hi setting (localStorage "easykhata_theme") — v158 se theme sirf
+  // drawer (☰ → Settings → Theme) se badalta hai; applyTheme drawer row ki
+  // value sync karta hai.
   function applyTheme(mode) {
     document.documentElement.setAttribute("data-theme", mode);
-    // v21: themeIcon (Account row ka icon) hata diya — sirf header icon bachta hai.
-    var hb = $("themeHeaderBtn");
-    if (hb) hb.textContent = mode === "dark" ? "☀️" : "🌙";
-    // v154: drawer Theme row ki value bhi sync (drawer khula ho to foran dikhe).
+    // v158: header theme icon hata diya — theme ab sirf drawer (☰ → Settings)
+    // se badalta hai; drawer row ki value yahan sync hoti hai.
     var tv = $("drawerThemeValue");
     if (tv) tv.textContent = mode === "dark" ? tr("Dark") : tr("Light");
     try { window.localStorage.setItem("easykhata_theme", mode); } catch (e) {}
@@ -10230,10 +10227,8 @@
     var cur = document.documentElement.getAttribute("data-theme") || "light";
     applyTheme(cur === "dark" ? "light" : "dark");
   }
-  // v21: themeBtn (Account "Dark mode" row) hata diya — theme ab sirf header
-  // icon (themeHeaderBtn) se badalta hai; applyTheme dono ko sync karta tha,
-  // themeIcon ka null guard pehle se hai.
-  $("themeHeaderBtn").addEventListener("click", toggleTheme);
+  // v158: themeHeaderBtn hata diya — is ka listener bhi khatam (drawerThemeBtn
+  // ka listener drawer wiring mein hai, toggleTheme wahi se chalta hai).
   // v24.1: guest mode mein navbar login icon — tap par login/sign-up page khulta hai.
   var loginIconBtn = $("loginIconBtn");
   if (loginIconBtn) loginIconBtn.addEventListener("click", function () { showAuth(); });
