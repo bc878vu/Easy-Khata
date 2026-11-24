@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=132">
+<link rel="stylesheet" href="styles.css?v=133">
 </head>
 <body>
 
@@ -753,6 +753,8 @@ window.addEventListener("error", function (e) {
         <button id="bizTabDashBtn" type="button" class="biz-tab is-active" data-biz-tab="dash"><span aria-hidden="true">📊</span> <span data-i18n="Dashboard">Dashboard</span></button>
         <button id="bizTabProductsBtn" type="button" class="biz-tab" data-biz-tab="products"><span aria-hidden="true">📦</span> <span data-i18n="Products">Products</span></button>
         <button id="bizTabStockBtn" type="button" class="biz-tab" data-biz-tab="stock"><span aria-hidden="true">📥</span> <span data-i18n="Stock">Stock</span></button>
+        <button id="bizTabSalesBtn" type="button" class="biz-tab" data-biz-tab="sales"><span aria-hidden="true">🧾</span> <span data-i18n="Sales">Sales</span></button>
+        <button id="bizTabPurchasesBtn" type="button" class="biz-tab" data-biz-tab="purchases"><span aria-hidden="true">🛒</span> <span data-i18n="Purchases">Purchases</span></button>
         <button id="bizTabSetupBtn" type="button" class="biz-tab" data-biz-tab="setup"><span aria-hidden="true">⚙️</span> <span data-i18n="Setup">Setup</span></button>
       </div>
 
@@ -766,6 +768,8 @@ window.addEventListener("error", function (e) {
         <div class="biz-quick">
           <button id="bizQuickAddBtn" class="btn btn-primary" type="button"><span aria-hidden="true">＋</span> <span data-i18n="Product add karein">Product add karein</span></button>
           <button id="bizQuickStockBtn" class="btn btn-soft" type="button"><span aria-hidden="true">📥</span> <span data-i18n="Stock add karein">Stock add karein</span></button>
+          <button id="bizQuickSaleBtn" class="btn btn-soft" type="button"><span aria-hidden="true">🧾</span> <span data-i18n="Sale karein">Sale karein</span></button>
+          <button id="bizQuickPurchaseBtn" class="btn btn-soft" type="button"><span aria-hidden="true">🛒</span> <span data-i18n="Kharid karein">Kharid karein</span></button>
         </div>
       </div>
 
@@ -827,6 +831,54 @@ window.addEventListener("error", function (e) {
           <h3 data-i18n="Stock history">Stock history</h3>
           <div id="bizMoveList" class="txns"></div>
           <p id="bizMoveEmpty" class="muted" data-i18n="Abhi koi stock movement nahi.">Abhi koi stock movement nahi.</p>
+        </div>
+      </div>
+
+      <div id="bizTabSales" class="biz-pane" hidden>
+        <div class="card biz-card">
+          <h3 data-i18n="Sale add karein">Sale add karein</h3>
+          <form id="bizSaleForm" class="biz-form" novalidate>
+            <label><span data-i18n="Product">Product</span><select id="bizSProduct"></select></label>
+            <div class="biz-form-row">
+              <label><span data-i18n="Quantity">Quantity</span><input id="bizSQty" type="number" min="1" step="1" inputmode="numeric" placeholder="1"></label>
+              <label><span data-i18n="Sale price (Rs)">Sale price (Rs)</span><input id="bizSPrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <div class="biz-form-row">
+              <label><span data-i18n="Payment">Payment</span><select id="bizSPayment"><option value="Cash" data-i18n="Cash">Cash</option><option value="JazzCash">JazzCash</option><option value="Easypaisa">Easypaisa</option></select></label>
+              <label><span data-i18n="Note (wajah)">Note (wajah)</span><input id="bizSNote" type="text" maxlength="100" data-i18n-ph="Masalan: Cash sale" placeholder="Masalan: Cash sale"></label>
+            </div>
+            <button class="btn btn-primary" type="submit"><span data-i18n="Sale save karein">Sale save karein</span></button>
+            <p id="bizSaleMsg" class="msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Sale history">Sale history</h3>
+          <div id="bizSaleList" class="txns"></div>
+          <p id="bizSaleEmpty" class="muted" data-i18n="Abhi koi sale nahi.">Abhi koi sale nahi.</p>
+        </div>
+      </div>
+
+      <div id="bizTabPurchases" class="biz-pane" hidden>
+        <div class="card biz-card">
+          <h3 data-i18n="Kharid add karein">Kharid add karein</h3>
+          <form id="bizPurchaseForm" class="biz-form" novalidate>
+            <label><span data-i18n="Product">Product</span><select id="bizPuProduct"></select></label>
+            <div class="biz-form-row">
+              <label><span data-i18n="Quantity">Quantity</span><input id="bizPuQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+              <label><span data-i18n="Cost price (Rs)">Cost price (Rs)</span><input id="bizPuCost" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+            </div>
+            <div class="biz-form-row">
+              <label><span data-i18n="Supplier">Supplier</span><input id="bizPuSupplier" type="text" maxlength="80" data-i18n-ph="Masalan: Al-Rahman Traders" placeholder="Masalan: Al-Rahman Traders"></label>
+              <label><span data-i18n="Note (wajah)">Note (wajah)</span><input id="bizPuNote" type="text" maxlength="100" data-i18n-ph="Masalan: Supplier se maal aaya" placeholder="Masalan: Supplier se maal aaya"></label>
+            </div>
+            <button class="btn btn-primary" type="submit"><span data-i18n="Purchase save karein">Purchase save karein</span></button>
+            <p id="bizPuMsg" class="msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card biz-card">
+          <h3 data-i18n="Purchase history">Purchase history</h3>
+          <div id="bizPuList" class="txns"></div>
+          <p id="bizPuEmpty" class="muted" data-i18n="Abhi koi khareed nahi.">Abhi koi khareed nahi.</p>
         </div>
       </div>
 
@@ -957,6 +1009,30 @@ window.addEventListener("error", function (e) {
           </div>
           <div id="adminCommunityMemberList" class="admin-user-grid"></div>
           <div id="adminCommunityMemberCount" class="admin-result-count"></div>
+        </article>
+        <!-- v176: Admin Panel Business controls — admin-only, local data only (cloud sync nahi). -->
+        <article class="admin-panel admin-users-panel" id="bizAdminBizSection" hidden>
+          <div class="admin-panel-head"><div><h2 data-i18n="Business — dukaan data">Business — dukaan data</h2><p data-i18n="Sirf is device par maujood business data — cloud sync abhi nahi hai.">Sirf is device par maujood business data — cloud sync abhi nahi hai.</p></div></div>
+          <h3 class="biz-admin-sub" data-i18n="Business overview">Business overview</h3>
+          <div id="bizAdminOverview" class="txns"></div>
+          <h3 class="biz-admin-sub" data-i18n="Categories">Categories</h3>
+          <div class="biz-filter-row">
+            <input id="bizAdminCatName" type="text" maxlength="40" data-i18n-ph="Masalan: Karyana" placeholder="Masalan: Karyana">
+            <button id="bizAdminCatAddBtn" class="btn btn-primary" type="button"><span data-i18n="Category add karein">Category add karein</span></button>
+          </div>
+          <div id="bizAdminCatList"></div>
+          <h3 class="biz-admin-sub" data-i18n="Business settings">Business settings</h3>
+          <div class="biz-form-row">
+            <label><span data-i18n="Default low-stock alert">Default low-stock alert</span><input id="bizAdminLowDefault" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+            <label><span data-i18n="SKU prefix">SKU prefix</span><input id="bizAdminSkuPrefix" type="text" maxlength="10" placeholder="SKU-"></label>
+          </div>
+          <button id="bizAdminSettingsSaveBtn" class="btn btn-primary" type="button"><span data-i18n="Settings save karein">Settings save karein</span></button>
+          <h3 class="biz-admin-sub" data-i18n="Data tools">Data tools</h3>
+          <div class="biz-quick">
+            <button id="bizAdminExportBtn" class="btn btn-soft" type="button"><span data-i18n="Export business data (JSON)">Export business data (JSON)</span></button>
+            <button id="bizAdminResetBtn" class="btn btn-danger" type="button"><span data-i18n="Reset business data">Reset business data</span></button>
+          </div>
+          <p id="bizAdminMsg" class="msg" role="status"></p>
         </article>
         <p class="admin-footnote" data-i18n="Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.">Analytics haal hi mein load kiye gaye 500 transactions par mabni hain.</p>
       </div>
@@ -1137,6 +1213,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=172"></script>
+<script src="app.js?v=173"></script>
 </body>
 </html>

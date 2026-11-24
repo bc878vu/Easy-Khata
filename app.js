@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v175";
+  var APP_VERSION = "v176";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -1013,6 +1013,7 @@
     if (tv) { var m = document.documentElement.getAttribute("data-theme") || "light"; tv.textContent = m === "dark" ? tr("Dark") : tr("Light"); }
     var dv = $("drawerDukaanValue");
     if (dv) dv.textContent = dukaanMode ? tr("On") : tr("Off");
+    var bb = $("drawerBizBtn"); if (bb) bb.hidden = !bizModuleEnabled(); // v176: admin ne module band kiya ho to entry chhupo
   }
   function showAppView() {
     showView("khata");
@@ -4332,6 +4333,7 @@
   }
   function renderAdmin() {
     renderAdminBtn();
+    renderAdminBusiness(); // v176: local-only business controls — network se pehle, offline bhi
     // v153: RPCs sirf tab jab admin page khula ho — boot/har save par nahi.
     var av = $("adminView"), auv = $("adminUserView");
     if (av && av.hidden && auv && auv.hidden) return;
@@ -8054,7 +8056,10 @@
      (Supabase biz_* tables — migrations-v174/business-module.sql) Part 2 mein.
      Pure functions (bizValidateProduct / bizValidateMove / bizApplyMove /
      bizStockValue / bizLowStock / bizNextSku / bizCategories) harness se
-     extract hote hain — in mein string literals ke andar braces nahi. */
+     extract hote hain — in mein string literals ke andar braces nahi.
+     v176: Sales/POS + Purchases tabs, dashboard sales KPIs, Admin Panel
+     Business controls (overview per workspace, module toggle, categories,
+     settings, export/reset) — sab local-first, isi key ke andar. */
   function bizValidateProduct(p, products, excludeId) {
     var errs = [];
     if (!p || !String(p.name || "").trim()) errs.push("name");
@@ -8091,18 +8096,130 @@
   function bizLowStock(products) {
     return (products || []).filter(function (p) { return (Number(p.stock) || 0) <= (Number(p.reorder) || 0); });
   }
-  function bizNextSku(products) {
+  function bizNextSku(products, prefix) {
+    var pre = String(prefix || "SKU-");
     var max = 1000;
     (products || []).forEach(function (p) {
-      var m = /^SKU-(\d+)$/.exec(String(p.sku || ""));
-      if (m) max = Math.max(max, parseInt(m[1], 10));
+      var s = String(p.sku || "");
+      if (s.indexOf(pre) === 0) { var n = parseInt(s.slice(pre.length), 10); if (isFinite(n)) max = Math.max(max, n); }
     });
-    return "SKU-" + (max + 1);
+    return pre + (max + 1);
   }
   function bizCategories(products) {
     var seen = {}, out = [];
     (products || []).forEach(function (p) { var c = String(p.category || "").trim(); if (c && !seen[c]) { seen[c] = true; out.push(c); } });
     return out.sort();
+  }
+  /* ---------- v176: Sales / Purchases + admin business controls ----------
+     Pure functions (harness se extract hote hain — string literals ke
+     andar braces nahi). Sale record mein buyPrice snapshot bhi hota hai
+     taake profit sale ke waqt ki kharid keemat se nikle (product delete
+     ya price change ke baad bhi sahi rahe). */
+  function bizValidateSale(sale, products) {
+    var errs = [];
+    var p = null;
+    (products || []).forEach(function (q) { if (q.id === sale.productId) p = q; });
+    if (!p) errs.push("product");
+    if (!isFinite(sale.qty) || sale.qty <= 0 || Math.floor(sale.qty) !== sale.qty) errs.push("qty");
+    if (p && isFinite(sale.qty) && sale.qty > (Number(p.stock) || 0)) errs.push("insufficient");
+    if (sale.price == null || !isFinite(sale.price) || sale.price < 0) errs.push("price");
+    return errs;
+  }
+  function bizValidatePurchase(pur) {
+    var errs = [];
+    if (!pur || !pur.productId) errs.push("product");
+    if (!isFinite(pur.qty) || pur.qty <= 0) errs.push("qty");
+    if (pur.cost == null || !isFinite(pur.cost) || pur.cost < 0) errs.push("cost");
+    return errs;
+  }
+  function bizApplySale(stock, qty) {
+    return Math.max(0, stock - qty);
+  }
+  function bizApplyPurchase(stock, qty) {
+    return stock + qty;
+  }
+  function bizSalesTotals(sales, purchases, products, todayStr) {
+    var todayTotal = 0, totalRevenue = 0, totalProfit = 0, totalSpend = 0;
+    (sales || []).forEach(function (s) {
+      var qty = Number(s.qty) || 0;
+      var price = Number(s.price) || 0;
+      var t = qty * price;
+      totalRevenue += t;
+      if (String(s.createdAt || "").slice(0, 10) === todayStr) todayTotal += t;
+      var buy = (s.buyPrice != null) ? (Number(s.buyPrice) || 0) : 0;
+      if (s.buyPrice == null) (products || []).forEach(function (p) { if (p.id === s.productId) buy = Number(p.buyPrice) || 0; });
+      totalProfit += qty * (price - buy);
+    });
+    (purchases || []).forEach(function (p) {
+      totalSpend += (Number(p.qty) || 0) * (Number(p.cost) || 0);
+    });
+    function r2(n) { return Math.round(n * 100) / 100; }
+    return { todayTotal: r2(todayTotal), totalRevenue: r2(totalRevenue), totalProfit: r2(totalProfit), totalSpend: r2(totalSpend) };
+  }
+  function bizAdminSummary(data, todayStr) {
+    var d = data || {};
+    var products = d.products || [];
+    var sales = d.sales || [];
+    var cost = 0, low = 0;
+    products.forEach(function (p) {
+      cost += (Number(p.stock) || 0) * (Number(p.buyPrice) || 0);
+      if ((Number(p.stock) || 0) <= (Number(p.reorder) || 0)) low++;
+    });
+    var t = bizSalesTotals(sales, d.purchases || [], products, todayStr || "");
+    return {
+      hasData: products.length > 0 || sales.length > 0 || (d.moves || []).length > 0 || (d.purchases || []).length > 0,
+      products: products.length,
+      stockValue: Math.round(cost * 100) / 100,
+      lowCount: low,
+      todaySales: t.todayTotal,
+      totalRevenue: t.totalRevenue
+    };
+  }
+  function bizAddCategory(cats, name) {
+    var n = String(name || "").trim();
+    if (!n) return { cats: (cats || []).slice(), ok: false, err: "empty" };
+    var list = (cats || []).slice();
+    var dup = false;
+    list.forEach(function (c) { if (String(c).toLowerCase() === n.toLowerCase()) dup = true; });
+    if (dup) return { cats: list, ok: false, err: "dup" };
+    list.push(n);
+    list.sort();
+    return { cats: list, ok: true, err: "" };
+  }
+  function bizRemoveCategory(cats, products, name) {
+    var n = String(name || "").trim();
+    var list = (cats || []).slice();
+    var inUse = false;
+    (products || []).forEach(function (p) { if (String(p.category || "").trim() === n) inUse = true; });
+    if (inUse) return { cats: list, ok: false, err: "inUse" };
+    return { cats: list.filter(function (c) { return c !== n; }), ok: true, err: "" };
+  }
+  function bizApplyAdminSettings(settings, patch) {
+    var s = settings || {};
+    var errs = [];
+    var out = {
+      enabled: s.enabled !== false,
+      categories: Array.isArray(s.categories) ? s.categories.slice() : [],
+      lowStockDefault: (s.lowStockDefault == null ? 0 : s.lowStockDefault),
+      skuPrefix: s.skuPrefix || "SKU-"
+    };
+    if (patch) {
+      if (patch.enabled !== undefined) out.enabled = !!patch.enabled;
+      if (patch.lowStockDefault !== undefined) {
+        var n = Number(patch.lowStockDefault);
+        if (!isFinite(n) || n < 0 || Math.floor(n) !== n) errs.push("lowStockDefault");
+        else out.lowStockDefault = n;
+      }
+      if (patch.skuPrefix !== undefined) {
+        var p = String(patch.skuPrefix || "").trim();
+        if (!p) errs.push("skuPrefix");
+        else out.skuPrefix = p;
+      }
+    }
+    return { settings: out, errs: errs };
+  }
+  function bizExportJson(data) {
+    return JSON.stringify(data || {}, null, 2);
   }
   function bizNowLocal() {
     var d = new Date();
@@ -8113,19 +8230,61 @@
   var bizEditId = null;
   var bizDeleteArm = null;
   function bizStoreKey() { return "easykhata_business_v1_" + (guestMode ? "guest" : (myId() || "anon")) + "_ws_" + (currentWorkspaceId || "default"); }
+  function bizStoreKeyFor(wsid) { return "easykhata_business_v1_" + (guestMode ? "guest" : (myId() || "anon")) + "_ws_" + (wsid || "default"); }
+  function bizReadStoreFor(wsid) {
+    try {
+      var raw = window.localStorage.getItem(bizStoreKeyFor(wsid));
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (d && Array.isArray(d.products) && Array.isArray(d.moves)) return d;
+    } catch (e) {}
+    return null;
+  }
+  function bizWriteStoreFor(wsid, data) { try { window.localStorage.setItem(bizStoreKeyFor(wsid), JSON.stringify(data)); } catch (e) {} }
   function bizLoad() {
     try {
       var raw = window.localStorage.getItem(bizStoreKey());
-      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.products) && Array.isArray(d.moves)) { bizData = d; return; } }
+      if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.products) && Array.isArray(d.moves)) { bizData = d; bizMigrate(); return; } }
     } catch (e) {}
-    bizData = { profile: null, products: [], moves: [] };
+    bizData = { profile: null, products: [], moves: [], sales: [], purchases: [], settings: { enabled: true, categories: [], lowStockDefault: 0, skuPrefix: "SKU-" } };
+  }
+  function bizMigrate() {
+    // v176: purana v174/v175 data toote nahi — naye fields defaults se bharo.
+    if (!Array.isArray(bizData.sales)) bizData.sales = [];
+    if (!Array.isArray(bizData.purchases)) bizData.purchases = [];
+    if (!bizData.settings || typeof bizData.settings !== "object") bizData.settings = {};
+  }
+  function bizSettings() {
+    if (!bizData) bizLoad();
+    if (!bizData.settings || typeof bizData.settings !== "object") bizData.settings = {};
+    var s = bizData.settings;
+    if (s.enabled === undefined) s.enabled = true;
+    if (!Array.isArray(s.categories)) s.categories = [];
+    if (s.lowStockDefault == null) s.lowStockDefault = 0;
+    if (!s.skuPrefix) s.skuPrefix = "SKU-";
+    return s;
+  }
+  function bizModuleEnabled() {
+    // Default ON — purana data ya khaali store par button kabhi na chhupe.
+    try {
+      var raw = window.localStorage.getItem(bizStoreKey());
+      if (!raw) return true;
+      var d = JSON.parse(raw);
+      return !d.settings || d.settings.enabled !== false;
+    } catch (e) { return true; }
+  }
+  function bizAllCategories() {
+    // Admin ki shared categories + products se mili categories, aik list.
+    var seen = {}, out = [];
+    (bizSettings().categories || []).concat(bizCategories(bizData.products)).forEach(function (c) { var s = String(c || "").trim(); if (s && !seen[s]) { seen[s] = true; out.push(s); } });
+    return out.sort();
   }
   function bizSave() { try { window.localStorage.setItem(bizStoreKey(), JSON.stringify(bizData)); } catch (e) {} }
   function bizSay(msg, elId) { var el = $(elId || "bizMsg"); if (el) el.textContent = msg || ""; }
   function bizProductById(id) { var found = null; (bizData.products || []).forEach(function (p) { if (p.id === id) found = p; }); return found; }
   function bizShowTab(tab) {
     bizTab = tab;
-    ["dash", "products", "stock", "setup"].forEach(function (t) {
+    ["dash", "products", "stock", "sales", "purchases", "setup"].forEach(function (t) {
       var pane = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)));
       if (pane) pane.hidden = t !== tab;
       var btn = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)) + "Btn");
@@ -8138,11 +8297,16 @@
   function bizRenderStats() {
     var v = bizStockValue(bizData.products);
     var low = bizLowStock(bizData.products);
+    var t = bizSalesTotals(bizData.sales || [], bizData.purchases || [], bizData.products, todayLocal());
     var el = $("bizStats"); if (!el) return;
     el.innerHTML = bizStatCard(tr("Total products"), String(bizData.products.length), "") +
       bizStatCard(tr("Stock value (kharid)"), fmtRs(v.cost), "") +
       bizStatCard(tr("Stock value (sale)"), fmtRs(v.retail), "") +
-      bizStatCard(tr("Low stock"), String(low.length), low.length ? "bad" : "good");
+      bizStatCard(tr("Low stock"), String(low.length), low.length ? "bad" : "good") +
+      bizStatCard(tr("Aaj ki sales"), fmtRs(t.todayTotal), "") +
+      bizStatCard(tr("Total revenue"), fmtRs(t.totalRevenue), "") +
+      bizStatCard(tr("Profit (andaza)"), fmtRs(t.totalProfit), t.totalProfit >= 0 ? "good" : "bad") +
+      bizStatCard(tr("Total khareed"), fmtRs(t.totalSpend), "");
     var val = $("bizValuation"); if (val) val.innerHTML =
       bizStatCard(tr("Kharid keemat"), fmtRs(v.cost), "") +
       bizStatCard(tr("Sale keemat"), fmtRs(v.retail), "") +
@@ -8160,7 +8324,7 @@
   function bizRenderProducts() {
     var q = ($("bizPSearch").value || "").trim().toLowerCase();
     var cat = $("bizPCatFilter").value || "";
-    var cats = bizCategories(bizData.products);
+    var cats = bizAllCategories();
     var dl = $("bizCatList"); if (dl) dl.innerHTML = cats.map(function (c) { return "<option value=\"" + esc(c) + "\">"; }).join("");
     var cf = $("bizPCatFilter"); if (cf) { var cur = cf.value; cf.innerHTML = '<option value="">' + esc(tr("Sab")) + '</option>' + cats.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join(""); cf.value = cur; }
     var rows = bizData.products.filter(function (p) {
@@ -8188,6 +8352,36 @@
       return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(m.productName) + '</strong><span class="muted">' + esc(fmtDate(m.createdAt) + " " + String(m.createdAt || "").slice(11, 16) + (m.note ? " · " + m.note : "")) + '</span></div><span class="biz-badge ' + (m.type === "out" ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(sign + " " + m.qty) + '</span></div>';
     }).join("");
   }
+  function bizPrefillSalePrice(force) {
+    var p = bizProductById($("bizSProduct").value); if (!p) return;
+    var el = $("bizSPrice"); if (!el) return;
+    if (force || el.value === "") el.value = (p.sellPrice == null ? "" : p.sellPrice);
+  }
+  function bizRenderSales() {
+    var sel = $("bizSProduct"); if (sel) { var cur = sel.value; sel.innerHTML = bizData.products.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + " (" + esc(tr("Stock") + ": " + p.stock + ")") + '</option>'; }).join(""); if (cur) sel.value = cur; bizPrefillSalePrice(false); }
+    var form = $("bizSaleForm"); if (form) form.querySelectorAll("input,select,button").forEach(function (el) { el.disabled = bizData.products.length === 0; });
+    var list = $("bizSaleList"); if (!list) return;
+    var sales = (bizData.sales || []).slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }).slice(0, 50);
+    $("bizSaleEmpty").hidden = sales.length > 0;
+    list.innerHTML = sales.map(function (s) {
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(s.productName) + '</strong><span class="muted">' + esc(fmtDate(s.createdAt) + " " + String(s.createdAt || "").slice(11, 16) + " · " + s.qty + " × " + fmtRs(s.price) + (s.note ? " · " + s.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-pay">' + esc(s.payment) + '</span><strong>' + esc(fmtRs(s.total)) + '</strong></div></div>';
+    }).join("");
+  }
+  function bizPrefillPurchaseCost(force) {
+    var p = bizProductById($("bizPuProduct").value); if (!p) return;
+    var el = $("bizPuCost"); if (!el) return;
+    if (force || el.value === "") el.value = (p.buyPrice == null ? "" : p.buyPrice);
+  }
+  function bizRenderPurchases() {
+    var sel = $("bizPuProduct"); if (sel) { var cur = sel.value; sel.innerHTML = bizData.products.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + " (" + esc(tr("Stock") + ": " + p.stock + ")") + '</option>'; }).join(""); if (cur) sel.value = cur; bizPrefillPurchaseCost(false); }
+    var form = $("bizPurchaseForm"); if (form) form.querySelectorAll("input,select,button").forEach(function (el) { el.disabled = bizData.products.length === 0; });
+    var list = $("bizPuList"); if (!list) return;
+    var purs = (bizData.purchases || []).slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }).slice(0, 50);
+    $("bizPuEmpty").hidden = purs.length > 0;
+    list.innerHTML = purs.map(function (p) {
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.productName) + '</strong><span class="muted">' + esc(fmtDate(p.createdAt) + " " + String(p.createdAt || "").slice(11, 16) + " · " + p.qty + " × " + fmtRs(p.cost) + (p.supplier ? " · " + p.supplier : "") + (p.note ? " · " + p.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-ok">' + esc(tr("Kharid")) + '</span><strong>' + esc(fmtRs(p.total)) + '</strong></div></div>';
+    }).join("");
+  }
   function bizRenderProfile() {
     var el = $("bizProfileView"); if (!el) return;
     var p = bizData.profile;
@@ -8209,7 +8403,7 @@
   function renderBusiness() {
     bizLoad();
     bizShowTab(bizTab);
-    bizRenderStats(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderProfile(); bizRenderSetupForm();
+    bizRenderStats(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm();
     bizSay("", "bizMsg");
   }
   function bizStartEdit(id) {
@@ -8243,9 +8437,9 @@
       unit: $("bizPUnit").value || "Piece",
       buyPrice: $("bizPBuy").value === "" ? 0 : Number($("bizPBuy").value),
       sellPrice: $("bizPSell").value === "" ? 0 : Number($("bizPSell").value),
-      sku: ($("bizPSku").value || "").trim() || bizNextSku(bizData.products),
+      sku: ($("bizPSku").value || "").trim() || bizNextSku(bizData.products, bizSettings().skuPrefix),
       stock: $("bizPStock").value === "" ? 0 : Number($("bizPStock").value),
-      reorder: $("bizPReorder").value === "" ? 0 : Number($("bizPReorder").value)
+      reorder: $("bizPReorder").value === "" ? bizSettings().lowStockDefault : Number($("bizPReorder").value)
     };
     var errs = bizValidateProduct(p, bizData.products, bizEditId);
     if (errs.indexOf("name") !== -1) { bizSay(tr("Pehle product ka naam likhein."), "bizPMsg"); return; }
@@ -8289,6 +8483,51 @@
     $("bizMQty").value = ""; $("bizMNote").value = "";
     bizSay(tr("Stock update ho gaya."), "bizMMsg");
   }
+  function bizSaveSale(e) {
+    if (e) e.preventDefault();
+    var id = $("bizSProduct").value;
+    var p = bizProductById(id);
+    var qty = Number($("bizSQty").value);
+    var price = $("bizSPrice").value === "" ? 0 : Number($("bizSPrice").value);
+    var payment = $("bizSPayment").value || "Cash";
+    var note = ($("bizSNote").value || "").trim();
+    var now = bizNowLocal(); // sale + linked move — aik hi local timestamp
+    var sale = { id: newUuid(), productId: id, productName: p ? p.name : "", qty: qty, price: price, total: 0, buyPrice: p ? (Number(p.buyPrice) || 0) : 0, payment: payment, note: note, createdAt: now };
+    var errs = bizValidateSale(sale, bizData.products);
+    if (errs.indexOf("product") !== -1) { bizSay(tr("Pehle product chunein."), "bizSaleMsg"); return; }
+    if (errs.indexOf("qty") !== -1) { bizSay(tr("Sahi quantity likhein (poori taadad, 0 se zyada)."), "bizSaleMsg"); return; }
+    if (errs.indexOf("insufficient") !== -1) { bizSay(tr("Stock kam hai — itna stock nahi hai."), "bizSaleMsg"); return; }
+    if (errs.indexOf("price") !== -1) { bizSay(tr("Sahi price likhein (0 ya zyada)."), "bizSaleMsg"); return; }
+    sale.total = Math.round(qty * price * 100) / 100;
+    p.stock = bizApplySale(Number(p.stock) || 0, qty);
+    bizData.sales.push(sale);
+    bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "out", qty: qty, note: note || (tr("Sale") + " — " + payment), createdAt: now });
+    bizSave(); renderBusiness();
+    $("bizSQty").value = ""; $("bizSNote").value = "";
+    bizSay(tr("Sale save ho gayi."), "bizSaleMsg");
+  }
+  function bizSavePurchase(e) {
+    if (e) e.preventDefault();
+    var id = $("bizPuProduct").value;
+    var p = bizProductById(id);
+    var qty = Number($("bizPuQty").value);
+    var cost = $("bizPuCost").value === "" ? 0 : Number($("bizPuCost").value);
+    var supplier = ($("bizPuSupplier").value || "").trim();
+    var note = ($("bizPuNote").value || "").trim();
+    var now = bizNowLocal(); // purchase + linked move — aik hi local timestamp
+    var pur = { id: newUuid(), productId: id, productName: p ? p.name : "", qty: qty, cost: cost, total: 0, supplier: supplier, note: note, createdAt: now };
+    var errs = bizValidatePurchase(pur);
+    if (errs.indexOf("product") !== -1) { bizSay(tr("Pehle product chunein."), "bizPuMsg"); return; }
+    if (errs.indexOf("qty") !== -1) { bizSay(tr("Sahi quantity likhein (0 se zyada)."), "bizPuMsg"); return; }
+    if (errs.indexOf("cost") !== -1) { bizSay(tr("Sahi cost likhein (0 ya zyada)."), "bizPuMsg"); return; }
+    pur.total = Math.round(qty * cost * 100) / 100;
+    p.stock = bizApplyPurchase(Number(p.stock) || 0, qty);
+    bizData.purchases.push(pur);
+    bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "in", qty: qty, note: note || (supplier ? tr("Kharid") + " — " + supplier : tr("Kharid")), createdAt: now });
+    bizSave(); renderBusiness();
+    $("bizPuQty").value = ""; $("bizPuNote").value = "";
+    bizSay(tr("Purchase save ho gaya."), "bizPuMsg");
+  }
   function bizSaveSetup(e) {
     if (e) e.preventDefault();
     var name = ($("bizSName").value || "").trim();
@@ -8298,6 +8537,120 @@
     bizData.profile = { name: name, type: $("bizSType").value || "General Store", currency: $("bizSCurrency").value || "PKR", phone: ($("bizSPhone").value || "").trim(), tax: tax, address: ($("bizSAddress").value || "").trim() };
     bizSave(); renderBusiness();
     bizSay(tr("Setup save ho gaya."), "bizSMsg");
+  }
+
+  /* ---------- v176: Admin Panel Business controls (admin-only, local data) ----------
+     Sirf adminView ke andar; guest kabhi nahi dekhta (isAdmin gate). Har
+     control is device ke local business store par kaam karta hai — koi
+     cross-user/cloud view nahi (v174 SQL cloud sync abhi pending hai). */
+  var bizResetArm = false;
+  function renderAdminBusiness() {
+    var sec = $("bizAdminBizSection"); if (!sec) return;
+    sec.hidden = !isAdmin();
+    if (!isAdmin()) return;
+    bizLoad();
+    var ov = $("bizAdminOverview"); if (ov) {
+      if (!workspaces.length) { ov.innerHTML = '<p class="muted">' + esc(tr("Koi workspace nahi.")) + '</p>'; }
+      else {
+        var today = todayLocal();
+        ov.innerHTML = workspaces.map(function (w) {
+          var d = bizReadStoreFor(w.id);
+          var enabled = !d || !d.settings || d.settings.enabled !== false;
+          var head = '<strong>' + esc(w.name) + '</strong>' + (w.type === "business" ? '<span class="muted"> · ' + esc(tr("Business")) + '</span>' : '');
+          var body = "";
+          if (!d || !bizAdminSummary(d, today).hasData) { body = '<span class="muted">' + esc(tr("Abhi business data nahi.")) + '</span>'; }
+          else {
+            var s = bizAdminSummary(d, today);
+            body = '<span class="muted">' + esc(s.products + " " + tr("Products") + " · " + tr("Stock") + " " + fmtRs(s.stockValue) + " · " + tr("Low stock") + " " + s.lowCount) + '</span>' +
+              '<span class="muted">' + esc(tr("Aaj ki sales") + " " + fmtRs(s.todaySales) + " · " + tr("Total revenue") + " " + fmtRs(s.totalRevenue)) + '</span>';
+          }
+          return '<div class="biz-prow"><div class="biz-prow-main">' + head + body + '</div><div class="biz-prow-side"><label class="biz-admin-toggle"><input type="checkbox" data-biz-ws-toggle="' + esc(w.id) + '"' + (enabled ? " checked" : "") + '> <span>' + esc(tr("Business module")) + '</span></label></div></div>';
+        }).join("");
+        ov.querySelectorAll("[data-biz-ws-toggle]").forEach(function (cb) {
+          cb.addEventListener("change", function () {
+            var wsid = cb.getAttribute("data-biz-ws-toggle");
+            var d = bizReadStoreFor(wsid) || { profile: null, products: [], moves: [], sales: [], purchases: [], settings: { enabled: true, categories: [], lowStockDefault: 0, skuPrefix: "SKU-" } };
+            if (!d.settings || typeof d.settings !== "object") d.settings = {};
+            d.settings.enabled = cb.checked;
+            bizWriteStoreFor(wsid, d);
+            if (wsid === currentWorkspaceId) bizLoad();
+            renderDrawer();
+            renderAdminBusiness();
+            bizSay(tr(cb.checked ? "Business module chalu kar diya." : "Business module band kar diya."), "bizAdminMsg");
+          });
+        });
+      }
+    }
+    var cl = $("bizAdminCatList"); if (cl) {
+      var cats = bizSettings().categories;
+      cl.innerHTML = cats.length ? cats.map(function (c) {
+        return '<span class="biz-cat-chip">' + esc(c) + '<button type="button" data-biz-cat-del="' + esc(c) + '" aria-label="' + esc(tr("Delete")) + '">×</button></span>';
+      }).join("") : '<p class="muted">' + esc(tr("Abhi koi category nahi.")) + '</p>';
+      cl.querySelectorAll("[data-biz-cat-del]").forEach(function (b) { b.addEventListener("click", function () { bizAdminDeleteCategory(b.getAttribute("data-biz-cat-del")); }); });
+    }
+    var s = bizSettings();
+    if ($("bizAdminLowDefault")) $("bizAdminLowDefault").value = s.lowStockDefault;
+    if ($("bizAdminSkuPrefix")) $("bizAdminSkuPrefix").value = s.skuPrefix;
+  }
+  function bizAdminAddCategory() {
+    if (!isAdmin()) return;
+    var name = ($("bizAdminCatName").value || "").trim();
+    var res = bizAddCategory(bizSettings().categories, name);
+    if (!res.ok) { bizSay(tr(res.err === "dup" ? "Category pehle se hai." : "Category ka naam likhein."), "bizAdminMsg"); return; }
+    bizSettings().categories = res.cats;
+    bizSave();
+    $("bizAdminCatName").value = "";
+    renderAdminBusiness(); renderBusiness();
+    bizSay(tr("Category save ho gayi."), "bizAdminMsg");
+  }
+  function bizAdminDeleteCategory(name) {
+    if (!isAdmin()) return;
+    var res = bizRemoveCategory(bizSettings().categories, bizData.products, name);
+    if (!res.ok) { bizSay(tr("Category istemal mein hai — pehle products se hatayein."), "bizAdminMsg"); return; }
+    bizSettings().categories = res.cats;
+    bizSave();
+    renderAdminBusiness(); renderBusiness();
+    bizSay(tr("Category delete ho gayi."), "bizAdminMsg");
+  }
+  function bizAdminSaveSettings() {
+    if (!isAdmin()) return;
+    var patch = {
+      lowStockDefault: $("bizAdminLowDefault").value === "" ? 0 : Number($("bizAdminLowDefault").value),
+      skuPrefix: ($("bizAdminSkuPrefix").value || "").trim()
+    };
+    var res = bizApplyAdminSettings(bizSettings(), patch);
+    if (res.errs.length) { bizSay(tr(res.errs[0] === "skuPrefix" ? "Sahi SKU prefix likhein." : "Sahi low-stock number likhein (0 ya zyada)."), "bizAdminMsg"); return; }
+    bizData.settings = res.settings;
+    bizSave();
+    renderAdminBusiness(); renderBusiness();
+    bizSay(tr("Settings save ho gayein."), "bizAdminMsg");
+  }
+  function bizAdminExport() {
+    if (!isAdmin()) return;
+    var blob = new Blob([bizExportJson(bizData)], { type: "application/json" });
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "easy-khata-business-" + (currentWorkspaceId || "default") + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
+    bizSay(tr("Business data export ho gaya."), "bizAdminMsg");
+  }
+  function bizAdminReset() {
+    if (!isAdmin()) return;
+    if (!bizResetArm) {
+      bizResetArm = true;
+      var btn = $("bizAdminResetBtn"); if (btn) btn.textContent = tr("Pakka reset karein?");
+      bizSay(tr("Dobara dabayein to business data reset ho jayega."), "bizAdminMsg");
+      setTimeout(function () { if (bizResetArm) { bizResetArm = false; renderAdminBusiness(); } }, 4000);
+      return;
+    }
+    bizResetArm = false;
+    try { window.localStorage.removeItem(bizStoreKey()); } catch (e) {}
+    bizLoad(); renderBusiness(); renderAdminBusiness(); renderDrawer();
+    bizSay(tr("Business data reset ho gaya."), "bizAdminMsg");
   }
 
   /* ---------- v115: Ghar ka kharcha (household) ---------- */
@@ -9148,6 +9501,66 @@
   "Setup save ho gaya.": "Setup saved.",
   "Setup abhi mukammal nahi — upar form bharein.": "Setup is not complete yet — fill in the form above.",
   "Edit se stock set": "Stock set by edit",
+  // ---- Business module (v176) — Sales / Purchases + admin controls ----
+  "Sales": "Sales",
+  "Purchases": "Purchases",
+  "Sale add karein": "Add a sale",
+  "Sale karein": "Sell",
+  "Kharid karein": "Buy",
+  "Sale price (Rs)": "Sale price (Rs)",
+  "Payment": "Payment",
+  "Cash": "Cash",
+  "Sale save karein": "Save sale",
+  "Sale history": "Sales history",
+  "Abhi koi sale nahi.": "No sales yet.",
+  "Kharid add karein": "Add a purchase",
+  "Cost price (Rs)": "Cost price (Rs)",
+  "Supplier": "Supplier",
+  "Purchase save karein": "Save purchase",
+  "Purchase history": "Purchase history",
+  "Abhi koi khareed nahi.": "No purchases yet.",
+  "Aaj ki sales": "Today's sales",
+  "Total revenue": "Total revenue",
+  "Profit (andaza)": "Profit (estimated)",
+  "Total khareed": "Total purchases",
+  "Pehle product chunein.": "Choose a product first.",
+  "Sahi quantity likhein (poori taadad, 0 se zyada).": "Enter a valid quantity (whole number, more than 0).",
+  "Sahi cost likhein (0 ya zyada).": "Enter a valid cost (0 or more).",
+  "Sale save ho gayi.": "Sale saved.",
+  "Purchase save ho gaya.": "Purchase saved.",
+  "Masalan: Cash sale": "E.g. Cash sale",
+  "Masalan: Al-Rahman Traders": "E.g. Al-Rahman Traders",
+  "Business — dukaan data": "Business — shop data",
+  "Business settings": "Business settings",
+  "Sirf is device par maujood business data — cloud sync abhi nahi hai.": "Only business data on this device — no cloud sync yet.",
+  "Business overview": "Business overview",
+  "Abhi business data nahi.": "No business data yet.",
+  "Koi workspace nahi.": "No workspaces.",
+  "Business module": "Business module",
+  "Business module chalu kar diya.": "Business module enabled.",
+  "Business module band kar diya.": "Business module disabled.",
+  "Categories": "Categories",
+  "Category add karein": "Add category",
+  "Category ka naam": "Category name",
+  "Abhi koi category nahi.": "No categories yet.",
+  "Category save ho gayi.": "Category saved.",
+  "Category pehle se hai.": "Category already exists.",
+  "Category ka naam likhein.": "Enter the category name.",
+  "Category istemal mein hai — pehle products se hatayein.": "Category is in use — remove it from products first.",
+  "Category delete ho gayi.": "Category deleted.",
+  "Default low-stock alert": "Default low-stock alert",
+  "SKU prefix": "SKU prefix",
+  "Settings save karein": "Save settings",
+  "Settings save ho gayein.": "Settings saved.",
+  "Sahi low-stock number likhein (0 ya zyada).": "Enter a valid low-stock number (0 or more).",
+  "Sahi SKU prefix likhein.": "Enter a valid SKU prefix.",
+  "Data tools": "Data tools",
+  "Export business data (JSON)": "Export business data (JSON)",
+  "Business data export ho gaya.": "Business data exported.",
+  "Reset business data": "Reset business data",
+  "Pakka reset karein?": "Reset for sure?",
+  "Dobara dabayein to business data reset ho jayega.": "Tap again to reset the business data.",
+  "Business data reset ho gaya.": "Business data reset.",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -10449,6 +10862,20 @@
   $("bizPCatFilter").addEventListener("change", bizRenderProducts);
   $("bizQuickAddBtn").addEventListener("click", function () { bizShowTab("products"); var el = $("bizPName"); if (el) el.focus(); });
   $("bizQuickStockBtn").addEventListener("click", function () { bizShowTab("stock"); });
+  $("bizQuickSaleBtn").addEventListener("click", function () { bizShowTab("sales"); });
+  $("bizQuickPurchaseBtn").addEventListener("click", function () { bizShowTab("purchases"); });
+  // v176: Sales / Purchases — form + price prefill + input par msg saaf (v175 pattern).
+  $("bizSaleForm").addEventListener("submit", bizSaveSale);
+  $("bizSaleForm").addEventListener("input", function () { bizSay("", "bizSaleMsg"); });
+  $("bizSProduct").addEventListener("change", function () { bizPrefillSalePrice(true); });
+  $("bizPurchaseForm").addEventListener("submit", bizSavePurchase);
+  $("bizPurchaseForm").addEventListener("input", function () { bizSay("", "bizPuMsg"); });
+  $("bizPuProduct").addEventListener("change", function () { bizPrefillPurchaseCost(true); });
+  // v176: Admin Panel Business controls (admin-only section ke andar).
+  $("bizAdminCatAddBtn").addEventListener("click", bizAdminAddCategory);
+  $("bizAdminSettingsSaveBtn").addEventListener("click", bizAdminSaveSettings);
+  $("bizAdminExportBtn").addEventListener("click", bizAdminExport);
+  $("bizAdminResetBtn").addEventListener("click", bizAdminReset);
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   // v166: home pill hata di — iska listener bhi gaya (element na hota to
