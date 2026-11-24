@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v178";
+  var APP_VERSION = "v179";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8323,6 +8323,34 @@
     });
     return { candles: candles };
   }
+  // v179: chart value labels + candle range + one-time category seed —
+  // pure, extractable (no braces in string literals). bizChartLabel
+  // 10,000 se neechay full bizFmt deta hai, us se upar compact k/M
+  // (taake labels 360px par bhi na takrayein). Seed sirf aik dafa
+  // chalta hai (catsSeeded flag) — user ke delete kiye hue categories
+  // kabhi wapas nahi aatein.
+  function bizChartLabel(n, currency) {
+    var v = Math.round((Number(n) || 0) * 100) / 100;
+    var sym = bizCurrencySymbol(currency);
+    if (Math.abs(v) >= 1000000) return sym + " " + (Math.round(v / 10000) / 100) + "M";
+    if (Math.abs(v) >= 10000) return sym + " " + (Math.round(v / 100) / 10) + "k";
+    return bizFmtMoney(v, currency);
+  }
+  function bizCandleRange(candles) {
+    var cs = candles || [];
+    if (!cs.length) return null;
+    var hi = cs[0].high, lo = cs[0].low;
+    cs.forEach(function (c) { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; });
+    return { high: Math.round(hi * 100) / 100, low: Math.round(lo * 100) / 100 };
+  }
+  function bizSeedCategories(settings, typeKey) {
+    var s = settings || {};
+    var cats = Array.isArray(s.categories) ? s.categories.slice() : [];
+    if (cats.length || s.catsSeeded) return { settings: s, seeded: false };
+    var res = bizApplyTemplate(s, typeKey || s.type || "general");
+    res.settings.catsSeeded = true;
+    return { settings: res.settings, seeded: true };
+  }
   // v178: universal business templates + reports — pure, extractable (no
   // braces in string literals). Templates sirf categories ADD karte hain,
   // kabhi delete nahi — purana data hamesha mehfooz. Reports sirf local
@@ -8631,6 +8659,7 @@
       var btn = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)) + "Btn");
       if (btn) btn.classList.toggle("is-active", t === tab);
     });
+    if (tab === "dash") bizRenderCharts(); // v179: dashboard khulte hi charts taaza
   }
   // v178: business currency — profile ki currency ka symbol (PKR default);
   // sirf business helpers is se format karte hain, khata ledger ka fmtRs
@@ -8693,7 +8722,7 @@
     var n = (d.days || []).length || 1;
     var slot = 300 / n;
     var bw = Math.min(14, slot / 3);
-    var bars = "", labels = "";
+    var bars = "", labels = "", vals = "";
     (d.days || []).forEach(function (o, i) {
       var x0 = 10 + i * slot + (slot - bw * 2 - 4) / 2;
       var hs = (o.sales / max) * (base - top);
@@ -8701,8 +8730,15 @@
       bars += '<rect x="' + x0.toFixed(1) + '" y="' + (base - hs).toFixed(1) + '" width="' + bw + '" height="' + Math.max(0, hs).toFixed(1) + '" rx="2" fill="#2f81f7"/>';
       bars += '<rect x="' + (x0 + bw + 4).toFixed(1) + '" y="' + (base - hp).toFixed(1) + '" width="' + bw + '" height="' + Math.max(0, hp).toFixed(1) + '" rx="2" fill="#8b949e"/>';
       labels += '<text x="' + (10 + i * slot + slot / 2).toFixed(1) + '" y="178" text-anchor="middle" font-size="11" fill="currentColor">' + esc(o.label) + '</text>';
+      // v179: har non-zero bar ke upar us ki value — dono labels aik hi
+      // unchai par hon to khareed wala 11px neechay sarak jata hai.
+      var cur = bizProfileCurrency();
+      var yS = Math.max(9, (base - hs) - 4), yP = Math.max(9, (base - hp) - 4);
+      if (o.sales > 0 && o.purchases > 0 && Math.abs((base - hs) - (base - hp)) < 12) yP = yS + 11;
+      if (o.sales > 0) vals += '<text x="' + (x0 + bw / 2).toFixed(1) + '" y="' + yS.toFixed(1) + '" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor">' + esc(bizChartLabel(o.sales, cur)) + '</text>';
+      if (o.purchases > 0) vals += '<text x="' + (x0 + bw + 4 + bw / 2).toFixed(1) + '" y="' + yP.toFixed(1) + '" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor">' + esc(bizChartLabel(o.purchases, cur)) + '</text>';
     });
-    return '<svg viewBox="0 0 320 190" role="img" aria-label="' + esc(tr("Aakhri 7 din — sales vs khareed")) + '">' + bars +
+    return '<svg viewBox="0 0 320 190" role="img" aria-label="' + esc(tr("Aakhri 7 din — sales vs khareed")) + '">' + bars + vals +
       '<line x1="10" y1="160" x2="310" y2="160" stroke="currentColor" stroke-opacity="0.25"/>' + labels + '</svg>';
   }
   function bizLineSvg(d) {
@@ -8715,9 +8751,31 @@
     var line = pts.map(function (p, i) { return xs(i).toFixed(1) + "," + ys(p.revenue).toFixed(1); }).join(" ");
     var area = "12," + base + " " + line + " " + xs(n - 1).toFixed(1) + "," + base;
     var dots = pts.map(function (p, i) { return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.revenue).toFixed(1) + '" r="3" fill="#2f81f7"/>'; }).join("");
+    // v179: sirf pehla, sab se bara aur aakhri point label hota hai —
+    // har point par label 14 points mein takra jata (spacing ~23px);
+    // takrao ho to label dot ke neechay chala jata hai.
+    var labs = "";
+    if (pts.length) {
+      var maxI = 0;
+      pts.forEach(function (p, i) { if (p.revenue > pts[maxI].revenue) maxI = i; });
+      var idx = [];
+      [0, maxI, n - 1].forEach(function (i) { if (idx.indexOf(i) === -1 && pts[i].revenue > 0) idx.push(i); });
+      var placed = [];
+      idx.forEach(function (i) {
+        var lx = Math.max(18, Math.min(W - 18, xs(i)));
+        var ly = ys(pts[i].revenue) - 6;
+        var below = false;
+        placed.forEach(function (pl) { if (Math.abs(lx - pl.x) < 32 && Math.abs(ly - pl.y) < 12) below = true; });
+        if (below) ly = ys(pts[i].revenue) + 16;
+        if (ly < 9) ly = 9;
+        if (ly > 124) ly = 124;
+        placed.push({ x: lx, y: ly });
+        labs += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor">' + esc(bizChartLabel(pts[i].revenue, bizProfileCurrency())) + '</text>';
+      });
+    }
     return '<svg viewBox="0 0 320 130" role="img" aria-label="' + esc(tr("Revenue trend — aakhri 14 din")) + '">' +
       '<polygon points="' + area + '" fill="#2f81f7" fill-opacity="0.12"/>' +
-      '<polyline points="' + line + '" fill="none" stroke="#2f81f7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' + dots + '</svg>';
+      '<polyline points="' + line + '" fill="none" stroke="#2f81f7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' + dots + labs + '</svg>';
   }
   function bizCandleSvg(d) {
     var base = 148, top = 12;
@@ -8745,6 +8803,7 @@
   }
   function bizRenderCharts() {
     var card = $("bizChartsCard"); if (!card) return;
+    if (bizTab !== "dash") return; // v179: charts sirf dashboard par bante hain — baaki tabs par render sasta
     var sales = bizData.sales || [];
     var purs = bizData.purchases || [];
     var today = todayLocal();
@@ -8766,6 +8825,13 @@
     if (tEl) tEl.innerHTML = bizLineSvg(trend) + (trend.max > 0 ? "" : '<p class="biz-chart-empty">' + esc(tr("Aakhri 14 din mein koi sale nahi.")) + '</p>');
     var cEl = $("bizChartCandles");
     if (cEl) cEl.innerHTML = candles.candles.length ? bizCandleSvg(candles) : '<p class="biz-chart-empty">' + esc(tr("Aakhri 7 din mein koi sale nahi — pehli sale ke baad candles yahan dikhenge.")) + '</p>';
+    // v179: candle caption — range ki sab se bari / sab se chhoti sale.
+    var cap = $("bizChartCandleCaption");
+    if (cap) {
+      var rg = bizCandleRange(candles.candles);
+      cap.hidden = !rg;
+      cap.textContent = rg ? (tr("Sab se bari sale") + ": " + bizFmt(rg.high) + " · " + tr("Sab se chhoti sale") + ": " + bizFmt(rg.low)) : "";
+    }
   }
   function bizRenderLow() {
     var low = bizLowStock(bizData.products);
@@ -8846,7 +8912,7 @@
     var el = $("bizProfileView"); if (!el) return;
     var p = bizData.profile;
     if (!p) { el.innerHTML = '<p class="muted">' + esc(tr("Setup abhi mukammal nahi — upar form bharein.")) + '</p>'; return; }
-    el.innerHTML = '<div class="biz-profile"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(p.type + " · " + p.currency) + '</span>' +
+    el.innerHTML = '<div class="biz-profile"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(bizTemplateByKey(bizTemplateKeyForLabel(p.type)).label + " · " + p.currency) + '</span>' +
       (p.owner ? '<span class="muted">' + esc(tr("Malik") + ": " + p.owner) + '</span>' : "") +
       (p.phone ? '<span class="muted">' + esc(p.phone) + '</span>' : "") +
       (p.address ? '<span class="muted">' + esc(p.address) + '</span>' : "") +
@@ -8879,8 +8945,12 @@
   }
   function renderBusiness() {
     bizLoad();
-    bizShowTab(bizTab);
-    bizRenderStats(); bizRenderCharts(); bizRenderLow(); bizRenderReports(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm(); bizRenderSetupCats();
+    // v179: pehli dafa categories khaali hon to template ki categories
+    // lagao (sirf aik dafa — catsSeeded flag; user ka delete mehfooz).
+    var seed = bizSeedCategories(bizSettings());
+    if (seed.seeded) { bizData.settings = seed.settings; bizSave(); }
+    bizShowTab(bizTab); // dash ho to charts bhi yahin bante hain (v179 lazy)
+    bizRenderStats(); bizRenderLow(); bizRenderReports(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm(); bizRenderSetupCats();
     bizSay("", "bizMsg");
   }
   function bizStartEdit(id) {
@@ -9048,8 +9118,12 @@
     var key = ($("bizSType") && $("bizSType").value) || "general";
     var res = bizApplyTemplate(bizSettings(), key);
     bizData.settings = res.settings;
+    // v179: type label foran update — Save ka intezar nahi; profile ho
+    // to us ka type bhi label ban jaye (summary line foran badle).
+    var tpl = bizTemplateByKey(key);
+    if (bizData.profile) bizData.profile.type = tpl.label;
     bizSave();
-    bizRenderSetupForm(); bizRenderSetupCats(); bizRenderProducts(); bizFillUnitSelect();
+    bizRenderSetupForm(); bizRenderSetupCats(); bizRenderProducts(); bizFillUnitSelect(); bizRenderProfile();
     var msg = res.added > 0 ? tr("Template lag gaya — nayi categories add ho gayein.") : tr("Template lag gaya — categories pehle se maujood thiin.");
     bizSay(msg, "bizSMsg");
   }
@@ -9108,6 +9182,11 @@
     var kindEl = $("bizReportKind"); if (!kindEl) return;
     var kind = kindEl.value || "sales";
     var r = bizReportRangeNow();
+    // v179: preset active ho to From/To mein us ki asal dates dikhao —
+    // khaali mm/dd/yyyy placeholder na rahe; custom mein values wahi
+    // rehti hain jo user ne likhi (range unhi se banta hai).
+    var fEl = $("bizReportFrom"); if (fEl) fEl.value = r.from || "";
+    var tEl = $("bizReportTo"); if (tEl) tEl.value = r.to || "";
     var d = bizReportDataFor(kind, r.from, r.to);
     var titles = { sales: "Sales report", purchases: "Purchase report", stock: "Stock report", profit: "Profit and loss" };
     var rangeText = (r.from || r.to) ? ((r.from ? fmtDate(r.from) : "—") + " se " + (r.to ? fmtDate(r.to) : "—")) : tr("All time");
@@ -10389,6 +10468,8 @@
   "Cost value": "Cost value",
   "Sell price": "Sell price",
   "Retail value": "Retail value",
+  "Sab se bari sale": "Highest single sale",
+  "Sab se chhoti sale": "Lowest single sale",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
