@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v177";
+  var APP_VERSION = "v178";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8201,7 +8201,8 @@
       enabled: s.enabled !== false,
       categories: Array.isArray(s.categories) ? s.categories.slice() : [],
       lowStockDefault: (s.lowStockDefault == null ? 0 : s.lowStockDefault),
-      skuPrefix: s.skuPrefix || "SKU-"
+      skuPrefix: s.skuPrefix || "SKU-",
+      type: s.type || "general" // v178: settings save se template type na khoye
     };
     if (patch) {
       if (patch.enabled !== undefined) out.enabled = !!patch.enabled;
@@ -8322,6 +8323,238 @@
     });
     return { candles: candles };
   }
+  // v178: universal business templates + reports — pure, extractable (no
+  // braces in string literals). Templates sirf categories ADD karte hain,
+  // kabhi delete nahi — purana data hamesha mehfooz. Reports sirf local
+  // dates (YYYY-MM-DD) filter karte hain, UTC shift kabhi nahi.
+  var BIZ_UNITS = ["Piece", "Kg", "Litre", "Packet", "Dozen", "Meter", "Box", "Carton", "Pack", "Metre"];
+  function bizBusinessTemplates() {
+    return [
+      { key: "karyana", label: "Karyana / Grocery", categories: ["Karyana", "Aata", "Chawal", "Daalain", "Masalay", "Tel / Ghee", "Sabun / Safai", "Biscuit / Snacks", "Doodh / Dairy", "Peya / Drinks"], units: ["Kg", "Litre", "Packet", "Piece", "Dozen"] },
+      { key: "mobile", label: "Mobile & Electronics", categories: ["Mobile Phones", "Accessories", "Chargers", "Covers", "SIM / Recharge", "Repair Parts"], units: ["Piece", "Box", "Packet"] },
+      { key: "garments", label: "Clothes / Garments", categories: ["Gents Wear", "Ladies Wear", "Kids Wear", "Shoes", "Shawl / Dupatta", "Stitching"], units: ["Piece", "Dozen", "Meter"] },
+      { key: "pharmacy", label: "Pharmacy", categories: ["Medicines", "Tablets", "Syrup", "First Aid", "Baby Care", "Supplements"], units: ["Piece", "Box", "Packet"] },
+      { key: "restaurant", label: "Restaurant / Food", categories: ["Breakfast", "Lunch", "Dinner", "BBQ", "Fast Food", "Drinks", "Desserts"], units: ["Piece", "Kg", "Litre", "Plate"] },
+      { key: "hardware", label: "Hardware", categories: ["Tools", "Paint", "Pipes", "Wires", "Nails / Screws", "Sanitary"], units: ["Piece", "Box", "Kg", "Meter", "Carton"] },
+      { key: "cosmetics", label: "Cosmetics", categories: ["Skin Care", "Hair Care", "Makeup", "Perfume", "Personal Care"], units: ["Piece", "Box", "Packet"] },
+      { key: "stationery", label: "Stationery / Books", categories: ["Books", "Notebooks", "Pens", "Art Supplies", "School Bags", "Office Supplies"], units: ["Piece", "Dozen", "Packet", "Box"] },
+      { key: "general", label: "General Store", categories: ["Karyana", "Home Items", "Personal Care", "Snacks", "Stationery"], units: ["Piece", "Kg", "Litre", "Packet", "Dozen"] },
+      { key: "services", label: "Services (Salon / Workshop / Repair)", categories: ["Haircut", "Shave / Beard", "Repair", "Stitching", "Cleaning", "Delivery"], units: ["Piece", "Hour", "Service"] },
+      { key: "custom", label: "Custom", categories: [], units: ["Piece", "Kg", "Litre", "Packet", "Dozen", "Meter", "Box", "Carton"] }
+    ];
+  }
+  function bizTemplateByKey(key) {
+    var found = null;
+    bizBusinessTemplates().forEach(function (t) { if (t.key === key) found = t; });
+    return found || bizBusinessTemplates()[8];
+  }
+  function bizTemplateKeyForLabel(label) {
+    var l = String(label || "").trim();
+    var map = { "General Store": "general", "Karyana / Grocery": "karyana", "Garments": "garments", "Mobile & Accessories": "mobile", "Pharmacy": "pharmacy", "Wholesale": "general", "Restaurant": "restaurant", "Service": "services", "Other": "custom" };
+    if (map[l]) return map[l];
+    var found = null;
+    bizBusinessTemplates().forEach(function (t) { if (t.key === l || t.label === l) found = t.key; });
+    return found || "general";
+  }
+  function bizApplyTemplate(settings, key) {
+    var s = settings || {};
+    var tpl = bizTemplateByKey(key);
+    var cats = Array.isArray(s.categories) ? s.categories.slice() : [];
+    var added = 0;
+    tpl.categories.forEach(function (c) {
+      var has = false;
+      cats.forEach(function (x) { if (String(x).toLowerCase() === String(c).toLowerCase()) has = true; });
+      if (!has) { cats.push(c); added++; }
+    });
+    cats.sort();
+    return { settings: { enabled: s.enabled !== false, categories: cats, lowStockDefault: (s.lowStockDefault == null ? 0 : s.lowStockDefault), skuPrefix: s.skuPrefix || "SKU-", type: tpl.key }, added: added };
+  }
+  function bizUnitShort(unit) {
+    var u = String(unit || "").trim();
+    var map = { "Piece": "pcs", "Kg": "kg", "Litre": "L", "Packet": "pkt", "Dozen": "doz", "Meter": "m", "Metre": "m", "Box": "box", "Carton": "ctn", "Pack": "pack", "Hour": "hr", "Service": "service", "Plate": "plate" };
+    return map[u] || u;
+  }
+  function bizCurrencySymbol(code) {
+    var map = { "PKR": "Rs", "USD": "$", "INR": "\u20B9", "AED": "AED", "SAR": "SR", "GBP": "\u00A3" };
+    return map[String(code || "").trim().toUpperCase()] || "Rs";
+  }
+  function bizFmtMoney(n, currency) {
+    var v = Math.round((Number(n) || 0) * 100) / 100;
+    return bizCurrencySymbol(currency) + " " + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  function bizReportRange(preset, todayStr, fromStr, toStr) {
+    function p2(n) { return (n < 10 ? "0" : "") + n; }
+    function iso(d) { return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
+    var tp = String(todayStr || "").split("-");
+    var base = (tp.length === 3) ? new Date(Number(tp[0]), Number(tp[1]) - 1, Number(tp[2])) : new Date();
+    var from = "", to = iso(base);
+    if (preset === "today") { from = to; }
+    else if (preset === "7d") { from = iso(new Date(base.getFullYear(), base.getMonth(), base.getDate() - 6)); }
+    else if (preset === "30d") { from = iso(new Date(base.getFullYear(), base.getMonth(), base.getDate() - 29)); }
+    else if (preset === "month") { from = iso(new Date(base.getFullYear(), base.getMonth(), 1)); }
+    else if (preset === "all") { from = ""; to = ""; }
+    else if (preset === "custom") {
+      from = String(fromStr || "").slice(0, 10);
+      to = String(toStr || "").slice(0, 10);
+      if (from && to && from > to) { var tmp = from; from = to; to = tmp; }
+    }
+    return { from: from, to: to };
+  }
+  function bizReportFilter(sales, purchases, fromStr, toStr) {
+    function inRange(ds) {
+      if (fromStr && ds < fromStr) return false;
+      if (toStr && ds > toStr) return false;
+      return true;
+    }
+    var fs = (sales || []).filter(function (s) { return inRange(String(s.createdAt || "").slice(0, 10)); });
+    var fp = (purchases || []).filter(function (p) { return inRange(String(p.createdAt || "").slice(0, 10)); });
+    return { sales: fs, purchases: fp };
+  }
+  function bizReportSales(sales, fromStr, toStr, products) {
+    function r2(n) { return Math.round(n * 100) / 100; }
+    var f = bizReportFilter(sales, [], fromStr, toStr).sales;
+    var byId = {};
+    var order = [];
+    var totalQty = 0, totalRevenue = 0;
+    f.forEach(function (s) {
+      var key = String(s.productId || s.productName || "-");
+      if (!byId[key]) {
+        var p = null;
+        (products || []).forEach(function (q) { if (q.id === s.productId) p = q; });
+        byId[key] = { productId: s.productId || "", productName: s.productName || (p ? p.name : ""), category: s.category || (p ? (p.category || "") : ""), unit: p ? (p.unit || "") : "", qty: 0, revenue: 0, count: 0 };
+        order.push(key);
+      }
+      var r = byId[key];
+      var q = Number(s.qty) || 0;
+      var t = q * (Number(s.price) || 0);
+      r.qty += q; r.revenue += t; r.count += 1;
+      totalQty += q; totalRevenue += t;
+    });
+    var rows = order.map(function (k) { var r = byId[k]; return { productId: r.productId, productName: r.productName, category: r.category, unit: r.unit, qty: r2(r.qty), revenue: r2(r.revenue), count: r.count }; });
+    rows.sort(function (a, b) { return b.revenue - a.revenue; });
+    return { rows: rows, totalQty: r2(totalQty), totalRevenue: r2(totalRevenue), count: f.length };
+  }
+  function bizReportPurchases(purchases, fromStr, toStr, products) {
+    function r2(n) { return Math.round(n * 100) / 100; }
+    var f = bizReportFilter([], purchases, fromStr, toStr).purchases;
+    var byId = {};
+    var order = [];
+    var totalQty = 0, totalCost = 0;
+    f.forEach(function (p) {
+      var key = String(p.productId || p.productName || "-");
+      if (!byId[key]) {
+        var pr = null;
+        (products || []).forEach(function (q) { if (q.id === p.productId) pr = q; });
+        byId[key] = { productId: p.productId || "", productName: p.productName || (pr ? pr.name : ""), unit: pr ? (pr.unit || "") : "", qty: 0, cost: 0, count: 0 };
+        order.push(key);
+      }
+      var r = byId[key];
+      var q = Number(p.qty) || 0;
+      var t = q * (Number(p.cost) || 0);
+      r.qty += q; r.cost += t; r.count += 1;
+      totalQty += q; totalCost += t;
+    });
+    var rows = order.map(function (k) { var r = byId[k]; return { productId: r.productId, productName: r.productName, unit: r.unit, qty: r2(r.qty), cost: r2(r.cost), count: r.count }; });
+    rows.sort(function (a, b) { return b.cost - a.cost; });
+    return { rows: rows, totalQty: r2(totalQty), totalCost: r2(totalCost), count: f.length };
+  }
+  function bizReportStock(products) {
+    function r2(n) { return Math.round(n * 100) / 100; }
+    var rows = (products || []).map(function (p) {
+      var st = Number(p.stock) || 0;
+      return { id: p.id || "", name: p.name || "", category: p.category || "", unit: p.unit || "Piece", stock: r2(st), buyPrice: Number(p.buyPrice) || 0, sellPrice: Number(p.sellPrice) || 0, costValue: r2(st * (Number(p.buyPrice) || 0)), retailValue: r2(st * (Number(p.sellPrice) || 0)) };
+    });
+    rows.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    var tc = 0, tr = 0;
+    rows.forEach(function (r) { tc += r.costValue; tr += r.retailValue; });
+    return { rows: rows, totalCost: r2(tc), totalRetail: r2(tr), count: rows.length };
+  }
+  function bizReportProfit(sales, products, fromStr, toStr) {
+    function r2(n) { return Math.round(n * 100) / 100; }
+    var f = bizReportFilter(sales, [], fromStr, toStr).sales;
+    var byId = {};
+    var order = [];
+    var totalRevenue = 0, totalCost = 0;
+    f.forEach(function (s) {
+      var key = String(s.productId || s.productName || "-");
+      if (!byId[key]) {
+        var p = null;
+        (products || []).forEach(function (q) { if (q.id === s.productId) p = q; });
+        byId[key] = { productId: s.productId || "", productName: s.productName || (p ? p.name : ""), category: s.category || (p ? (p.category || "") : ""), unit: p ? (p.unit || "") : "", qty: 0, revenue: 0, cost: 0, count: 0 };
+        order.push(key);
+      }
+      var r = byId[key];
+      var q = Number(s.qty) || 0;
+      var price = Number(s.price) || 0;
+      var buy = (s.buyPrice != null) ? (Number(s.buyPrice) || 0) : 0;
+      if (s.buyPrice == null) (products || []).forEach(function (pp) { if (pp.id === s.productId) buy = Number(pp.buyPrice) || 0; });
+      r.qty += q; r.revenue += q * price; r.cost += q * buy; r.count += 1;
+      totalRevenue += q * price; totalCost += q * buy;
+    });
+    var rows = order.map(function (k) { var r = byId[k]; return { productId: r.productId, productName: r.productName, category: r.category, unit: r.unit, qty: r2(r.qty), revenue: r2(r.revenue), cost: r2(r.cost), profit: r2(r.revenue - r.cost), count: r.count }; });
+    rows.sort(function (a, b) { return b.profit - a.profit; });
+    return { rows: rows, totalRevenue: r2(totalRevenue), totalCost: r2(totalCost), totalProfit: r2(totalRevenue - totalCost) };
+  }
+  function bizReportXlsxRows(kind, data, profile, fromStr, toStr, generatedStr) {
+    function dmy(iso) { var s = String(iso || "").slice(0, 10).split("-"); return (s.length === 3) ? s[2] + "-" + s[1] + "-" + s[0] : ""; }
+    var titles = { sales: "Sales Report", purchases: "Purchase Report", stock: "Stock Report", profit: "Profit & Loss Report" };
+    var title = titles[kind] || "Business Report";
+    var p = profile || {};
+    var range = (fromStr || toStr) ? ((fromStr ? dmy(fromStr) : "Shuru se") + " se " + (toStr ? dmy(toStr) : "Aaj tak")) : "Tamam tareekhein";
+    var aoa = [];
+    aoa.push(["Easy Khata — " + title]);
+    aoa.push(["Business: " + (p.name || "") + "  ·  " + (p.typeLabel || "") + (p.owner ? "  ·  Malik: " + p.owner : "") + (p.phone ? "  ·  " + p.phone : "")]);
+    aoa.push(["Muddat: " + range + "  ·  Tayyar: " + (generatedStr || "")]);
+    aoa.push([]);
+    var d = data || {};
+    if (kind === "sales") {
+      aoa.push(["Kull sales", d.count || 0]);
+      aoa.push(["Kull items", d.totalQty || 0]);
+      aoa.push(["Kull revenue", d.totalRevenue || 0]);
+      aoa.push([]);
+      aoa.push(["Sales report — product ke hisaab se"]);
+      aoa.push(["Product", "Category", "Qty", "Unit", "Revenue"]);
+      (d.rows || []).forEach(function (r) { aoa.push([r.productName, r.category, r.qty, r.unit, r.revenue]); });
+      aoa.push(["Total", "", d.totalQty || 0, "", d.totalRevenue || 0]);
+    } else if (kind === "purchases") {
+      aoa.push(["Kull khareed", d.count || 0]);
+      aoa.push(["Kull items", d.totalQty || 0]);
+      aoa.push(["Kull cost", d.totalCost || 0]);
+      aoa.push([]);
+      aoa.push(["Purchase report — product ke hisaab se"]);
+      aoa.push(["Product", "Qty", "Unit", "Cost"]);
+      (d.rows || []).forEach(function (r) { aoa.push([r.productName, r.qty, r.unit, r.cost]); });
+      aoa.push(["Total", d.totalQty || 0, "", d.totalCost || 0]);
+    } else if (kind === "stock") {
+      aoa.push(["Kull products", d.count || 0]);
+      aoa.push(["Stock value (kharid)", d.totalCost || 0]);
+      aoa.push(["Stock value (sale)", d.totalRetail || 0]);
+      aoa.push([]);
+      aoa.push(["Stock report — maujooda stock"]);
+      aoa.push(["Product", "Category", "Stock", "Unit", "Buy price", "Cost value", "Sell price", "Retail value"]);
+      (d.rows || []).forEach(function (r) { aoa.push([r.name, r.category, r.stock, r.unit, r.buyPrice, r.costValue, r.sellPrice, r.retailValue]); });
+      aoa.push(["Total", "", "", "", "", d.totalCost || 0, "", d.totalRetail || 0]);
+    } else {
+      aoa.push(["Kull revenue", d.totalRevenue || 0]);
+      aoa.push(["Kull cost", d.totalCost || 0]);
+      aoa.push(["Kull profit", d.totalProfit || 0]);
+      aoa.push([]);
+      aoa.push(["Profit & loss — product ke hisaab se"]);
+      aoa.push(["Product", "Category", "Qty", "Revenue", "Cost", "Profit"]);
+      (d.rows || []).forEach(function (r) { aoa.push([r.productName, r.category, r.qty, r.revenue, r.cost, r.profit]); });
+      aoa.push(["Total", "", d.totalQty || 0, d.totalRevenue || 0, d.totalCost || 0, d.totalProfit || 0]);
+    }
+    return aoa;
+  }
+  function bizReportCsvText(aoa) {
+    return (aoa || []).map(function (row) {
+      return (row || []).map(function (c) {
+        var s = String(c == null ? "" : c);
+        if (s.indexOf(",") !== -1 || s.indexOf('"') !== -1 || s.indexOf("\n") !== -1) return '"' + s.split('"').join('""') + '"';
+        return s;
+      }).join(",");
+    }).join("\n");
+  }
   function bizNowLocal() {
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
@@ -8354,6 +8587,12 @@
     if (!Array.isArray(bizData.sales)) bizData.sales = [];
     if (!Array.isArray(bizData.purchases)) bizData.purchases = [];
     if (!bizData.settings || typeof bizData.settings !== "object") bizData.settings = {};
+    // v178: template type — purana profile.type (label, e.g. "General Store")
+    // ko template key mein badlo; products jin ki unit nahi, Piece lein.
+    var t = bizData.profile && bizData.profile.type;
+    if (t && !bizData.settings.type) bizData.settings.type = bizTemplateKeyForLabel(t);
+    if (!bizData.settings.type) bizData.settings.type = "general";
+    (bizData.products || []).forEach(function (p) { if (!p.unit) p.unit = "Piece"; });
   }
   function bizSettings() {
     if (!bizData) bizLoad();
@@ -8363,6 +8602,7 @@
     if (!Array.isArray(s.categories)) s.categories = [];
     if (s.lowStockDefault == null) s.lowStockDefault = 0;
     if (!s.skuPrefix) s.skuPrefix = "SKU-";
+    if (!s.type) s.type = "general";
     return s;
   }
   function bizModuleEnabled() {
@@ -8385,13 +8625,27 @@
   function bizProductById(id) { var found = null; (bizData.products || []).forEach(function (p) { if (p.id === id) found = p; }); return found; }
   function bizShowTab(tab) {
     bizTab = tab;
-    ["dash", "products", "stock", "sales", "purchases", "setup"].forEach(function (t) {
+    ["dash", "products", "stock", "sales", "purchases", "setup", "reports"].forEach(function (t) {
       var pane = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)));
       if (pane) pane.hidden = t !== tab;
       var btn = $("bizTab" + (t === "dash" ? "Dash" : t.charAt(0).toUpperCase() + t.slice(1)) + "Btn");
       if (btn) btn.classList.toggle("is-active", t === tab);
     });
   }
+  // v178: business currency — profile ki currency ka symbol (PKR default);
+  // sirf business helpers is se format karte hain, khata ledger ka fmtRs
+  // bilkul nahi badla. PDF ke liye WinAnsi-safe code (INR ka ₹ PDF mein "?"
+  // ban jata — is liye PDF mein "INR" likhte hain).
+  function bizProfileCurrency() { return (bizData && bizData.profile && bizData.profile.currency) || "PKR"; }
+  function bizFmt(n) { return bizFmtMoney(n, bizProfileCurrency()); }
+  function bizPdfMoney(n) {
+    var code = bizProfileCurrency();
+    var map = { "PKR": "Rs", "USD": "$", "INR": "INR", "AED": "AED", "SAR": "SR", "GBP": "£" };
+    var sym = map[code] || "Rs";
+    var v = Math.round((Number(n) || 0) * 100) / 100;
+    return sym + " " + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  function bizProductUnit(id) { var p = bizProductById(id); return p ? (p.unit || "") : ""; }
   function bizStatCard(label, value, tone) {
     return '<div class="biz-stat' + (tone ? " biz-stat-" + tone : "") + '"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>';
   }
@@ -8401,17 +8655,17 @@
     var t = bizSalesTotals(bizData.sales || [], bizData.purchases || [], bizData.products, todayLocal());
     var el = $("bizStats"); if (!el) return;
     el.innerHTML = bizStatCard(tr("Total products"), String(bizData.products.length), "") +
-      bizStatCard(tr("Stock value (kharid)"), fmtRs(v.cost), "") +
-      bizStatCard(tr("Stock value (sale)"), fmtRs(v.retail), "") +
+      bizStatCard(tr("Stock value (kharid)"), bizFmt(v.cost), "") +
+      bizStatCard(tr("Stock value (sale)"), bizFmt(v.retail), "") +
       bizStatCard(tr("Low stock"), String(low.length), low.length ? "bad" : "good") +
-      bizStatCard(tr("Aaj ki sales"), fmtRs(t.todayTotal), "") +
-      bizStatCard(tr("Total revenue"), fmtRs(t.totalRevenue), "") +
-      bizStatCard(tr("Profit (andaza)"), fmtRs(t.totalProfit), t.totalProfit >= 0 ? "good" : "bad") +
-      bizStatCard(tr("Total khareed"), fmtRs(t.totalSpend), "");
+      bizStatCard(tr("Aaj ki sales"), bizFmt(t.todayTotal), "") +
+      bizStatCard(tr("Total revenue"), bizFmt(t.totalRevenue), "") +
+      bizStatCard(tr("Profit (andaza)"), bizFmt(t.totalProfit), t.totalProfit >= 0 ? "good" : "bad") +
+      bizStatCard(tr("Total khareed"), bizFmt(t.totalSpend), "");
     var val = $("bizValuation"); if (val) val.innerHTML =
-      bizStatCard(tr("Kharid keemat"), fmtRs(v.cost), "") +
-      bizStatCard(tr("Sale keemat"), fmtRs(v.retail), "") +
-      bizStatCard(tr("Expected profit"), fmtRs(Math.round((v.retail - v.cost) * 100) / 100), (v.retail - v.cost) >= 0 ? "good" : "bad");
+      bizStatCard(tr("Kharid keemat"), bizFmt(v.cost), "") +
+      bizStatCard(tr("Sale keemat"), bizFmt(v.retail), "") +
+      bizStatCard(tr("Expected profit"), bizFmt(Math.round((v.retail - v.cost) * 100) / 100), (v.retail - v.cost) >= 0 ? "good" : "bad");
   }
   // v177: charts — hand-built inline SVG (koi library nahi, koi network
   // nahi, offline + guest mein bhi). Colours dono themes mein parhne
@@ -8429,7 +8683,7 @@
       return str;
     }).join("");
     return '<svg viewBox="0 0 200 200" role="img" aria-label="' + esc(tr("Sales by category")) + '">' + parts +
-      '<text x="100" y="97" text-anchor="middle" font-size="15" font-weight="800" fill="currentColor">' + esc(fmtRs(d.total)) + '</text>' +
+      '<text x="100" y="97" text-anchor="middle" font-size="15" font-weight="800" fill="currentColor">' + esc(bizFmt(d.total)) + '</text>' +
       '<text x="100" y="117" text-anchor="middle" font-size="11" fill="currentColor">' + esc(tr("Total revenue")) + '</text></svg>';
   }
   function bizBarsSvg(d) {
@@ -8502,7 +8756,7 @@
     if (dEl) dEl.innerHTML = donut.slices.length ? bizDonutSvg(donut) : '<p class="biz-chart-empty">' + esc(tr("Abhi koi sale nahi — pehli sale ke baad charts yahan dikhenge.")) + '</p>';
     var lg = $("bizChartDonutLegend");
     if (lg) lg.innerHTML = donut.slices.length ? donut.slices.map(function (s, i) {
-      return '<div class="biz-legend-row"><span class="biz-legend-dot" style="background:' + bizChartColor(s.label, i) + '"></span><span>' + esc(s.label === "Other" ? tr("Other") : s.label) + '</span><span class="muted">' + esc(s.pct + "%") + '</span><strong>' + esc(fmtRs(s.value)) + '</strong></div>';
+      return '<div class="biz-legend-row"><span class="biz-legend-dot" style="background:' + bizChartColor(s.label, i) + '"></span><span>' + esc(s.label === "Other" ? tr("Other") : s.label) + '</span><span class="muted">' + esc(s.pct + "%") + '</span><strong>' + esc(bizFmt(s.value)) + '</strong></div>';
     }).join("") : "";
     var anyActivity = false;
     daily.days.forEach(function (o) { if (o.sales > 0 || o.purchases > 0) anyActivity = true; });
@@ -8518,7 +8772,7 @@
     var list = $("bizLowList"); if (!list) return;
     $("bizLowEmpty").hidden = low.length > 0;
     list.innerHTML = low.map(function (p) {
-      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(tr("Stock") + ": " + p.stock + " " + p.unit + " · " + tr("Reorder") + ": " + p.reorder) + '</span></div><button class="btn btn-soft biz-low-add" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Stock add karein")) + '</button></div>';
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(tr("Stock") + ": " + p.stock + " " + bizUnitShort(p.unit) + " · " + tr("Reorder") + ": " + p.reorder) + '</span></div><button class="btn btn-soft biz-low-add" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Stock add karein")) + '</button></div>';
     }).join("");
     list.querySelectorAll(".biz-low-add").forEach(function (b) { b.addEventListener("click", function () { bizShowTab("stock"); var s = $("bizMProduct"); if (s) s.value = b.getAttribute("data-id"); }); });
   }
@@ -8537,7 +8791,7 @@
     $("bizPEmpty").hidden = rows.length > 0;
     list.innerHTML = rows.map(function (p) {
       var low = (Number(p.stock) || 0) <= (Number(p.reorder) || 0);
-      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc((p.category || "—") + " · " + p.unit + " · " + p.sku) + '</span><span class="muted">' + esc(tr("Kharid") + ": " + fmtRs(p.buyPrice) + " · " + tr("Sale") + ": " + fmtRs(p.sellPrice)) + '</span></div><div class="biz-prow-side"><span class="biz-badge ' + (low ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(tr("Stock") + ": " + p.stock) + '</span><span class="biz-prow-actions"><button class="btn btn-ghost biz-p-edit" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Edit")) + '</button><button class="btn btn-ghost biz-p-del" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Delete")) + '</button></span></div></div>';
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc((p.category || "—") + " · " + p.unit + " · " + p.sku) + '</span><span class="muted">' + esc(tr("Kharid") + ": " + bizFmt(p.buyPrice) + " · " + tr("Sale") + ": " + bizFmt(p.sellPrice)) + '</span></div><div class="biz-prow-side"><span class="biz-badge ' + (low ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(tr("Stock") + ": " + p.stock + " " + bizUnitShort(p.unit)) + '</span><span class="biz-prow-actions"><button class="btn btn-ghost biz-p-edit" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Edit")) + '</button><button class="btn btn-ghost biz-p-del" type="button" data-id="' + esc(p.id) + '">' + esc(tr("Delete")) + '</button></span></div></div>';
     }).join("");
     list.querySelectorAll(".biz-p-edit").forEach(function (b) { b.addEventListener("click", function () { bizStartEdit(b.getAttribute("data-id")); }); });
     list.querySelectorAll(".biz-p-del").forEach(function (b) { b.addEventListener("click", function () { bizDeleteProduct(b.getAttribute("data-id"), b); }); });
@@ -8550,13 +8804,15 @@
     $("bizMoveEmpty").hidden = moves.length > 0;
     list.innerHTML = moves.map(function (m) {
       var sign = m.type === "in" ? "+" : (m.type === "out" ? "−" : "→");
-      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(m.productName) + '</strong><span class="muted">' + esc(fmtDate(m.createdAt) + " " + String(m.createdAt || "").slice(11, 16) + (m.note ? " · " + m.note : "")) + '</span></div><span class="biz-badge ' + (m.type === "out" ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(sign + " " + m.qty) + '</span></div>';
+      var u = bizUnitShort(bizProductUnit(m.productId));
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(m.productName) + '</strong><span class="muted">' + esc(fmtDate(m.createdAt) + " " + String(m.createdAt || "").slice(11, 16) + (m.note ? " · " + m.note : "")) + '</span></div><span class="biz-badge ' + (m.type === "out" ? "biz-badge-low" : "biz-badge-ok") + '">' + esc(sign + " " + m.qty + (u ? " " + u : "")) + '</span></div>';
     }).join("");
   }
   function bizPrefillSalePrice(force) {
     var p = bizProductById($("bizSProduct").value); if (!p) return;
     var el = $("bizSPrice"); if (!el) return;
     if (force || el.value === "") el.value = (p.sellPrice == null ? "" : p.sellPrice);
+    var u = $("bizSUnitLbl"); if (u) u.textContent = p.unit ? "(" + bizUnitShort(p.unit) + ")" : ""; // v178: qty ke sath unit dikhao
   }
   function bizRenderSales() {
     var sel = $("bizSProduct"); if (sel) { var cur = sel.value; sel.innerHTML = bizData.products.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + " (" + esc(tr("Stock") + ": " + p.stock + ")") + '</option>'; }).join(""); if (cur) sel.value = cur; bizPrefillSalePrice(false); }
@@ -8565,13 +8821,15 @@
     var sales = (bizData.sales || []).slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }).slice(0, 50);
     $("bizSaleEmpty").hidden = sales.length > 0;
     list.innerHTML = sales.map(function (s) {
-      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(s.productName) + '</strong><span class="muted">' + esc(fmtDate(s.createdAt) + " " + String(s.createdAt || "").slice(11, 16) + " · " + s.qty + " × " + fmtRs(s.price) + (s.note ? " · " + s.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-pay">' + esc(s.payment) + '</span><strong>' + esc(fmtRs(s.total)) + '</strong></div></div>';
+      var u = bizUnitShort(bizProductUnit(s.productId));
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(s.productName) + '</strong><span class="muted">' + esc(fmtDate(s.createdAt) + " " + String(s.createdAt || "").slice(11, 16) + " · " + s.qty + (u ? " " + u : "") + " × " + bizFmt(s.price) + (s.note ? " · " + s.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-pay">' + esc(s.payment) + '</span><strong>' + esc(bizFmt(s.total)) + '</strong></div></div>';
     }).join("");
   }
   function bizPrefillPurchaseCost(force) {
     var p = bizProductById($("bizPuProduct").value); if (!p) return;
     var el = $("bizPuCost"); if (!el) return;
     if (force || el.value === "") el.value = (p.buyPrice == null ? "" : p.buyPrice);
+    var u = $("bizPuUnitLbl"); if (u) u.textContent = p.unit ? "(" + bizUnitShort(p.unit) + ")" : ""; // v178: qty ke sath unit dikhao
   }
   function bizRenderPurchases() {
     var sel = $("bizPuProduct"); if (sel) { var cur = sel.value; sel.innerHTML = bizData.products.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + " (" + esc(tr("Stock") + ": " + p.stock + ")") + '</option>'; }).join(""); if (cur) sel.value = cur; bizPrefillPurchaseCost(false); }
@@ -8580,7 +8838,8 @@
     var purs = (bizData.purchases || []).slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }).slice(0, 50);
     $("bizPuEmpty").hidden = purs.length > 0;
     list.innerHTML = purs.map(function (p) {
-      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.productName) + '</strong><span class="muted">' + esc(fmtDate(p.createdAt) + " " + String(p.createdAt || "").slice(11, 16) + " · " + p.qty + " × " + fmtRs(p.cost) + (p.supplier ? " · " + p.supplier : "") + (p.note ? " · " + p.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-ok">' + esc(tr("Kharid")) + '</span><strong>' + esc(fmtRs(p.total)) + '</strong></div></div>';
+      var u = bizUnitShort(bizProductUnit(p.productId));
+      return '<div class="biz-prow"><div class="biz-prow-main"><strong>' + esc(p.productName) + '</strong><span class="muted">' + esc(fmtDate(p.createdAt) + " " + String(p.createdAt || "").slice(11, 16) + " · " + p.qty + (u ? " " + u : "") + " × " + bizFmt(p.cost) + (p.supplier ? " · " + p.supplier : "") + (p.note ? " · " + p.note : "")) + '</span></div><div class="biz-prow-side"><span class="biz-badge biz-badge-ok">' + esc(tr("Kharid")) + '</span><strong>' + esc(bizFmt(p.total)) + '</strong></div></div>';
     }).join("");
   }
   function bizRenderProfile() {
@@ -8588,23 +8847,40 @@
     var p = bizData.profile;
     if (!p) { el.innerHTML = '<p class="muted">' + esc(tr("Setup abhi mukammal nahi — upar form bharein.")) + '</p>'; return; }
     el.innerHTML = '<div class="biz-profile"><strong>' + esc(p.name) + '</strong><span class="muted">' + esc(p.type + " · " + p.currency) + '</span>' +
+      (p.owner ? '<span class="muted">' + esc(tr("Malik") + ": " + p.owner) + '</span>' : "") +
       (p.phone ? '<span class="muted">' + esc(p.phone) + '</span>' : "") +
       (p.address ? '<span class="muted">' + esc(p.address) + '</span>' : "") +
       '<span class="muted">' + esc(tr("Tax") + ": " + (p.tax || 0) + "%") + '</span></div>';
   }
   function bizRenderSetupForm() {
     var p = bizData.profile || {};
+    // v178: type select template keys se banta hai (JS) — purana label wali
+    // profile migrate ho kar key ban chuki hoti hai (bizMigrate).
+    var typeSel = $("bizSType");
+    if (typeSel) {
+      var cur = typeSel.value || bizSettings().type || "general";
+      typeSel.innerHTML = bizBusinessTemplates().map(function (t) { return '<option value="' + esc(t.key) + '">' + esc(t.label) + '</option>'; }).join("");
+      typeSel.value = cur;
+      var hint = $("bizTemplateHint");
+      if (hint) {
+        var tpl = bizTemplateByKey(typeSel.value);
+        hint.textContent = tr("Template ki categories") + ": " + (tpl.categories.length ? tpl.categories.join(", ") : tr("Koi tayyar category nahi — apni categories neechay add karein."));
+      }
+    }
     if ($("bizSName")) $("bizSName").value = p.name || "";
-    if ($("bizSType")) $("bizSType").value = p.type || "General Store";
+    if ($("bizSOwner")) $("bizSOwner").value = p.owner || "";
     if ($("bizSCurrency")) $("bizSCurrency").value = p.currency || "PKR";
     if ($("bizSPhone")) $("bizSPhone").value = p.phone || "";
     if ($("bizSTax")) $("bizSTax").value = (p.tax == null ? "" : p.tax);
     if ($("bizSAddress")) $("bizSAddress").value = p.address || "";
+    if ($("bizSetupLowDefault")) $("bizSetupLowDefault").value = bizSettings().lowStockDefault;
+    if ($("bizSetupSkuPrefix")) $("bizSetupSkuPrefix").value = bizSettings().skuPrefix;
+    bizFillUnitSelect();
   }
   function renderBusiness() {
     bizLoad();
     bizShowTab(bizTab);
-    bizRenderStats(); bizRenderCharts(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm();
+    bizRenderStats(); bizRenderCharts(); bizRenderLow(); bizRenderReports(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm(); bizRenderSetupCats();
     bizSay("", "bizMsg");
   }
   function bizStartEdit(id) {
@@ -8612,7 +8888,7 @@
     bizEditId = id;
     $("bizPName").value = p.name || "";
     $("bizPCat").value = p.category || "";
-    $("bizPUnit").value = p.unit || "Piece";
+    bizFillUnitSelect(p.unit || "Piece"); // v178: template units + custom unit
     $("bizPBuy").value = (p.buyPrice == null ? "" : p.buyPrice);
     $("bizPSell").value = (p.sellPrice == null ? "" : p.sellPrice);
     $("bizPSku").value = p.sku || "";
@@ -8626,16 +8902,18 @@
   function bizClearProductForm() {
     bizEditId = null;
     ["bizPName", "bizPCat", "bizPBuy", "bizPSell", "bizPSku", "bizPStock", "bizPReorder"].forEach(function (id) { var el = $(id); if (el) el.value = ""; });
-    if ($("bizPUnit")) $("bizPUnit").value = "Piece";
+    bizFillUnitSelect("Piece");
     $("bizPCancelBtn").hidden = true;
   }
   function bizSaveProduct(e) {
     if (e) e.preventDefault();
+    var unitSel = $("bizPUnit").value || "Piece";
+    var unit = unitSel === "__custom" ? (($("bizPUnitCustom").value || "").trim() || "Piece") : unitSel; // v178: custom unit free text
     var p = {
       id: bizEditId || newUuid(),
       name: ($("bizPName").value || "").trim(),
       category: ($("bizPCat").value || "").trim(),
-      unit: $("bizPUnit").value || "Piece",
+      unit: unit,
       buyPrice: $("bizPBuy").value === "" ? 0 : Number($("bizPBuy").value),
       sellPrice: $("bizPSell").value === "" ? 0 : Number($("bizPSell").value),
       sku: ($("bizPSku").value || "").trim() || bizNextSku(bizData.products, bizSettings().skuPrefix),
@@ -8735,9 +9013,295 @@
     if (!name) { bizSay(tr("Business ka naam likhein."), "bizSMsg"); return; }
     var tax = $("bizSTax").value === "" ? 0 : Number($("bizSTax").value);
     if (!isFinite(tax) || tax < 0 || tax > 100) { bizSay(tr("Sahi tax likhein (0–100)."), "bizSMsg"); return; }
-    bizData.profile = { name: name, type: $("bizSType").value || "General Store", currency: $("bizSCurrency").value || "PKR", phone: ($("bizSPhone").value || "").trim(), tax: tax, address: ($("bizSAddress").value || "").trim() };
+    var typeKey = ($("bizSType") && $("bizSType").value) || bizSettings().type || "general";
+    var tpl = bizTemplateByKey(typeKey);
+    // v178: profile mein display label, settings.type mein template key;
+    // template ki categories bhi lagao (sirf missing add hoti hain).
+    bizData.profile = { name: name, owner: ($("bizSOwner").value || "").trim(), type: tpl.label, currency: $("bizSCurrency").value || "PKR", phone: ($("bizSPhone").value || "").trim(), tax: tax, address: ($("bizSAddress").value || "").trim() };
+    var res = bizApplyTemplate(bizSettings(), typeKey);
+    bizData.settings = res.settings;
     bizSave(); renderBusiness();
     bizSay(tr("Setup save ho gaya."), "bizSMsg");
+  }
+
+  /* ---------- v178: universal setup (templates, units, setup categories) + Reports ----------
+     Template change par sirf missing categories add hoti hain — products,
+     sales ya purani categories kabhi delete nahi hoti. Reports sirf local
+     store se banti hain; Excel/PDF wahi self-hosted vendor libs use karte
+     hain jo khata ledger use karta hai (ensureReportLib) — koi CDN nahi. */
+  var bizReportPreset = "today";
+  function bizFillUnitSelect(selectedUnit) {
+    var sel = $("bizPUnit"); if (!sel) return;
+    var tpl = bizTemplateByKey(bizSettings().type);
+    var opts = [];
+    (tpl.units || []).concat(BIZ_UNITS).forEach(function (u) { if (opts.indexOf(u) === -1) opts.push(u); });
+    var sel2 = selectedUnit || sel.value || "";
+    var custom = sel2 && opts.indexOf(sel2) === -1;
+    sel.innerHTML = opts.map(function (u) { return '<option value="' + esc(u) + '">' + esc(u) + '</option>'; }).join("") + '<option value="__custom">' + esc(tr("Custom unit")) + '</option>';
+    sel.value = custom ? "__custom" : (sel2 || "Piece");
+    var row = $("bizPUnitCustomRow");
+    if (row) row.hidden = sel.value !== "__custom";
+    var ci = $("bizPUnitCustom");
+    if (ci) ci.value = custom ? sel2 : "";
+  }
+  function bizSetupTemplateChange() {
+    var key = ($("bizSType") && $("bizSType").value) || "general";
+    var res = bizApplyTemplate(bizSettings(), key);
+    bizData.settings = res.settings;
+    bizSave();
+    bizRenderSetupForm(); bizRenderSetupCats(); bizRenderProducts(); bizFillUnitSelect();
+    var msg = res.added > 0 ? tr("Template lag gaya — nayi categories add ho gayein.") : tr("Template lag gaya — categories pehle se maujood thiin.");
+    bizSay(msg, "bizSMsg");
+  }
+  function bizRenderSetupCats() {
+    var cl = $("bizSetupCatList"); if (!cl) return;
+    var cats = bizSettings().categories;
+    cl.innerHTML = cats.length ? cats.map(function (c) {
+      return '<span class="biz-cat-chip">' + esc(c) + '<button type="button" data-biz-setup-cat-del="' + esc(c) + '" aria-label="' + esc(tr("Delete")) + '">\u00D7</button></span>';
+    }).join("") : '<p class="muted">' + esc(tr("Abhi koi category nahi.")) + '</p>';
+    cl.querySelectorAll("[data-biz-setup-cat-del]").forEach(function (b) { b.addEventListener("click", function () { bizSetupDeleteCategory(b.getAttribute("data-biz-setup-cat-del")); }); });
+  }
+  function bizSetupAddCategory() {
+    var name = ($("bizSetupCatName").value || "").trim();
+    var res = bizAddCategory(bizSettings().categories, name);
+    if (!res.ok) { bizSay(tr(res.err === "dup" ? "Category pehle se hai." : "Category ka naam likhein."), "bizSetupCatMsg"); return; }
+    bizSettings().categories = res.cats;
+    bizSave();
+    $("bizSetupCatName").value = "";
+    bizRenderSetupCats(); bizRenderProducts();
+    bizSay(tr("Category save ho gayi."), "bizSetupCatMsg");
+  }
+  function bizSetupDeleteCategory(name) {
+    var res = bizRemoveCategory(bizSettings().categories, bizData.products, name);
+    if (!res.ok) { bizSay(tr("Category istemal mein hai — pehle products se hatayein."), "bizSetupCatMsg"); return; }
+    bizSettings().categories = res.cats;
+    bizSave();
+    bizRenderSetupCats(); bizRenderProducts();
+    bizSay(tr("Category delete ho gayi."), "bizSetupCatMsg");
+  }
+  function bizSetupSaveSettings() {
+    var patch = {
+      lowStockDefault: $("bizSetupLowDefault").value === "" ? 0 : Number($("bizSetupLowDefault").value),
+      skuPrefix: ($("bizSetupSkuPrefix").value || "").trim()
+    };
+    var res = bizApplyAdminSettings(bizSettings(), patch);
+    if (res.errs.length) { bizSay(tr(res.errs[0] === "skuPrefix" ? "Sahi SKU prefix likhein." : "Sahi low-stock number likhein (0 ya zyada)."), "bizSetupSettingsMsg"); return; }
+    bizData.settings = res.settings;
+    bizSave();
+    renderBusiness();
+    bizSay(tr("Settings save ho gayein."), "bizSetupSettingsMsg");
+  }
+  function bizReportDataFor(kind, from, to) {
+    if (kind === "purchases") return bizReportPurchases(bizData.purchases || [], from, to, bizData.products);
+    if (kind === "stock") return bizReportStock(bizData.products);
+    if (kind === "profit") return bizReportProfit(bizData.sales || [], bizData.products, from, to);
+    return bizReportSales(bizData.sales || [], from, to, bizData.products);
+  }
+  function bizReportProfileObj() {
+    var p = bizData.profile || {};
+    return { name: p.name || "", typeLabel: p.type || bizTemplateByKey(bizSettings().type).label, owner: p.owner || "", phone: p.phone || "", address: p.address || "", currency: p.currency || "PKR" };
+  }
+  function bizReportRangeNow() {
+    return bizReportRange(bizReportPreset, todayLocal(), $("bizReportFrom") ? $("bizReportFrom").value : "", $("bizReportTo") ? $("bizReportTo").value : "");
+  }
+  function bizRenderReports() {
+    var kindEl = $("bizReportKind"); if (!kindEl) return;
+    var kind = kindEl.value || "sales";
+    var r = bizReportRangeNow();
+    var d = bizReportDataFor(kind, r.from, r.to);
+    var titles = { sales: "Sales report", purchases: "Purchase report", stock: "Stock report", profit: "Profit and loss" };
+    var rangeText = (r.from || r.to) ? ((r.from ? fmtDate(r.from) : "—") + " se " + (r.to ? fmtDate(r.to) : "—")) : tr("All time");
+    var titleEl = $("bizReportTitle"); if (titleEl) titleEl.textContent = tr(titles[kind]) + " · " + rangeText;
+    var dateWrap = $("bizReportDateWrap"); if (dateWrap) dateWrap.hidden = kind === "stock";
+    var sum = $("bizReportSummary"); if (sum) {
+      if (kind === "sales") sum.innerHTML = bizStatCard(tr("Kull sales"), String(d.count), "") + bizStatCard(tr("Kull items"), String(d.totalQty), "") + bizStatCard(tr("Kull revenue"), bizFmt(d.totalRevenue), "");
+      else if (kind === "purchases") sum.innerHTML = bizStatCard(tr("Kull khareed"), String(d.count), "") + bizStatCard(tr("Kull items"), String(d.totalQty), "") + bizStatCard(tr("Kull cost"), bizFmt(d.totalCost), "");
+      else if (kind === "stock") sum.innerHTML = bizStatCard(tr("Kull products"), String(d.count), "") + bizStatCard(tr("Stock value (kharid)"), bizFmt(d.totalCost), "") + bizStatCard(tr("Stock value (sale)"), bizFmt(d.totalRetail), "");
+      else sum.innerHTML = bizStatCard(tr("Kull revenue"), bizFmt(d.totalRevenue), "") + bizStatCard(tr("Kull cost"), bizFmt(d.totalCost), "") + bizStatCard(tr("Kull profit"), bizFmt(d.totalProfit), d.totalProfit >= 0 ? "good" : "bad");
+    }
+    var wrap = $("bizReportTableWrap"); var empty = $("bizReportEmpty");
+    var rows = d.rows || [];
+    if (empty) {
+      empty.hidden = rows.length > 0;
+      empty.textContent = kind === "stock" ? tr("Abhi koi product nahi — pehle product add karein.") : tr("Is range mein koi data nahi — koi aur range chunein ya pehle sale/khareed record karein.");
+    }
+    if (!wrap) return;
+    function head(cols) { return "<thead><tr>" + cols.map(function (c) { return "<th" + (c.r ? ' class="r"' : "") + ">" + esc(c.t) + "</th>"; }).join("") + "</tr></thead>"; }
+    function moneyCell(n) { return '<td class="r">' + esc(bizFmt(n)) + '</td>'; }
+    function qtyCell(q, u) { return "<td>" + esc(String(q) + (u ? " " + bizUnitShort(u) : "")) + "</td>"; }
+    var html = "";
+    if (kind === "sales") {
+      html = '<table class="biz-table">' + head([{ t: tr("Product") }, { t: tr("Category") }, { t: tr("Qty") }, { t: tr("Revenue"), r: 1 }]) + "<tbody>" +
+        rows.map(function (x) { return "<tr><td>" + esc(x.productName) + "</td><td>" + esc(x.category || "—") + "</td>" + qtyCell(x.qty, x.unit) + moneyCell(x.revenue) + "</tr>"; }).join("") +
+        '</tbody><tfoot><tr><td>' + esc(tr("Total")) + '</td><td></td>' + qtyCell(d.totalQty, "") + moneyCell(d.totalRevenue) + "</tr></tfoot></table>";
+    } else if (kind === "purchases") {
+      html = '<table class="biz-table">' + head([{ t: tr("Product") }, { t: tr("Qty") }, { t: tr("Cost"), r: 1 }]) + "<tbody>" +
+        rows.map(function (x) { return "<tr><td>" + esc(x.productName) + "</td>" + qtyCell(x.qty, x.unit) + moneyCell(x.cost) + "</tr>"; }).join("") +
+        '</tbody><tfoot><tr><td>' + esc(tr("Total")) + '</td>' + qtyCell(d.totalQty, "") + moneyCell(d.totalCost) + "</tr></tfoot></table>";
+    } else if (kind === "stock") {
+      html = '<table class="biz-table">' + head([{ t: tr("Product") }, { t: tr("Category") }, { t: tr("Stock") }, { t: tr("Buy price"), r: 1 }, { t: tr("Cost value"), r: 1 }, { t: tr("Sell price"), r: 1 }, { t: tr("Retail value"), r: 1 }]) + "<tbody>" +
+        rows.map(function (x) { return "<tr><td>" + esc(x.name) + "</td><td>" + esc(x.category || "—") + "</td>" + qtyCell(x.stock, x.unit) + moneyCell(x.buyPrice) + moneyCell(x.costValue) + moneyCell(x.sellPrice) + moneyCell(x.retailValue) + "</tr>"; }).join("") +
+        '</tbody><tfoot><tr><td>' + esc(tr("Total")) + '</td><td></td><td></td><td></td>' + moneyCell(d.totalCost) + "<td></td>" + moneyCell(d.totalRetail) + "</tr></tfoot></table>";
+    } else {
+      html = '<table class="biz-table">' + head([{ t: tr("Product") }, { t: tr("Category") }, { t: tr("Qty") }, { t: tr("Revenue"), r: 1 }, { t: tr("Cost"), r: 1 }, { t: tr("Profit"), r: 1 }]) + "<tbody>" +
+        rows.map(function (x) { return "<tr><td>" + esc(x.productName) + "</td><td>" + esc(x.category || "—") + "</td>" + qtyCell(x.qty, x.unit) + moneyCell(x.revenue) + moneyCell(x.cost) + moneyCell(x.profit) + "</tr>"; }).join("") +
+        '</tbody><tfoot><tr><td>' + esc(tr("Total")) + '</td><td></td>' + qtyCell(d.totalQty, "") + moneyCell(d.totalRevenue) + moneyCell(d.totalCost) + moneyCell(d.totalProfit) + "</tr></tfoot></table>";
+    }
+    wrap.innerHTML = html;
+  }
+  function bizReportFileBase(kind) {
+    var names = { sales: "Sales", purchases: "Purchase", stock: "Stock", profit: "Profit" };
+    return "EasyKhata-" + (names[kind] || "Business") + "-Report-" + todayLocal();
+  }
+  async function bizDownloadReportXlsx() {
+    var kind = ($("bizReportKind") || {}).value || "sales";
+    var r = bizReportRangeNow();
+    var d = bizReportDataFor(kind, r.from, r.to);
+    var aoa = bizReportXlsxRows(kind, d, bizReportProfileObj(), r.from, r.to, bizNowLocal().replace("T", " "));
+    var base = bizReportFileBase(kind);
+    var X = await ensureReportLib("xlsx");
+    if (!X) {
+      downloadBlob(new Blob([bizReportCsvText(aoa)], { type: "text/csv;charset=utf-8" }), base + ".csv");
+      bizSay(tr("Excel library nahi mili — CSV download ho gaya."), "bizReportMsg");
+      return;
+    }
+    try {
+      var wb = X.utils.book_new();
+      var ws = X.utils.aoa_to_sheet(aoa);
+      var maxC = 0;
+      aoa.forEach(function (row) { if (row.length > maxC) maxC = row.length; });
+      var headRow = -1;
+      aoa.forEach(function (row, i) { if (row && row[0] === "Product") headRow = i; });
+      var totalRow = aoa.length - 1;
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: maxC - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: maxC - 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: maxC - 1 } }
+      ];
+      if (headRow > 0) ws["!merges"].push({ s: { r: headRow - 1, c: 0 }, e: { r: headRow - 1, c: maxC - 1 } });
+      var widths = { sales: [28, 18, 10, 10, 16], purchases: [28, 10, 10, 16], stock: [24, 16, 10, 10, 12, 14, 12, 14], profit: [24, 16, 10, 14, 14, 14] };
+      ws["!cols"] = (widths[kind] || widths.sales).map(function (w) { return { wch: w }; });
+      ws["!margins"] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+      xCell(ws, "A1", X_TITLE);
+      xCell(ws, "A2", X_META);
+      xCell(ws, "A3", X_META);
+      function colLetter(i) { return String.fromCharCode(65 + i); }
+      if (headRow >= 0) {
+        xCell(ws, "A" + headRow, X_SECTION);
+        for (var c = 0; c < maxC; c++) xCell(ws, colLetter(c) + (headRow + 1), xHeadStyle(c >= 2));
+        for (var ri = headRow + 1; ri < totalRow; ri++) {
+          var zebra = (ri - headRow) % 2 === 0;
+          for (var cj = 0; cj < maxC; cj++) {
+            var cell = ws[colLetter(cj) + (ri + 1)];
+            var isNum = cell && typeof cell.v === "number";
+            xCell(ws, colLetter(cj) + (ri + 1), xDataStyle(zebra, isNum, false, cj === 0), isNum ? "#,##0.00" : undefined);
+          }
+        }
+        for (var ck = 0; ck < maxC; ck++) {
+          var tc = ws[colLetter(ck) + (totalRow + 1)];
+          var tNum = tc && typeof tc.v === "number";
+          xCell(ws, colLetter(ck) + (totalRow + 1), xTotalStyle(tNum, false), tNum ? "#,##0.00" : undefined);
+        }
+      }
+      X.utils.book_append_sheet(wb, ws, "Report");
+      var bytes = X.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+      downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), base + ".xlsx");
+      bizSay(tr("Excel report download ho gaya."), "bizReportMsg");
+    } catch (e) {
+      downloadBlob(new Blob([bizReportCsvText(aoa)], { type: "text/csv;charset=utf-8" }), base + ".csv");
+      bizSay(tr("Excel nahi ban saka — CSV download ho gaya."), "bizReportMsg");
+    }
+  }
+  async function bizDownloadReportPdf() {
+    var PdfCtor = await ensureReportLib("jspdf");
+    if (!PdfCtor) { bizSay(tr("PDF library nahi mili — internet check karke dobara try karein."), "bizReportMsg"); return; }
+    var kind = ($("bizReportKind") || {}).value || "sales";
+    var r = bizReportRangeNow();
+    var d = bizReportDataFor(kind, r.from, r.to);
+    var prof = bizReportProfileObj();
+    var titles = { sales: "Sales Report", purchases: "Purchase Report", stock: "Stock Report", profit: "Profit & Loss Report" };
+    var title = titles[kind] || "Business Report";
+    try {
+      var base = pdfBase(new PdfCtor({ unit: "pt", format: "a4" }));
+      var doc = base.doc, M = base.M, R = base.R, C = base.C;
+      base.headerBand(title, fmtDateLong(todayLocal()));
+      base.metaLine("Business: " + (prof.name || "") + "  ·  " + (prof.typeLabel || "") + (prof.owner ? "  ·  Malik: " + prof.owner : "") + (prof.phone ? "  ·  " + prof.phone : ""));
+      if (prof.address) base.metaLine("Pata: " + prof.address);
+      var rangeText = (r.from || r.to) ? ("Muddat: " + (r.from ? fmtDate(r.from) : "Shuru se") + " se " + (r.to ? fmtDate(r.to) : "Aaj tak")) : "Muddat: Tamam tareekhein";
+      base.metaLine(rangeText + "  ·  Tayyar: " + bizNowLocal().replace("T", " "));
+      if (kind === "sales") base.summaryCards([
+        { label: "Kull sales", value: String(d.count), color: C.blue },
+        { label: "Kull items", value: String(d.totalQty), color: C.steel },
+        { label: "Kull revenue", value: bizPdfMoney(d.totalRevenue), color: C.green }
+      ]);
+      else if (kind === "purchases") base.summaryCards([
+        { label: "Kull khareed", value: String(d.count), color: C.blue },
+        { label: "Kull items", value: String(d.totalQty), color: C.steel },
+        { label: "Kull cost", value: bizPdfMoney(d.totalCost), color: C.red }
+      ]);
+      else if (kind === "stock") base.summaryCards([
+        { label: "Kull products", value: String(d.count), color: C.blue },
+        { label: "Stock (kharid)", value: bizPdfMoney(d.totalCost), color: C.steel },
+        { label: "Stock (sale)", value: bizPdfMoney(d.totalRetail), color: C.green }
+      ]);
+      else base.summaryCards([
+        { label: "Kull revenue", value: bizPdfMoney(d.totalRevenue), color: C.green },
+        { label: "Kull cost", value: bizPdfMoney(d.totalCost), color: C.red },
+        { label: "Kull profit", value: bizPdfMoney(d.totalProfit), color: C.blue }
+      ]);
+      base.section(title + " — tafseel");
+      var rows = d.rows || [];
+      if (kind === "sales") {
+        (function () {
+          function head() { base.tableHead([{ t: "Product", x: M, maxW: 220 }, { t: "Qty", x: 300, align: "right", maxW: 70 }, { t: "Revenue", x: R, align: "right", maxW: 120 }]); }
+          head();
+          if (!rows.length) base.emptyBox(tr("Is range mein koi data nahi."));
+          rows.forEach(function (x, i) {
+            if (base.needPage(14)) head();
+            base.tableRow([{ t: x.productName, x: M, maxW: 220 }, { t: String(x.qty) + (x.unit ? " " + bizUnitShort(x.unit) : ""), x: 300, align: "right", maxW: 70 }, { t: bizPdfMoney(x.revenue), x: R, align: "right", maxW: 120 }], i % 2 === 1);
+          });
+          if (rows.length) base.totalsRow([{ t: "Total", x: M, maxW: 220 }, { t: String(d.totalQty), x: 300, align: "right", maxW: 70 }, { t: bizPdfMoney(d.totalRevenue), x: R, align: "right", maxW: 120 }]);
+        })();
+      } else if (kind === "purchases") {
+        (function () {
+          function head() { base.tableHead([{ t: "Product", x: M, maxW: 220 }, { t: "Qty", x: 300, align: "right", maxW: 70 }, { t: "Cost", x: R, align: "right", maxW: 120 }]); }
+          head();
+          if (!rows.length) base.emptyBox(tr("Is range mein koi data nahi."));
+          rows.forEach(function (x, i) {
+            if (base.needPage(14)) head();
+            base.tableRow([{ t: x.productName, x: M, maxW: 220 }, { t: String(x.qty) + (x.unit ? " " + bizUnitShort(x.unit) : ""), x: 300, align: "right", maxW: 70 }, { t: bizPdfMoney(x.cost), x: R, align: "right", maxW: 120 }], i % 2 === 1);
+          });
+          if (rows.length) base.totalsRow([{ t: "Total", x: M, maxW: 220 }, { t: String(d.totalQty), x: 300, align: "right", maxW: 70 }, { t: bizPdfMoney(d.totalCost), x: R, align: "right", maxW: 120 }]);
+        })();
+      } else if (kind === "stock") {
+        (function () {
+          function head() { base.tableHead([{ t: "Product", x: M, maxW: 150 }, { t: "Stock", x: 215, align: "right", maxW: 60 }, { t: "Cost value", x: 310, align: "right", maxW: 100 }, { t: "Retail value", x: R, align: "right", maxW: 100 }]); }
+          head();
+          if (!rows.length) base.emptyBox(tr("Abhi koi product nahi."));
+          rows.forEach(function (x, i) {
+            if (base.needPage(14)) head();
+            base.tableRow([{ t: x.name, x: M, maxW: 150 }, { t: String(x.stock) + (x.unit ? " " + bizUnitShort(x.unit) : ""), x: 215, align: "right", maxW: 60 }, { t: bizPdfMoney(x.costValue), x: 310, align: "right", maxW: 100 }, { t: bizPdfMoney(x.retailValue), x: R, align: "right", maxW: 100 }], i % 2 === 1);
+          });
+          if (rows.length) base.totalsRow([{ t: "Total", x: M, maxW: 150 }, { t: "", x: 215 }, { t: bizPdfMoney(d.totalCost), x: 310, align: "right", maxW: 100 }, { t: bizPdfMoney(d.totalRetail), x: R, align: "right", maxW: 100 }]);
+        })();
+      } else {
+        (function () {
+          function head() { base.tableHead([{ t: "Product", x: M, maxW: 150 }, { t: "Revenue", x: 250, align: "right", maxW: 90 }, { t: "Cost", x: 360, align: "right", maxW: 90 }, { t: "Profit", x: R, align: "right", maxW: 100 }]); }
+          head();
+          if (!rows.length) base.emptyBox(tr("Is range mein koi data nahi."));
+          rows.forEach(function (x, i) {
+            if (base.needPage(14)) head();
+            base.tableRow([{ t: x.productName, x: M, maxW: 150 }, { t: bizPdfMoney(x.revenue), x: 250, align: "right", maxW: 90 }, { t: bizPdfMoney(x.cost), x: 360, align: "right", maxW: 90 }, { t: bizPdfMoney(x.profit), x: R, align: "right", maxW: 100 }], i % 2 === 1);
+          });
+          if (rows.length) base.totalsRow([{ t: "Total", x: M, maxW: 150 }, { t: bizPdfMoney(d.totalRevenue), x: 250, align: "right", maxW: 90 }, { t: bizPdfMoney(d.totalCost), x: 360, align: "right", maxW: 90 }, { t: bizPdfMoney(d.totalProfit), x: R, align: "right", maxW: 100 }]);
+        })();
+      }
+      base.addFooter();
+      downloadBlob(doc.output("blob"), bizReportFileBase(kind) + ".pdf");
+      bizSay(tr("PDF report download ho gaya."), "bizReportMsg");
+    } catch (e) {
+      bizSay(tr("PDF report nahi ban saki — dobara try karein."), "bizReportMsg");
+    }
   }
 
   /* ---------- v176: Admin Panel Business controls (admin-only, local data) ----------
@@ -9775,6 +10339,56 @@
   "Aakhri 7 din mein koi sale nahi — pehli sale ke baad candles yahan dikhenge.": "No sales in the last 7 days — candles appear after your first sale.",
   "Other": "Other",
   "Business kholein": "Open Business",
+  // ---- Business module (v178) — universal setup + reports ----
+  "Reports": "Reports",
+  "Reports dekhein": "View reports",
+  "Today": "Today",
+  "Last 7 days": "Last 7 days",
+  "Last 30 days": "Last 30 days",
+  "This month": "This month",
+  "All time": "All time",
+  "Report type": "Report type",
+  "Sales report": "Sales report",
+  "Purchase report": "Purchase report",
+  "Stock report": "Stock report",
+  "Profit and loss": "Profit and loss",
+  "Download Excel": "Download Excel",
+  "Download PDF": "Download PDF",
+  "Business details": "Business details",
+  "Owner ka naam": "Owner name",
+  "Masalan: Asad Amanat Ali": "E.g. Asad Amanat Ali",
+  "Custom unit": "Custom unit",
+  "Masalan: Plate, Bottle, Service": "E.g. Plate, Bottle, Service",
+  "Template ki categories": "Template categories",
+  "Koi tayyar category nahi — apni categories neechay add karein.": "No ready-made categories — add your own below.",
+  "Template lag gaya — nayi categories add ho gayein.": "Template applied — new categories added.",
+  "Template lag gaya — categories pehle se maujood thiin.": "Template applied — categories already existed.",
+  "Malik": "Owner",
+  "Kull sales": "Total sales",
+  "Kull items": "Total items",
+  "Kull revenue": "Total revenue",
+  "Kull khareed": "Total purchases",
+  "Kull cost": "Total cost",
+  "Kull products": "Total products",
+  "Kull profit": "Total profit",
+  "Is range mein koi data nahi — koi aur range chunein ya pehle sale/khareed record karein.": "No data in this range — choose another range or record a sale/purchase first.",
+  "Is range mein koi data nahi.": "No data in this range.",
+  "Abhi koi product nahi — pehle product add karein.": "No products yet — add a product first.",
+  "Abhi koi product nahi.": "No products yet.",
+  "Excel report download ho gaya.": "Excel report downloaded.",
+  "PDF report download ho gaya.": "PDF report downloaded.",
+  "Excel library nahi mili — CSV download ho gaya.": "Excel library not found — CSV downloaded instead.",
+  "Excel nahi ban saka — CSV download ho gaya.": "Excel could not be made — CSV downloaded instead.",
+  "PDF library nahi mili — internet check karke dobara try karein.": "PDF library not found — check the internet and try again.",
+  "PDF report nahi ban saki — dobara try karein.": "PDF report could not be made — try again.",
+  "Qty": "Qty",
+  "Revenue": "Revenue",
+  "Cost": "Cost",
+  "Profit": "Profit",
+  "Buy price": "Buy price",
+  "Cost value": "Cost value",
+  "Sell price": "Sell price",
+  "Retail value": "Retail value",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -11092,6 +11706,23 @@
   $("bizAdminSettingsSaveBtn").addEventListener("click", bizAdminSaveSettings);
   $("bizAdminExportBtn").addEventListener("click", bizAdminExport);
   $("bizAdminResetBtn").addEventListener("click", bizAdminReset);
+  // v178: universal setup — template change, custom unit, setup categories/settings.
+  $("bizSType").addEventListener("change", bizSetupTemplateChange);
+  $("bizPUnit").addEventListener("change", function () { bizFillUnitSelect(); });
+  $("bizSetupCatAddBtn").addEventListener("click", bizSetupAddCategory);
+  $("bizSetupSettingsSaveBtn").addEventListener("click", bizSetupSaveSettings);
+  $("bizQuickReportsBtn").addEventListener("click", function () { bizShowTab("reports"); });
+  // v178: Reports tab — presets, kind, custom dates, downloads.
+  document.querySelectorAll("[data-biz-range]").forEach(function (b) { b.addEventListener("click", function () {
+    bizReportPreset = b.getAttribute("data-biz-range");
+    document.querySelectorAll("[data-biz-range]").forEach(function (x) { x.classList.toggle("is-active", x === b); });
+    bizRenderReports();
+  }); });
+  $("bizReportKind").addEventListener("change", bizRenderReports);
+  $("bizReportFrom").addEventListener("change", function () { bizReportPreset = "custom"; document.querySelectorAll("[data-biz-range]").forEach(function (x) { x.classList.remove("is-active"); }); bizRenderReports(); });
+  $("bizReportTo").addEventListener("change", function () { bizReportPreset = "custom"; document.querySelectorAll("[data-biz-range]").forEach(function (x) { x.classList.remove("is-active"); }); bizRenderReports(); });
+  $("bizReportXlsxBtn").addEventListener("click", bizDownloadReportXlsx);
+  $("bizReportPdfBtn").addEventListener("click", bizDownloadReportPdf);
   // v115: dukaan mode + credit limit save.
   loadDukaanMode(); applyDukaanMode();
   // v166: home pill hata di — iska listener bhi gaya (element na hota to

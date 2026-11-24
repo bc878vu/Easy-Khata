@@ -2220,3 +2220,17 @@ input,select,textarea,button{max-width:100%}
 [data-theme="dark"] .biz-badge-ok{background:#14301f;color:#56d364}
 [data-theme="dark"] .biz-badge-low{background:#3a1a20;color:#ff7b72}
 [data-theme="dark"] .biz-badge-pay{background:#1c2b45;color:#8ab4f8}
+
+/* ---------- v178: universal setup + reports ---------- */
+.biz-hint{font-size:.82rem;margin-top:2px}
+.biz-unit-lbl{font-size:.78rem;color:var(--muted);font-weight:600}
+.biz-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.biz-preset{border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:.82rem;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;min-height:36px}
+.biz-preset.is-active{background:var(--accent,#005A9C);border-color:var(--accent,#005A9C);color:#fff}
+.biz-table-wrap{overflow-x:auto;margin-top:4px}
+.biz-table{width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px}
+.biz-table th,.biz-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.biz-table th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.biz-table th.r,.biz-table td.r{text-align:right}
+.biz-table tbody tr:nth-child(even){background:var(--surface-muted,var(--tab-bg))}
+.biz-table tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:0}
