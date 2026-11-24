@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=133">
+<link rel="stylesheet" href="styles.css?v=134">
 </head>
 <body>
 
@@ -760,6 +760,30 @@ window.addEventListener("error", function (e) {
 
       <div id="bizTabDash" class="biz-pane">
         <div id="bizStats" class="biz-stats" aria-live="polite"></div>
+        <div class="card biz-card" id="bizChartsCard">
+          <h3 data-i18n="Charts — dukaan ki tasveer">Charts — dukaan ki tasveer</h3>
+          <div class="biz-charts">
+            <div class="biz-chart">
+              <h4 data-i18n="Sales by category">Sales by category</h4>
+              <div id="bizChartDonut"></div>
+              <div id="bizChartDonutLegend" class="biz-legend"></div>
+            </div>
+            <div class="biz-chart">
+              <h4 data-i18n="Aakhri 7 din — sales vs khareed">Aakhri 7 din — sales vs khareed</h4>
+              <div id="bizChartBars"></div>
+              <p class="muted biz-chart-note" data-i18n="Neela: sales · Grey: khareed">Neela: sales · Grey: khareed</p>
+            </div>
+            <div class="biz-chart">
+              <h4 data-i18n="Revenue trend — aakhri 14 din">Revenue trend — aakhri 14 din</h4>
+              <div id="bizChartTrend"></div>
+            </div>
+            <div class="biz-chart">
+              <h4 data-i18n="Rozana sale range — aakhri 7 din">Rozana sale range — aakhri 7 din</h4>
+              <div id="bizChartCandles"></div>
+              <p class="muted biz-chart-note" data-i18n="Har candle aik din hai — body pehli sale se aakhri sale tak, line din ki sab se bari aur sab se chhoti sale tak.">Har candle aik din hai — body pehli sale se aakhri sale tak, line din ki sab se bari aur sab se chhoti sale tak.</p>
+            </div>
+          </div>
+        </div>
         <div class="card biz-card">
           <h3 data-i18n="Low stock — foran action">Low stock — foran action</h3>
           <div id="bizLowList" class="txns"></div>
@@ -840,7 +864,7 @@ window.addEventListener("error", function (e) {
           <form id="bizSaleForm" class="biz-form" novalidate>
             <label><span data-i18n="Product">Product</span><select id="bizSProduct"></select></label>
             <div class="biz-form-row">
-              <label><span data-i18n="Quantity">Quantity</span><input id="bizSQty" type="number" min="1" step="1" inputmode="numeric" placeholder="1"></label>
+              <label><span data-i18n="Quantity">Quantity</span><input id="bizSQty" type="number" min="1" step="1" inputmode="numeric" value="1"></label>
               <label><span data-i18n="Sale price (Rs)">Sale price (Rs)</span><input id="bizSPrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
             </div>
             <div class="biz-form-row">
@@ -864,7 +888,7 @@ window.addEventListener("error", function (e) {
           <form id="bizPurchaseForm" class="biz-form" novalidate>
             <label><span data-i18n="Product">Product</span><select id="bizPuProduct"></select></label>
             <div class="biz-form-row">
-              <label><span data-i18n="Quantity">Quantity</span><input id="bizPuQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+              <label><span data-i18n="Quantity">Quantity</span><input id="bizPuQty" type="number" min="0" step="any" inputmode="decimal" value="1"></label>
               <label><span data-i18n="Cost price (Rs)">Cost price (Rs)</span><input id="bizPuCost" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
             </div>
             <div class="biz-form-row">
@@ -1011,22 +1035,32 @@ window.addEventListener("error", function (e) {
           <div id="adminCommunityMemberCount" class="admin-result-count"></div>
         </article>
         <!-- v176: Admin Panel Business controls — admin-only, local data only (cloud sync nahi). -->
+        <!-- v177: upar full-width navigation button + compact responsive grid (columns mein mazeed cheezein add nahi). -->
         <article class="admin-panel admin-users-panel" id="bizAdminBizSection" hidden>
           <div class="admin-panel-head"><div><h2 data-i18n="Business — dukaan data">Business — dukaan data</h2><p data-i18n="Sirf is device par maujood business data — cloud sync abhi nahi hai.">Sirf is device par maujood business data — cloud sync abhi nahi hai.</p></div></div>
+          <div class="biz-admin-top">
+            <button id="bizAdminOpenBizBtn" class="btn btn-primary biz-admin-open" type="button"><span aria-hidden="true">🏢</span> <span data-i18n="Business kholein">Business kholein</span></button>
+          </div>
           <h3 class="biz-admin-sub" data-i18n="Business overview">Business overview</h3>
           <div id="bizAdminOverview" class="txns"></div>
-          <h3 class="biz-admin-sub" data-i18n="Categories">Categories</h3>
-          <div class="biz-filter-row">
-            <input id="bizAdminCatName" type="text" maxlength="40" data-i18n-ph="Masalan: Karyana" placeholder="Masalan: Karyana">
-            <button id="bizAdminCatAddBtn" class="btn btn-primary" type="button"><span data-i18n="Category add karein">Category add karein</span></button>
+          <div class="biz-admin-cols">
+            <div>
+              <h3 class="biz-admin-sub" data-i18n="Categories">Categories</h3>
+              <div class="biz-filter-row">
+                <input id="bizAdminCatName" type="text" maxlength="40" data-i18n-ph="Masalan: Karyana" placeholder="Masalan: Karyana">
+                <button id="bizAdminCatAddBtn" class="btn btn-primary" type="button"><span data-i18n="Category add karein">Category add karein</span></button>
+              </div>
+              <div id="bizAdminCatList"></div>
+            </div>
+            <div>
+              <h3 class="biz-admin-sub" data-i18n="Business settings">Business settings</h3>
+              <div class="biz-form-row">
+                <label><span data-i18n="Default low-stock alert">Default low-stock alert</span><input id="bizAdminLowDefault" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+                <label><span data-i18n="SKU prefix">SKU prefix</span><input id="bizAdminSkuPrefix" type="text" maxlength="10" placeholder="SKU-"></label>
+              </div>
+              <button id="bizAdminSettingsSaveBtn" class="btn btn-primary" type="button"><span data-i18n="Settings save karein">Settings save karein</span></button>
+            </div>
           </div>
-          <div id="bizAdminCatList"></div>
-          <h3 class="biz-admin-sub" data-i18n="Business settings">Business settings</h3>
-          <div class="biz-form-row">
-            <label><span data-i18n="Default low-stock alert">Default low-stock alert</span><input id="bizAdminLowDefault" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></label>
-            <label><span data-i18n="SKU prefix">SKU prefix</span><input id="bizAdminSkuPrefix" type="text" maxlength="10" placeholder="SKU-"></label>
-          </div>
-          <button id="bizAdminSettingsSaveBtn" class="btn btn-primary" type="button"><span data-i18n="Settings save karein">Settings save karein</span></button>
           <h3 class="biz-admin-sub" data-i18n="Data tools">Data tools</h3>
           <div class="biz-quick">
             <button id="bizAdminExportBtn" class="btn btn-soft" type="button"><span data-i18n="Export business data (JSON)">Export business data (JSON)</span></button>
@@ -1213,6 +1247,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=173"></script>
+<script src="app.js?v=174"></script>
 </body>
 </html>

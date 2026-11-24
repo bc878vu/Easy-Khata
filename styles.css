@@ -2153,8 +2153,8 @@ input,select,textarea,button{max-width:100%}
    Professional, compact, fully responsive; theme tokens only (light + dark). */
 .biz-head{margin:2px 0 10px}
 .biz-head .page-title{margin-bottom:2px}
-.biz-tabs{display:flex;gap:3px;background:var(--tab-bg);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:12px}
-.biz-tab{flex:1;min-width:0;border:0;background:transparent;color:var(--muted);font-size:.82rem;font-weight:600;padding:8px 2px;border-radius:9px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.biz-tabs{display:flex;gap:3px;background:var(--tab-bg);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:12px;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.biz-tab{flex:0 0 auto;border:0;background:transparent;color:var(--muted);font-size:.82rem;font-weight:600;padding:8px 10px;border-radius:9px;cursor:pointer;white-space:nowrap}
 .biz-tab.is-active{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
 .biz-pane{padding-bottom:8px}
 .biz-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
@@ -2186,6 +2186,28 @@ input,select,textarea,button{max-width:100%}
 .biz-badge-low{background:var(--red-soft);color:var(--red-dark)}
 .biz-badge-pay{background:#e8f0fe;color:#1a56db}
 .biz-admin-sub{margin:16px 0 8px;font-size:.92rem;font-weight:700}
+.biz-admin-top{margin:4px 0 12px}
+.biz-admin-open{width:100%;min-height:44px;font-size:.95rem}
+.biz-admin-cols{display:grid;gap:4px}
+.biz-admin-cols .biz-admin-sub{margin-top:8px}
+@media(min-width:520px){
+  #bizAdminOverview{grid-template-columns:1fr 1fr}
+  #bizAdminOverview .biz-prow{flex-direction:column;align-items:flex-start}
+  .biz-admin-cols{grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  .biz-admin-cols .biz-admin-sub{margin-top:16px}
+}
+/* ---------- v177: Business charts (inline SVG, koi library nahi) ---------- */
+.biz-charts{display:grid;gap:12px}
+@media(min-width:640px){.biz-charts{grid-template-columns:1fr 1fr}}
+.biz-chart{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.biz-chart h4{font-size:.88rem;font-weight:700;margin-bottom:8px}
+.biz-chart svg{display:block;width:100%;height:auto;max-height:200px}
+.biz-chart-empty{font-size:.85rem;color:var(--muted);padding:12px 0}
+.biz-chart-note{font-size:.8rem;margin-top:6px}
+.biz-legend{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.biz-legend-row{display:flex;align-items:center;gap:8px;font-size:.82rem}
+.biz-legend-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.biz-legend-row strong{margin-left:auto;font-weight:800}
 .biz-cat-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;font-size:.85rem;font-weight:600;margin:0 6px 6px 0}
 .biz-cat-chip button{border:0;background:transparent;color:var(--red);font-size:1rem;line-height:1;cursor:pointer;padding:2px 6px;border-radius:50%}
 .biz-admin-toggle{display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:600;white-space:nowrap;cursor:pointer}

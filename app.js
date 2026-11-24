@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v176";
+  var APP_VERSION = "v177";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -8221,6 +8221,107 @@
   function bizExportJson(data) {
     return JSON.stringify(data || {}, null, 2);
   }
+  // v177: chart data-shaping — pure, extractable (no braces in string
+  // literals). Sab local store se; koi data invent nahi. Dates local
+  // (YYYY-MM-DD) hain; todayStr aaj ki local date hai.
+  function bizChartDonut(sales, products) {
+    var byCat = {};
+    var total = 0;
+    (sales || []).forEach(function (s) {
+      var cat = String(s.category || "").trim();
+      if (!cat) {
+        var p = null;
+        (products || []).forEach(function (q) { if (q.id === s.productId) p = q; });
+        cat = p ? String(p.category || "").trim() : "";
+      }
+      if (!cat) cat = "Other";
+      var t = (Number(s.qty) || 0) * (Number(s.price) || 0);
+      byCat[cat] = (byCat[cat] || 0) + t;
+      total += t;
+    });
+    total = Math.round(total * 100) / 100;
+    var rows = Object.keys(byCat).map(function (k) { return { label: k, value: Math.round(byCat[k] * 100) / 100 }; });
+    rows.sort(function (a, b) { return b.value - a.value; });
+    if (rows.length > 6) {
+      var rest = rows.slice(5);
+      var restTotal = 0;
+      rest.forEach(function (r) { restTotal += r.value; });
+      rows = rows.slice(0, 5);
+      var oi = -1;
+      rows.forEach(function (r, i) { if (r.label === "Other") oi = i; });
+      if (oi >= 0) rows[oi].value = Math.round((rows[oi].value + restTotal) * 100) / 100;
+      else rows.push({ label: "Other", value: Math.round(restTotal * 100) / 100 });
+      rows.sort(function (a, b) { return b.value - a.value; });
+    }
+    var slices = rows.map(function (r) { return { label: r.label, value: r.value, pct: total ? Math.round(r.value / total * 1000) / 10 : 0 }; });
+    if (total > 0 && slices.length) {
+      var sum = 0;
+      slices.forEach(function (s) { sum += s.pct; });
+      var diff = Math.round((100 - sum) * 10) / 10;
+      if (diff !== 0) slices[0].pct = Math.round((slices[0].pct + diff) * 10) / 10;
+    }
+    return { total: total, slices: slices };
+  }
+  function bizChartDaily(sales, purchases, days, todayStr) {
+    function p2(n) { return (n < 10 ? "0" : "") + n; }
+    var wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var tp = String(todayStr || "").split("-");
+    var base = (tp.length === 3) ? new Date(Number(tp[0]), Number(tp[1]) - 1, Number(tp[2])) : new Date();
+    var n = Math.floor(days) || 7;
+    if (n < 1) n = 1;
+    var out = [];
+    var i, d;
+    for (i = n - 1; i >= 0; i--) {
+      d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - i);
+      out.push({ date: d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()), label: wd[d.getDay()], sales: 0, purchases: 0 });
+    }
+    var byDate = {};
+    out.forEach(function (o) { byDate[o.date] = o; });
+    (sales || []).forEach(function (s) {
+      var o = byDate[String(s.createdAt || "").slice(0, 10)];
+      if (o) o.sales += (Number(s.qty) || 0) * (Number(s.price) || 0);
+    });
+    (purchases || []).forEach(function (p) {
+      var o = byDate[String(p.createdAt || "").slice(0, 10)];
+      if (o) o.purchases += (Number(p.qty) || 0) * (Number(p.cost) || 0);
+    });
+    out.forEach(function (o) { o.sales = Math.round(o.sales * 100) / 100; o.purchases = Math.round(o.purchases * 100) / 100; });
+    return { days: out };
+  }
+  function bizChartTrend(sales, days, todayStr) {
+    var d = bizChartDaily(sales, [], days, todayStr);
+    var max = 0;
+    var points = d.days.map(function (o) { if (o.sales > max) max = o.sales; return { date: o.date, label: o.label, revenue: o.sales }; });
+    return { points: points, max: Math.round(max * 100) / 100 };
+  }
+  function bizChartCandles(sales, days, todayStr) {
+    function p2(n) { return (n < 10 ? "0" : "") + n; }
+    var wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var tp = String(todayStr || "").split("-");
+    var base = (tp.length === 3) ? new Date(Number(tp[0]), Number(tp[1]) - 1, Number(tp[2])) : new Date();
+    var n = Math.floor(days) || 7;
+    if (n < 1) n = 1;
+    var start = new Date(base.getFullYear(), base.getMonth(), base.getDate() - (n - 1));
+    var endStr = base.getFullYear() + "-" + p2(base.getMonth() + 1) + "-" + p2(base.getDate());
+    var startStr = start.getFullYear() + "-" + p2(start.getMonth() + 1) + "-" + p2(start.getDate());
+    var byDay = {};
+    (sales || []).forEach(function (s) {
+      var ds = String(s.createdAt || "").slice(0, 10);
+      if (ds < startStr || ds > endStr) return;
+      var t = (Number(s.qty) || 0) * (Number(s.price) || 0);
+      if (!byDay[ds]) byDay[ds] = [];
+      byDay[ds].push({ t: t, at: String(s.createdAt || "") });
+    });
+    var candles = Object.keys(byDay).sort().map(function (ds) {
+      var list = byDay[ds].slice().sort(function (a, b) { return a.at < b.at ? -1 : (a.at > b.at ? 1 : 0); });
+      var open = list[0].t, close = list[list.length - 1].t, high = open, low = open;
+      list.forEach(function (x) { if (x.t > high) high = x.t; if (x.t < low) low = x.t; });
+      var dp = ds.split("-");
+      var d = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
+      return { date: ds, label: wd[d.getDay()], open: Math.round(open * 100) / 100, close: Math.round(close * 100) / 100, high: Math.round(high * 100) / 100, low: Math.round(low * 100) / 100, up: close >= open };
+    });
+    return { candles: candles };
+  }
   function bizNowLocal() {
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
@@ -8311,6 +8412,106 @@
       bizStatCard(tr("Kharid keemat"), fmtRs(v.cost), "") +
       bizStatCard(tr("Sale keemat"), fmtRs(v.retail), "") +
       bizStatCard(tr("Expected profit"), fmtRs(Math.round((v.retail - v.cost) * 100) / 100), (v.retail - v.cost) >= 0 ? "good" : "bad");
+  }
+  // v177: charts — hand-built inline SVG (koi library nahi, koi network
+  // nahi, offline + guest mein bhi). Colours dono themes mein parhne
+  // layak hain; text currentColor se theme se milta hai.
+  var BIZ_CHART_COLORS = ["#2f81f7", "#3fb950", "#d29922", "#a371f7", "#39c5cf", "#f778ba", "#8b949e"];
+  function bizChartColor(label, i) { return label === "Other" ? BIZ_CHART_COLORS[6] : BIZ_CHART_COLORS[i % 6]; }
+  function bizDonutSvg(d) {
+    if (!d || !d.slices || !d.slices.length) return "";
+    var C = 2 * Math.PI * 70;
+    var off = 0;
+    var parts = d.slices.map(function (s, i) {
+      var len = (s.pct / 100) * C;
+      var str = '<circle cx="100" cy="100" r="70" fill="none" stroke="' + bizChartColor(s.label, i) + '" stroke-width="34" stroke-dasharray="' + len.toFixed(1) + " " + C.toFixed(1) + '" stroke-dashoffset="' + (-off).toFixed(1) + '" transform="rotate(-90 100 100)"/>';
+      off += len;
+      return str;
+    }).join("");
+    return '<svg viewBox="0 0 200 200" role="img" aria-label="' + esc(tr("Sales by category")) + '">' + parts +
+      '<text x="100" y="97" text-anchor="middle" font-size="15" font-weight="800" fill="currentColor">' + esc(fmtRs(d.total)) + '</text>' +
+      '<text x="100" y="117" text-anchor="middle" font-size="11" fill="currentColor">' + esc(tr("Total revenue")) + '</text></svg>';
+  }
+  function bizBarsSvg(d) {
+    var base = 160, top = 12;
+    var max = 1;
+    (d.days || []).forEach(function (o) { if (o.sales > max) max = o.sales; if (o.purchases > max) max = o.purchases; });
+    var n = (d.days || []).length || 1;
+    var slot = 300 / n;
+    var bw = Math.min(14, slot / 3);
+    var bars = "", labels = "";
+    (d.days || []).forEach(function (o, i) {
+      var x0 = 10 + i * slot + (slot - bw * 2 - 4) / 2;
+      var hs = (o.sales / max) * (base - top);
+      var hp = (o.purchases / max) * (base - top);
+      bars += '<rect x="' + x0.toFixed(1) + '" y="' + (base - hs).toFixed(1) + '" width="' + bw + '" height="' + Math.max(0, hs).toFixed(1) + '" rx="2" fill="#2f81f7"/>';
+      bars += '<rect x="' + (x0 + bw + 4).toFixed(1) + '" y="' + (base - hp).toFixed(1) + '" width="' + bw + '" height="' + Math.max(0, hp).toFixed(1) + '" rx="2" fill="#8b949e"/>';
+      labels += '<text x="' + (10 + i * slot + slot / 2).toFixed(1) + '" y="178" text-anchor="middle" font-size="11" fill="currentColor">' + esc(o.label) + '</text>';
+    });
+    return '<svg viewBox="0 0 320 190" role="img" aria-label="' + esc(tr("Aakhri 7 din — sales vs khareed")) + '">' + bars +
+      '<line x1="10" y1="160" x2="310" y2="160" stroke="currentColor" stroke-opacity="0.25"/>' + labels + '</svg>';
+  }
+  function bizLineSvg(d) {
+    var W = 320, base = 110, top = 14;
+    var pts = d.points || [];
+    var max = (d.max && d.max > 0) ? d.max : 1;
+    var n = pts.length || 1;
+    var xs = function (i) { return 12 + (i * (W - 24)) / Math.max(1, n - 1); };
+    var ys = function (v) { return base - (v / max) * (base - top); };
+    var line = pts.map(function (p, i) { return xs(i).toFixed(1) + "," + ys(p.revenue).toFixed(1); }).join(" ");
+    var area = "12," + base + " " + line + " " + xs(n - 1).toFixed(1) + "," + base;
+    var dots = pts.map(function (p, i) { return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.revenue).toFixed(1) + '" r="3" fill="#2f81f7"/>'; }).join("");
+    return '<svg viewBox="0 0 320 130" role="img" aria-label="' + esc(tr("Revenue trend — aakhri 14 din")) + '">' +
+      '<polygon points="' + area + '" fill="#2f81f7" fill-opacity="0.12"/>' +
+      '<polyline points="' + line + '" fill="none" stroke="#2f81f7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' + dots + '</svg>';
+  }
+  function bizCandleSvg(d) {
+    var base = 148, top = 12;
+    var cs = d.candles || [];
+    if (!cs.length) return "";
+    var lo = cs[0].low, hi = cs[0].high;
+    cs.forEach(function (c) { if (c.low < lo) lo = c.low; if (c.high > hi) hi = c.high; });
+    if (hi === lo) hi = lo + 1;
+    var n = cs.length;
+    var slot = 300 / n;
+    var bw = Math.min(16, slot * 0.5);
+    var ys = function (v) { return base - ((v - lo) / (hi - lo)) * (base - top); };
+    var out = "";
+    cs.forEach(function (c, i) {
+      var cx = 10 + i * slot + slot / 2;
+      var col = c.up ? "#3fb950" : "#f85149";
+      var yO = ys(c.open), yC = ys(c.close);
+      var yTop = Math.min(yO, yC), yBot = Math.max(yO, yC);
+      if (yBot - yTop < 2) { yTop -= 1; yBot += 1; }
+      out += '<line x1="' + cx.toFixed(1) + '" y1="' + ys(c.high).toFixed(1) + '" x2="' + cx.toFixed(1) + '" y2="' + ys(c.low).toFixed(1) + '" stroke="' + col + '" stroke-width="2"/>';
+      out += '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw + '" height="' + (yBot - yTop).toFixed(1) + '" rx="1" fill="' + col + '"/>';
+      out += '<text x="' + cx.toFixed(1) + '" y="166" text-anchor="middle" font-size="11" fill="currentColor">' + esc(c.label) + '</text>';
+    });
+    return '<svg viewBox="0 0 320 170" role="img" aria-label="' + esc(tr("Rozana sale range — aakhri 7 din")) + '">' + out + '</svg>';
+  }
+  function bizRenderCharts() {
+    var card = $("bizChartsCard"); if (!card) return;
+    var sales = bizData.sales || [];
+    var purs = bizData.purchases || [];
+    var today = todayLocal();
+    var donut = bizChartDonut(sales, bizData.products);
+    var daily = bizChartDaily(sales, purs, 7, today);
+    var trend = bizChartTrend(sales, 14, today);
+    var candles = bizChartCandles(sales, 7, today);
+    var dEl = $("bizChartDonut");
+    if (dEl) dEl.innerHTML = donut.slices.length ? bizDonutSvg(donut) : '<p class="biz-chart-empty">' + esc(tr("Abhi koi sale nahi — pehli sale ke baad charts yahan dikhenge.")) + '</p>';
+    var lg = $("bizChartDonutLegend");
+    if (lg) lg.innerHTML = donut.slices.length ? donut.slices.map(function (s, i) {
+      return '<div class="biz-legend-row"><span class="biz-legend-dot" style="background:' + bizChartColor(s.label, i) + '"></span><span>' + esc(s.label === "Other" ? tr("Other") : s.label) + '</span><span class="muted">' + esc(s.pct + "%") + '</span><strong>' + esc(fmtRs(s.value)) + '</strong></div>';
+    }).join("") : "";
+    var anyActivity = false;
+    daily.days.forEach(function (o) { if (o.sales > 0 || o.purchases > 0) anyActivity = true; });
+    var bEl = $("bizChartBars");
+    if (bEl) bEl.innerHTML = bizBarsSvg(daily) + (anyActivity ? "" : '<p class="biz-chart-empty">' + esc(tr("Aakhri 7 din mein koi sale ya khareed nahi.")) + '</p>');
+    var tEl = $("bizChartTrend");
+    if (tEl) tEl.innerHTML = bizLineSvg(trend) + (trend.max > 0 ? "" : '<p class="biz-chart-empty">' + esc(tr("Aakhri 14 din mein koi sale nahi.")) + '</p>');
+    var cEl = $("bizChartCandles");
+    if (cEl) cEl.innerHTML = candles.candles.length ? bizCandleSvg(candles) : '<p class="biz-chart-empty">' + esc(tr("Aakhri 7 din mein koi sale nahi — pehli sale ke baad candles yahan dikhenge.")) + '</p>';
   }
   function bizRenderLow() {
     var low = bizLowStock(bizData.products);
@@ -8403,7 +8604,7 @@
   function renderBusiness() {
     bizLoad();
     bizShowTab(bizTab);
-    bizRenderStats(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm();
+    bizRenderStats(); bizRenderCharts(); bizRenderLow(); bizRenderProducts(); bizRenderMoves(); bizRenderSales(); bizRenderPurchases(); bizRenderProfile(); bizRenderSetupForm();
     bizSay("", "bizMsg");
   }
   function bizStartEdit(id) {
@@ -8492,7 +8693,7 @@
     var payment = $("bizSPayment").value || "Cash";
     var note = ($("bizSNote").value || "").trim();
     var now = bizNowLocal(); // sale + linked move — aik hi local timestamp
-    var sale = { id: newUuid(), productId: id, productName: p ? p.name : "", qty: qty, price: price, total: 0, buyPrice: p ? (Number(p.buyPrice) || 0) : 0, payment: payment, note: note, createdAt: now };
+    var sale = { id: newUuid(), productId: id, productName: p ? p.name : "", category: p ? (p.category || "") : "", qty: qty, price: price, total: 0, buyPrice: p ? (Number(p.buyPrice) || 0) : 0, payment: payment, note: note, createdAt: now };
     var errs = bizValidateSale(sale, bizData.products);
     if (errs.indexOf("product") !== -1) { bizSay(tr("Pehle product chunein."), "bizSaleMsg"); return; }
     if (errs.indexOf("qty") !== -1) { bizSay(tr("Sahi quantity likhein (poori taadad, 0 se zyada)."), "bizSaleMsg"); return; }
@@ -8503,7 +8704,7 @@
     bizData.sales.push(sale);
     bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "out", qty: qty, note: note || (tr("Sale") + " — " + payment), createdAt: now });
     bizSave(); renderBusiness();
-    $("bizSQty").value = ""; $("bizSNote").value = "";
+    $("bizSQty").value = "1"; $("bizSNote").value = ""; // v177: qty hamesha 1 se shuru — khaali placeholder wala papercut khatam
     bizSay(tr("Sale save ho gayi."), "bizSaleMsg");
   }
   function bizSavePurchase(e) {
@@ -8525,7 +8726,7 @@
     bizData.purchases.push(pur);
     bizData.moves.push({ id: newUuid(), productId: p.id, productName: p.name, type: "in", qty: qty, note: note || (supplier ? tr("Kharid") + " — " + supplier : tr("Kharid")), createdAt: now });
     bizSave(); renderBusiness();
-    $("bizPuQty").value = ""; $("bizPuNote").value = "";
+    $("bizPuQty").value = "1"; $("bizPuNote").value = ""; // v177: sale wali fix — qty hamesha 1 se shuru
     bizSay(tr("Purchase save ho gaya."), "bizPuMsg");
   }
   function bizSaveSetup(e) {
@@ -9561,6 +9762,19 @@
   "Pakka reset karein?": "Reset for sure?",
   "Dobara dabayein to business data reset ho jayega.": "Tap again to reset the business data.",
   "Business data reset ho gaya.": "Business data reset.",
+  "Charts — dukaan ki tasveer": "Charts — shop at a glance",
+  "Sales by category": "Sales by category",
+  "Aakhri 7 din — sales vs khareed": "Last 7 days — sales vs purchases",
+  "Neela: sales · Grey: khareed": "Blue: sales · Grey: purchases",
+  "Revenue trend — aakhri 14 din": "Revenue trend — last 14 days",
+  "Rozana sale range — aakhri 7 din": "Daily sale range — last 7 days",
+  "Har candle aik din hai — body pehli sale se aakhri sale tak, line din ki sab se bari aur sab se chhoti sale tak.": "Each candle is one day — the body runs from the first to the last sale, the line reaches the day's biggest and smallest sale.",
+  "Abhi koi sale nahi — pehli sale ke baad charts yahan dikhenge.": "No sales yet — charts appear after your first sale.",
+  "Aakhri 7 din mein koi sale ya khareed nahi.": "No sales or purchases in the last 7 days.",
+  "Aakhri 14 din mein koi sale nahi.": "No sales in the last 14 days.",
+  "Aakhri 7 din mein koi sale nahi — pehli sale ke baad candles yahan dikhenge.": "No sales in the last 7 days — candles appear after your first sale.",
+  "Other": "Other",
+  "Business kholein": "Open Business",
     }
   };
   // v121: tr() — translation. Naam "tr" is liye ke "t" aksar local
@@ -10872,6 +11086,8 @@
   $("bizPurchaseForm").addEventListener("input", function () { bizSay("", "bizPuMsg"); });
   $("bizPuProduct").addEventListener("change", function () { bizPrefillPurchaseCost(true); });
   // v176: Admin Panel Business controls (admin-only section ke andar).
+  // v177: upar wala "Business kholein" button — seedha Business view par.
+  $("bizAdminOpenBizBtn").addEventListener("click", function () { showView("business"); });
   $("bizAdminCatAddBtn").addEventListener("click", bizAdminAddCategory);
   $("bizAdminSettingsSaveBtn").addEventListener("click", bizAdminSaveSettings);
   $("bizAdminExportBtn").addEventListener("click", bizAdminExport);
