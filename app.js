@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v186";
+  var APP_VERSION = "v187";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -3951,6 +3951,29 @@
   /* ---------- push notifications (even when the app is closed) ---------- */
   var pushSupported = ("Notification" in window) && ("serviceWorker" in navigator) && ("PushManager" in window);
   var pushState = "unknown";
+  // v187: native Android APK bridge — the APK bundles the web app in a
+  // WebView (no Notification/PushManager/service-worker push there), but
+  // native FCM works through EasyKhataNative. All guarded: absent on web.
+  function nativeBridge() {
+    try {
+      var b = window.EasyKhataNative;
+      return (b && typeof b.isFcmReady === "function") ? b : null;
+    } catch (e) { return null; }
+  }
+  function nativeFcmReady() {
+    try {
+      var b = nativeBridge();
+      return !!(b && b.isFcmReady());
+    } catch (e) { return false; }
+  }
+  function nativeFcmToken() {
+    try {
+      var b = nativeBridge();
+      if (!b || typeof b.getFcmToken !== "function") return "";
+      var t = b.getFcmToken();
+      return (typeof t === "string") ? t : "";
+    } catch (e) { return ""; }
+  }
   function pushVapidKey() { return (window.EASY_KHATA_CONFIG && window.EASY_KHATA_CONFIG.VAPID_PUBLIC_KEY) || ""; }
   function urlBase64ToUint8Array(base64) {
     var padding = "=".repeat((4 - base64.length % 4) % 4);
@@ -3985,7 +4008,17 @@
   function updatePushToggleLabel() {
     var el = $("acctPushLabel");
     if (!el) return;
-    if (!pushSupported) { el.textContent = tr("Notifications: Is browser mein nahi"); return; }
+    if (!pushSupported) {
+      // v187: APK mein browser push nahi, native FCM hai — bridge se pata
+      // chalta hai. "On" sirf tab jab save confirm ho (pushState); warna
+      // neutral "available" — kabhi jhootha "On ✓" nahi.
+      if (nativeFcmReady()) {
+        if (pushState === "on") el.textContent = tr("Notifications: On ✓");
+        else el.textContent = tr("Notifications: Android app mein available");
+        return;
+      }
+      el.textContent = tr("Notifications: Is browser mein nahi"); return;
+    }
     if (pushState === "on") el.textContent = tr("Notifications: On ✓");
     else if (pushState === "denied") el.textContent = tr("Notifications: Blocked — browser settings se on karein");
     else el.textContent = tr("Notifications On karein");
@@ -4043,6 +4076,16 @@
       if (!res.ok) { var e = new Error("save failed: " + res.status); e.status = res.status; throw e; }
     });
   }
+  // v187: native Android APK bridge — APK apna FCM token web app ke apne
+  // saver se save karta hai (session refresh ke saath; web par no-op).
+  // v2.1 report ka one-liner, thin wrapper ke saath: save confirm hote hi
+  // menu label bhi "On ✓" ho jata hai (native sync boot ke baad bhi aata
+  // hai, is liye label yahin update hota hai).
+  window.EASY_KHATA_SAVE_FCM_TOKEN = function (token) {
+    return saveFcmToken(token).then(function () {
+      pushState = "on"; updatePushToggleLabel();
+    });
+  };
   // FCM token ki maujoodgi check (self-heal: token milte hi DB mein save).
   // v23.1: "on" sirf tab jab DB save CONFIRM ho — pehle token milte hi
   // "on" set ho jata tha aur save error chhup jata tha, is liye UI jhootha
@@ -4141,8 +4184,27 @@
     if (reason === "save-denied") return "Notifications on nahi ho sakin. App dobara khol kar try karein.";
     return "Notifications on nahi hui — dobara try karein.";
   }
+  // v187: APK native push state — bridge se token lo, web saver se save
+  // karo (idempotent upsert). Token na ho (abhi fetch ho raha ho) to
+  // "off" — label neutral "available" dikhata hai; token aate hi native
+  // sync (EASY_KHATA_SAVE_FCM_TOKEN wrapper) pushState "on" kar deta hai.
+  function nativePushState() {
+    var token = nativeFcmToken();
+    if (!token) { pushState = "off"; updatePushToggleLabel(); return Promise.resolve(pushState); }
+    return saveFcmToken(token).then(function () {
+      pushState = "on"; updatePushToggleLabel(); return pushState;
+    }, function () {
+      pushState = "off"; updatePushToggleLabel(); return pushState;
+    });
+  }
   function refreshPushState() {
-    if (!pushSupported) { pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState); }
+    if (!pushSupported) {
+      // v187: APK — native FCM token hi source of truth hai. Token ho to
+      // dobara save karo (idempotent upsert) taake "on" ka matlab DB row
+      // maujood ho — web FCM wala hi standard.
+      if (nativeFcmReady()) return nativePushState();
+      pushState = "unsupported"; updatePushToggleLabel(); return Promise.resolve(pushState);
+    }
     if (window.Notification && Notification.permission === "denied") {
       pushState = "denied"; updatePushToggleLabel(); return Promise.resolve(pushState);
     }
@@ -4180,6 +4242,7 @@
   // v22: sirf "on" hone par skip karein — "unknown" (SW abhi ready nahi) par
   // bhi poochna chahiye, warna prompt kabhi nahi aata.
   function maybeAskPushPermission() {
+    if (nativeFcmReady()) return; // v187: APK — browser permission nahi, APK launch par mangta hai
     if (!pushSupported) return;
     if (!window.Notification || Notification.permission !== "default") return;
     if (pushState === "on") return;
@@ -4218,7 +4281,34 @@
       return { ok: false, reason: "permission-default" };
     });
   }
+  // v187: APK native enable — bridge se fresh token mangwao, phir web
+  // saver se save karo. Token aane mein waqt lag sakta hai (Firebase
+  // getToken async hai), is liye poll karo; timeout par asal wajah.
+  function enablePushNative(timeoutMs) {
+    var bridge = nativeBridge();
+    if (!bridge) return Promise.resolve({ ok: false, reason: "unsupported" });
+    try { bridge.requestFcmToken(); } catch (e) {}
+    var deadline = Date.now() + (timeoutMs || 8000);
+    return new Promise(function (resolve) {
+      (function wait() {
+        var token = nativeFcmToken();
+        if (token) {
+          saveFcmToken(token).then(function () {
+            pushState = "on"; updatePushToggleLabel();
+            resolve({ ok: true });
+          }, function (e) { resolve({ ok: false, reason: saveReason(e) }); });
+          return;
+        }
+        if (Date.now() >= deadline) {
+          resolve({ ok: false, reason: "fcm-token-failed", detail: "native" });
+          return;
+        }
+        setTimeout(wait, 500);
+      })();
+    });
+  }
   function enablePush() {
+    if (nativeFcmReady()) return enablePushNative();
     if (!pushSupported) return Promise.resolve({ ok: false, reason: "unsupported" });
     if (fcmSupported()) return enablePushFcm();
     return enablePushVapid();
@@ -4241,8 +4331,13 @@
   var pushAutoTries = 0;
   var pushAutoBusy = false;
   function autoEnablePush() {
-    if (!pushSupported || guestMode) return;
-    if (!window.Notification || Notification.permission !== "granted") return;
+    if (guestMode) return;
+    // v187: APK — browser permission ka intezar nahi; native token se
+    // seedha enable karo.
+    if (!nativeFcmReady()) {
+      if (!pushSupported) return;
+      if (!window.Notification || Notification.permission !== "granted") return;
+    }
     if (pushState === "on" || pushState === "denied" || pushState === "unsupported") return;
     if (pushAutoBusy || pushAutoTries >= 2) return;
     pushAutoTries++;
@@ -4259,7 +4354,7 @@
     });
   }
   function enablePushFromButton() {
-    if (!pushSupported) { setPushMsg(pushReasonText("unsupported"), false); return; }
+    if (!pushSupported && !nativeFcmReady()) { setPushMsg(pushReasonText("unsupported"), false); return; }
     if (window.Notification && Notification.permission === "denied") {
       setPushMsg(pushReasonText("permission-denied"), false);
       return;
@@ -4282,6 +4377,20 @@
   // bhejta hai). Web push mein custom ringtone possible nahi — phone ki
   // default notification awaz bajti hai.
   function testPushNotification() {
+    // v187: APK — native test notification (WebView mein Notification /
+    // serviceWorker nahi hote, is liye web rasta yahan dead hai). Bridge
+    // ready ho lekin test method na ho (purana APK) to web raste par
+    // girte hain, jo sachchi "available nahi" message dikhata hai.
+    if (nativeFcmReady()) {
+      try {
+        var b = nativeBridge();
+        if (b && typeof b.showTestNotification === "function") {
+          b.showTestNotification();
+          setPushMsg(tr("Test notification bhej di — phone par popup + awaz check karein."), true);
+          return;
+        }
+      } catch (e) {}
+    }
     if (!("Notification" in window) || !("serviceWorker" in navigator)) { setPushMsg(tr("Is browser mein notifications available nahi hain."), false); return; }
     if (Notification.permission !== "granted") { setPushMsg(tr("Pehle Notifications On karein — permission chahiye."), false); return; }
     swReady(4000).then(function (reg) {
@@ -10331,6 +10440,7 @@
   "Pehle dost chunein, phir raqam likhein.": "Choose friends first, then enter the amount.",
   "Bina login ke — personal hisaab": "Without login — personal ledger",
   "Notifications: Is browser mein nahi": "Notifications: Not in this browser",
+  "Notifications: Android app mein available": "Notifications: Available in the Android app",
   "Notifications: On ✓": "Notifications: On ✓",
   "Notifications: Blocked — browser settings se on karein": "Notifications: Blocked — turn on from browser settings",
   "Bohot koshishen — thodi der ruk kar dobara try karein.": "Too many attempts — wait a bit and try again.",
