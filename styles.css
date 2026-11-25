@@ -2257,3 +2257,6 @@ input,select,textarea,button{max-width:100%}
 .split-row-main{flex:1 1 auto;overflow-wrap:normal}
 .split-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .split-list .split-paid-input{flex:0 0 84px;width:84px;min-width:84px;min-height:34px;padding:6px 7px;font-size:13px}
+
+/* v183: header title left (Boss order 25 Nov 15:11 PKT — screenshot: naam center mein tha, left side chahiye). .header-title-btn ka text-align center -> left; flex:1 rehta hai taake avatar right end par rahe, naam hamburger ke foran baad shuru hota hai. */
+.header-title-btn{text-align:left}
