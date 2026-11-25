@@ -2260,3 +2260,13 @@ input,select,textarea,button{max-width:100%}
 
 /* v183: header title left (Boss order 25 Nov 15:11 PKT — screenshot: naam center mein tha, left side chahiye). .header-title-btn ka text-align center -> left; flex:1 rehta hai taake avatar right end par rahe, naam hamburger ke foran baad shuru hota hai. */
 .header-title-btn{text-align:left}
+
+/* v184: household modal polish (Boss order 25 Nov 15:14 PKT — screenshot: member naam 2 lines mein toot raha tha, amounts tedhi column mein). Member rows: avatar initial + naam aik line ellipsis + amount right edge (margin-left:auto). Category rows: label ellipsis + moti bar (12px) + % text. Note: .hh-row>span (0,1,1) purani 92px flex deta hai — v184 classes .hh-row .hh-* (0,2,0) se override hote hain. */
+.hh-total{padding:10px 12px}
+.hh-row{padding:7px 0}
+.hh-row .hh-cat{flex:0 1 96px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hh-row .hh-bar{height:12px}
+.hh-row .hh-pct{flex:0 0 38px;text-align:right;font-size:.78rem;font-weight:700;color:var(--muted)}
+.hh-row .hh-avatar{flex:0 0 28px;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:.8rem}
+.hh-row .hh-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hh-row.hh-member-row>strong{margin-left:auto}

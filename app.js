@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v183";
+  var APP_VERSION = "v184";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -9690,13 +9690,16 @@
     html += '<p class="section-label">CATEGORY</p>';
     cats.forEach(function (cat) {
       var pct = Math.round((byCat[cat] / maxCat) * 100);
-      html += '<div class="hh-row"><span>' + esc(cat) + '</span><div class="hh-bar"><i style="width:' + pct + '%"></i></div><strong>' + esc(fmtRs(moneyFromMinor(byCat[cat]))) + "</strong></div>";
+      html += '<div class="hh-row hh-cat-row"><span class="hh-cat">' + esc(cat) + '</span><div class="hh-bar"><i style="width:' + pct + '%"></i></div><span class="hh-pct">' + pct + '%</span><strong>' + esc(fmtRs(moneyFromMinor(byCat[cat]))) + "</strong></div>";
     });
     var persons = Object.keys(byPerson).sort(function (x, y) { return byPerson[y] - byPerson[x]; });
     if (persons.length) {
       html += '<p class="section-label">MEMBER</p>';
       persons.forEach(function (pid) {
-        html += '<div class="hh-row"><span>' + partyNameMarkup(pid) + '</span><strong>' + esc(fmtRs(moneyFromMinor(byPerson[pid]))) + "</strong></div>";
+        var nm = profileName(pid);
+        var initial = (nm && nm !== "Naam nahi mila") ? nm.trim().charAt(0).toUpperCase() : "?";
+        var nameHtml = (nm === "Naam nahi mila") ? partyNameMarkup(pid) : esc(nm);
+        html += '<div class="hh-row hh-member-row"><span class="hh-avatar">' + esc(initial) + '</span><span class="hh-name">' + nameHtml + '</span><strong>' + esc(fmtRs(moneyFromMinor(byPerson[pid]))) + "</strong></div>";
       });
     }
     el.innerHTML = html;
