@@ -2234,3 +2234,19 @@ input,select,textarea,button{max-width:100%}
 .biz-table th.r,.biz-table td.r{text-align:right}
 .biz-table tbody tr:nth-child(even){background:var(--surface-muted,var(--tab-bg))}
 .biz-table tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:0}
+
+/* ---------- v180: save-success popup + auto-remind popup + split paid inputs ---------- */
+.save-success-dialog{text-align:center}
+.save-success-check{width:64px;height:64px;margin:2px auto 14px;display:grid;place-items:center;border-radius:50%;background:var(--green-soft);color:var(--green);font-size:32px;font-weight:800;animation:saveSuccessPop .3s ease-out}
+@keyframes saveSuccessPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.save-success-dialog h2{margin-bottom:6px}
+.save-success-detail{font-size:15px;font-weight:700;color:var(--text);margin:0 0 18px}
+.remind-check{background:var(--accent-soft);color:var(--accent)}
+.remind-list{display:flex;flex-direction:column;gap:8px;margin:14px 0 18px;text-align:left}
+.remind-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;cursor:pointer}
+.remind-row-go{color:var(--muted);font-size:18px;line-height:1}
+.split-row{justify-content:space-between}
+.split-row-main{display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
+.split-paid-input{flex:0 0 96px;width:96px;min-height:38px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;text-align:right}
+.split-paid-input:disabled{opacity:.45}
+@media(prefers-reduced-motion:reduce){.save-success-check{animation:none}}

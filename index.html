@@ -35,7 +35,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles.css?v=136">
+<link rel="stylesheet" href="styles.css?v=137">
 </head>
 <body>
 
@@ -220,6 +220,8 @@ window.addEventListener("error", function (e) {
     <div class="menu-list drawer-list">
       <button id="acctLangBtn" class="menu-item" type="button"><span class="mi-ico">🌐</span><span class="menu-label" data-i18n="Language">Language</span><span class="menu-right" id="acctLangValue">Roman Urdu</span></button>
       <button id="drawerThemeBtn" class="menu-item" type="button"><span class="mi-ico">🌙</span><span class="menu-label" data-i18n="Theme">Theme</span><span class="menu-right" id="drawerThemeValue">Light</span></button>
+      <button id="drawerSoundBtn" class="menu-item" type="button"><span class="mi-ico">🔊</span><span class="menu-label" data-i18n="Save ki awaz">Save ki awaz</span><span class="menu-right" id="drawerSoundValue">On</span></button>
+      <button id="drawerRemindBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span class="menu-label" data-i18n="Auto yaad-dihani">Auto yaad-dihani</span><span class="menu-right" id="drawerRemindValue">On</span></button>
       <button id="acctPushBtn" class="menu-item" type="button"><span class="mi-ico">🔔</span><span id="acctPushLabel" class="menu-label" data-i18n="Notifications On karein">Notifications On karein</span><span class="menu-right">›</span></button>
       <p id="pushMsg" class="msg" role="status"></p>
       <button id="acctLocBtn" class="menu-item" type="button"><span class="mi-ico">📍</span><span id="acctLocLabel" class="menu-label" data-i18n="Map par location">Map par location</span><span class="menu-right" id="acctLocValue">Band</span></button>
@@ -1226,6 +1228,9 @@ window.addEventListener("error", function (e) {
 <div id="dueModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="dueModalTitle"><div class="tool-modal-head"><h2 id="dueModalTitle" data-i18n="due">⏰ Due-soon</h2><button id="dueCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="dueCard"><p class="muted" data-i18n="Aane wale 7 din mein due hone wale udhaar — aur overdue.">Aane wale 7 din mein due hone wale udhaar — aur overdue.</p><p id="dueMsg" class="msg" role="status"></p><div id="dueBody"></div></div></section></div>
 <div id="budgetModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle"><div class="tool-modal-head"><h2 id="budgetModalTitle" data-i18n="budget">💰 Monthly Budget</h2><button id="budgetCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="budgetCard"><p class="muted" data-i18n="Is mahine kitna kharch kar sakte hain — 80% par alert milega.">Is mahine kitna kharch kar sakte hain — 80% par alert milega.</p><div class="budget-set-row"><input id="budgetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20000" data-i18n-ph="e.g. 20000"><button id="budgetSaveBtn" class="btn btn-primary" type="button" data-i18n="Save">Save</button></div><p id="budgetMsg" class="msg" role="status"></p><div id="budgetBody"></div></div></section></div>
 <div id="goalModal" class="app-dialog-overlay" hidden><section class="app-dialog tool-dialog card" role="dialog" aria-modal="true" aria-labelledby="goalModalTitle"><div class="tool-modal-head"><h2 id="goalModalTitle" data-i18n="goal">🎯 Bachat Goal</h2><button id="goalCloseBtn" class="icon-btn" type="button" aria-label="Band karein" data-i18n-aria="Band karein">✕</button></div><div id="goalCard"><p class="muted" data-i18n="Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.">Kuch khaas ke liye bachat karein — target set karein aur progress dekhein.</p><div id="goalBody"></div><div class="goal-set-row"><input id="goalNameInput" type="text" placeholder="Goal ka naam (e.g. Bike)" data-i18n-ph="Goal ka naam (e.g. Bike)"><input id="goalTargetInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Target (Rs)" data-i18n-ph="Target (Rs)"><button id="goalSaveBtn" class="btn btn-soft" type="button" data-i18n="Goal Save">Goal Save</button></div><div class="goal-set-row"><input id="goalAddInput" type="number" min="0" step="1" inputmode="numeric" placeholder="Bachat add karein (Rs)" data-i18n-ph="Bachat add karein (Rs)"><button id="goalAddBtn" class="btn btn-primary" type="button" data-i18n="Add">Add</button></div><p id="goalMsg" class="msg" role="status"></p></div></section></div>
+<!-- v180: record save success popup + auto-reminder popup -->
+<div id="saveSuccessOverlay" class="app-dialog-overlay" hidden><section class="app-dialog save-success-dialog card" role="dialog" aria-modal="true" aria-labelledby="saveSuccessTitle"><div class="save-success-check" aria-hidden="true">✓</div><h2 id="saveSuccessTitle" data-i18n="Record save ho gaya!">Record save ho gaya!</h2><p id="saveSuccessDetail" class="save-success-detail"></p><button id="saveSuccessOkBtn" class="btn btn-primary btn-block" type="button" data-i18n="Theek hai">Theek hai</button></section></div>
+<div id="autoRemindOverlay" class="app-dialog-overlay" hidden><section class="app-dialog save-success-dialog card" role="dialog" aria-modal="true" aria-labelledby="autoRemindTitle"><div class="save-success-check remind-check" aria-hidden="true">🔔</div><h2 id="autoRemindTitle" data-i18n="Udhaar ki yaad-dihani">Udhaar ki yaad-dihani</h2><p class="muted" data-i18n="Ye hisaab abhi baaqi hai.">Ye hisaab abhi baaqi hai.</p><div id="autoRemindList" class="remind-list"></div><button id="autoRemindOkBtn" class="btn btn-primary btn-block" type="button" data-i18n="Theek hai">Theek hai</button></section></div>
 <button id="fabAdd" class="fab" type="button" title="New record" hidden data-i18n-title="New record">+</button>
 
 <script id="supabaseSdk" async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
@@ -1305,6 +1310,6 @@ window.addEventListener("error", function (e) {
     </section>
   </div>
 
-<script src="app.js?v=176"></script>
+<script src="app.js?v=177"></script>
 </body>
 </html>

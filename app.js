@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v179";
+  var APP_VERSION = "v180";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -449,6 +449,7 @@
     renderAll();
     runRecurringDue(); // v87: guest boot par bhi due rules ke local record banein
     maybeMonthlyReport(); // v88: guest boot par bhi pichhle mahine ka report
+    maybeAutoRemind(); // v180: baaqi udhaar ki auto yaad-dihani (guest boot — loadAll yahan nahi chalta)
     maybeShowPinLock(); // v78: PIN set ho to boot par lock screen
   }
   // v24.1: reload par bhi seedha guest mode (saved hisaab ho ya naya) —
@@ -1011,6 +1012,7 @@
     updatePushToggleLabel(); // Notifications label (On/Blocked/On karein)
     var tv = $("drawerThemeValue");
     if (tv) { var m = document.documentElement.getAttribute("data-theme") || "light"; tv.textContent = m === "dark" ? tr("Dark") : tr("Light"); }
+    renderSaveSoundRow(); // v180: Save awaz + auto yaad-dihani values
     var dv = $("drawerDukaanValue");
     if (dv) dv.textContent = dukaanMode ? tr("On") : tr("Off");
     var bb = $("drawerBizBtn"); if (bb) bb.hidden = !bizModuleEnabled(); // v176: admin ne module band kiya ho to entry chhupo
@@ -2900,6 +2902,7 @@
       renderAll();
       runRecurringDue(); // v87: guest rules bhi due hon to local record bane
       maybeMonthlyReport(); // v88: naye mahine mein pichhle mahine ka report
+      maybeAutoRemind(); // v180: baaqi udhaar ki auto yaad-dihani
       setTxnMsg("", true);
       return;
     }
@@ -2970,6 +2973,7 @@
         var savedMark = loadCache(currentWorkspaceId);
         if (savedMark && savedMark.monthlyReportSeen) monthlyReportSeen = savedMark.monthlyReportSeen;
         maybeMonthlyReport(); // v88: naye mahine mein pichhle mahine ka report
+        maybeAutoRemind(); // v180: baaqi udhaar ki auto yaad-dihani
         saveCache();
         flushOutbox();
       });
@@ -2990,6 +2994,7 @@
         renderOffline();
         runRecurringDue(); // v87: offline bhi due record queue ho jaye
         maybeMonthlyReport(); // v88: offline bhi banner dikhe, PDF online aate hi
+        maybeAutoRemind(); // v180: baaqi udhaar ki auto yaad-dihani
         return;
       }
       // v136: cache na ho to bhi offline state dikhao — pehle ye branch
@@ -3247,7 +3252,7 @@
     if (t.payer_id === recipientId) return "Aap ne " + other + " ko " + a + " diye — " + note + " · " + date;
     return actor + " ne aap ko " + a + " diye — " + note + " · " + date;
   }
-  function sendNotif(userId, kind, txn) {
+  function sendNotif(userId, kind, txn, bodyOverride) {
     if (!userId || userId === myId() || !txn) return;
     var real = false;
     profiles.forEach(function (p) { if (p.id === userId) real = true; });
@@ -3257,8 +3262,21 @@
       : myName() + " ne record add kiya";
     sb("khata_notifications", { method: "POST", body: {
       user_id: userId, actor_id: myId(), txn_id: txn.id || null, kind: kind,
-      title: title, body: notifBodyFor(txn, userId)
+      title: title, body: bodyOverride || notifBodyFor(txn, userId)
     } }).catch(function () {});
+  }
+  // v180: split record ki notification mein diye hue + baaki udhaar bhi.
+  // t: banaya hua net record; paidMinor/shareMinor/totalMinor: paisa.
+  // payer === recipient matlab dost ne hissa se zyada diye — mujhe dene hain.
+  function splitNotifBodyFor(t, recipientId, paidMinor, shareMinor, totalMinor) {
+    var note = t.note || "Food";
+    var date = fmtDate(t.txn_date);
+    var total = fmtRs(moneyFromMinor(totalMinor));
+    var paid = fmtRs(moneyFromMinor(paidMinor));
+    var share = fmtRs(moneyFromMinor(shareMinor));
+    var net = fmtRs(t.amount);
+    if (t.payer_id === recipientId) return total + " ka khana — aap ne " + paid + " diye (hissa " + share + "), baaki " + net + " " + myName() + " dega — " + note + " · " + date;
+    return total + " ka khana — aap ne " + paid + " diye (hissa " + share + "), baaki " + net + " udhaar — " + note + " · " + date;
   }
   var notifAudioCtx = null, notifAudioUnlocked = false, notifFirstLoad = true, seenNotifIds = {};
   function unlockNotifAudio() {
@@ -3287,6 +3305,50 @@
         osc.start(now + i * 0.13); osc.stop(now + i * 0.13 + 0.12);
       });
     } catch (e) {}
+  }
+
+  // v180: record save par popup + awaz (Boss order 25 Nov 14:21 PKT).
+  // Awaz: maujooda notification chime (playNotifSound) reuse — unlock
+  // pointerdown/keydown par pehle se hota hai, is liye Save dabate hi
+  // context warm hota hai; koi nayi audio file ya permission nahi.
+  var SAVE_SOUND_KEY = "easykhata_save_sound";
+  var AUTO_REMIND_KEY = "easykhata_auto_remind";
+  function saveSoundEnabled() {
+    try { return window.localStorage.getItem(SAVE_SOUND_KEY) !== "0"; } catch (e) { return true; }
+  }
+  function autoRemindEnabled() {
+    try { return window.localStorage.getItem(AUTO_REMIND_KEY) !== "0"; } catch (e) { return true; }
+  }
+  function playSaveSound() {
+    if (!saveSoundEnabled()) return;
+    playNotifSound();
+  }
+  // Pure: "%1"/"%2" template se detail line — braces nahi (extractFunction-safe).
+  function saveSuccessDetailText(template, a, b) {
+    return String(template || "").split("%1").join(String(a == null ? "" : a)).split("%2").join(String(b == null ? "" : b));
+  }
+  var saveSuccessTimer = null;
+  function showSaveSuccessPopup(title, detail) {
+    var ov = $("saveSuccessOverlay"); if (!ov) return;
+    var t = $("saveSuccessTitle"); if (t) t.textContent = title || tr("Record save ho gaya!");
+    var d = $("saveSuccessDetail"); if (d) d.textContent = detail || "";
+    ov.hidden = false;
+    if (saveSuccessTimer) clearTimeout(saveSuccessTimer);
+    saveSuccessTimer = setTimeout(hideSaveSuccessPopup, 3000);
+  }
+  function hideSaveSuccessPopup() {
+    var ov = $("saveSuccessOverlay"); if (!ov) return;
+    ov.hidden = true;
+    if (saveSuccessTimer) { clearTimeout(saveSuccessTimer); saveSuccessTimer = null; }
+  }
+  // Save site se aik call: awaz + popup (title/detail caller banata hai).
+  function confirmRecordSaved(title, detail) {
+    playSaveSound();
+    showSaveSuccessPopup(title, detail);
+  }
+  function renderSaveSoundRow() {
+    var sv = $("drawerSoundValue"); if (sv) sv.textContent = saveSoundEnabled() ? tr("On") : tr("Band");
+    var rv = $("drawerRemindValue"); if (rv) rv.textContent = autoRemindEnabled() ? tr("On") : tr("Band");
   }
   document.addEventListener("pointerdown", unlockNotifAudio, { passive: true });
   document.addEventListener("keydown", unlockNotifAudio);
@@ -5477,6 +5539,95 @@
       setPeopleMsg("Copy nahi hua — number save karein ya text khud likh kar bhej dein.", false);
     });
   }
+  // v180: auto yaad-dihani (Boss order 25 Nov 14:33 PKT).
+  // Boot par (loadAll ke baad, aik dafa): jin doston ka udhaar baaqi hai,
+  // un mein se jin ki random muddat (1-3 din) poori ho gayi — un ko
+  // notification + push, aur mujhe aik popup mein list. Guest mein sirf
+  // popup (push ke liye login + asli profile chahiye). Har dost ko baar
+  // baar nahi — aik dafa bhejne ke baad agli random muddat set ho jati hai.
+  // sendRemindNotif khud bhi anti-spam karta hai (unread reminder ho to skip).
+  var AUTO_REMIND_STATE_KEY = "easykhata_autoremind_v1";
+  var autoRemindRan = false;
+  function autoRemindStateKey() { return AUTO_REMIND_STATE_KEY + "_ws_" + (currentWorkspaceId || "default"); }
+  function autoRemindLoadState() {
+    try { return JSON.parse(window.localStorage.getItem(autoRemindStateKey()) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function autoRemindSaveState(s) {
+    try { window.localStorage.setItem(autoRemindStateKey(), JSON.stringify(s || {})); } catch (e) {}
+  }
+  // Pure: due list + nayi state. rand: 0..1 (test ke liye injectable).
+  function autoRemindDue(nets, state, nowMs, rand) {
+    var due = [];
+    var next = {};
+    var i;
+    for (i = 0; i < nets.length; i++) {
+      var id = nets[i].id, net = nets[i].net;
+      if (!net) continue;
+      var rec = (state && state[id]) || {};
+      if (rec.next && nowMs < rec.next) { next[id] = rec; continue; }
+      due.push({ id: id, net: net });
+      var gapDays = 1 + (rand == null ? Math.random() : rand) * 2;
+      next[id] = { last: nowMs, next: nowMs + Math.round(gapDays * 24 * 3600 * 1000) };
+    }
+    return { due: due, state: next };
+  }
+  function autoRemindTextFor(id, net) {
+    // net > 0: dost ko mujhe dene hain. net < 0: mujhe dost ko dene hain.
+    var amt = fmtRs(Math.abs(net));
+    if (net > 0) return "Aap ko " + myName() + " ko " + amt + " dene hain — Easy Khata par hisaab dekhein.";
+    return myName() + " ne aap ko " + amt + " dene hain — Easy Khata par hisaab dekhein.";
+  }
+  function autoRemindMyLine(id, net) {
+    var name = profileName(id);
+    var amt = fmtRs(Math.abs(net));
+    if (net > 0) return name + " se " + amt + " lene hain";
+    return name + " ko " + amt + " dene hain";
+  }
+  function showAutoRemindPopup(rows) {
+    var ov = $("autoRemindOverlay"); if (!ov) return;
+    var list = $("autoRemindList"); if (!list) return;
+    var html = "";
+    rows.forEach(function (r) {
+      html += '<button type="button" class="remind-row" data-remind-person="' + esc(r.id) + '"><span>' + esc(r.line) + '</span><span class="remind-row-go">›</span></button>';
+    });
+    list.innerHTML = html;
+    ov.hidden = false;
+    playSaveSound();
+  }
+  function hideAutoRemindPopup() { var ov = $("autoRemindOverlay"); if (ov) ov.hidden = true; }
+  function maybeAutoRemind() {
+    if (autoRemindRan) return;
+    autoRemindRan = true;
+    if (!autoRemindEnabled()) return;
+    try {
+      var nets = [];
+      var seen = {};
+      profiles.forEach(function (p) { if (p.id !== myId() && !seen[p.id]) { seen[p.id] = true; nets.push({ id: p.id, net: personStats(p.id).net }); } });
+      myContacts.forEach(function (c) {
+        var id = c.linked_profile_id || c.id;
+        if (id === myId() || seen[id]) return;
+        seen[id] = true;
+        nets.push({ id: id, net: personStats(id).net });
+      });
+      var res = autoRemindDue(nets, autoRemindLoadState(), Date.now());
+      autoRemindSaveState(res.state);
+      if (!res.due.length) return;
+      var rows = [];
+      res.due.forEach(function (d) {
+        rows.push({ id: d.id, net: d.net, line: autoRemindMyLine(d.id, d.net) });
+        if (!guestMode) {
+          var real = false;
+          profiles.forEach(function (p) { if (p.id === d.id) real = true; });
+          if (real) {
+            var text = autoRemindTextFor(d.id, d.net);
+            sendRemindNotif(d.id, text);
+            triggerPush(d.id, myName() + " ne yaad dilaya", text, null);
+          }
+        }
+      });
+      showAutoRemindPopup(rows);
+    } catch (e) {}
+  }
   function settlePerson(id) {
     var p = findPerson(id);
     if (!p) return;
@@ -5512,21 +5663,24 @@
       saveGuestStore();
       renderAll();
       setPeopleMsg(tr("Hisaab barabar ho gaya!"), true);
+      confirmRecordSaved(tr("Hisaab barabar ho gaya!"), saveSuccessDetailText(tr("%1 se hisaab barabar — %2"), profileName(id), fmtRs(amount)));
       return;
     }
     sb("khata_transactions", { method: "POST", prefer: "return=representation", body: body })
       .then(function (res) {
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg(tr("Server se rabta nahi ho saka") + saveErrDetail(res) + ". " + tr("Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega."),true);return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(body);setPeopleMsg(tr("Server se rabta nahi ho saka") + saveErrDetail(res) + ". " + tr("Hisaab phone mein save ho gaya; thodi der mein khud update ho jayega."),true);confirmRecordSaved(tr("Hisaab barabar ho gaya!"), saveSuccessDetailText(tr("%1 se hisaab barabar — %2"), profileName(id), fmtRs(amount)));return;}
           setPeopleMsg(tr("Hisaab barabar nahi ho saka") + saveErrDetail(res) + " — " + tr("dobara try karein."), false); return;
         }
         var created = res.body && res.body[0];
         if (created) { sendNotif(id, "settle", created); triggerPush(id, tr("Hisaab barabar ho gaya"), notifBodyFor(created, id), created.id); }
         setPeopleMsg(tr("Hisaab barabar ho gaya!"), true);
+        confirmRecordSaved(tr("Hisaab barabar ho gaya!"), saveSuccessDetailText(tr("%1 se hisaab barabar — %2"), profileName(id), fmtRs(amount)));
         loadAll();
       }).catch(function () {
         offlineTxnInsert(body);
         setPeopleMsg(tr("Hisaab save ho gaya. Internet aate hi update ho jayega."), true);
+        confirmRecordSaved(tr("Hisaab barabar ho gaya!"), saveSuccessDetailText(tr("%1 se hisaab barabar — %2"), profileName(id), fmtRs(amount)));
       });
   }
   function shareAll() {
@@ -9763,6 +9917,23 @@
   "Leave blank to keep current": "Leave blank to keep current",
   "Save karein": "Save",
   "Save": "Save",
+  // ---- v180: save popup + sound, multi-payer split, auto reminders ----
+  "Save ki awaz": "Save sound",
+  "Auto yaad-dihani": "Auto reminders",
+  "Record save ho gaya!": "Record saved!",
+  "Record update ho gaya!": "Record updated!",
+  "Hisaab barabar ho gaya!": "Settled!",
+  "Theek hai": "OK",
+  "%1 ko %2 diye": "%2 given to %1",
+  "%1 se %2 liye": "%2 taken from %1",
+  "%1 doston mein %2 baant diye": "%2 split among %1 friends",
+  "%1 se hisaab barabar — %2": "Settled with %1 — %2",
+  "Sab ne apna hissa de diya — koi udhaar nahi bana.": "Everyone paid their share — no balance left.",
+  "Doston ne diye: ": "Friends paid: ",
+  "Aap ne diye: ": "You paid: ",
+  "Udhaar ki yaad-dihani": "Balance reminders",
+  "Ye hisaab abhi baaqi hai.": "These balances are still outstanding.",
+  "Diye (Rs)": "Paid (Rs)",
   "Cancel karein": "Cancel",
   "Cancel": "Cancel",
   "Band karein": "Close",
@@ -10993,12 +11164,59 @@
     $("txnForm").scrollIntoView({ behavior: "smooth", block: "center" });
   }
   /* ---------- group split (split equally) ---------- */
+  // v180: multi-payer split — pure hisaab (paisa/minor units, extraction-safe).
+  // totalMinor: kull bill (paisa). paidMinors: har selected dost ne kitne diye
+  // (paisa, order = ids order). Returns { nets, myPaidMinor, myShareMinor, error }.
+  // nets[i] = { paidMinor, shareMinor, netMinor } — net > 0: dost ko mujhe
+  // dene hain, net < 0: mujhe dost ko dene hain, 0: barabar (koi record nahi).
+  // Baaqi paisa (total % people) aakhri dost ke hisse mein — pehle wala rule.
+  function splitMealNets(totalMinor, paidMinors) {
+    var n = paidMinors.length;
+    var people = n + 1;
+    var share = Math.floor(totalMinor / people);
+    var remainder = totalMinor - share * people;
+    var paidSum = 0;
+    var i;
+    for (i = 0; i < n; i++) paidSum += paidMinors[i];
+    var myPaid = totalMinor - paidSum;
+    if (myPaid < 0) return { nets: [], myPaidMinor: myPaid, myShareMinor: share, error: "overpaid" };
+    var nets = [];
+    for (i = 0; i < n; i++) {
+      var sh = share + (i === n - 1 ? remainder : 0);
+      nets.push({ paidMinor: paidMinors[i], shareMinor: sh, netMinor: sh - paidMinors[i] });
+    }
+    return { nets: nets, myPaidMinor: myPaid, myShareMinor: share, error: "" };
+  }
+  // Selected doston ke "diye" boxes parhi hui raqam (paisa). Khaali = 0.
+  function splitPaidMinors() {
+    var ids = selectedSplitIds();
+    var out = [];
+    for (var i = 0; i < ids.length; i++) {
+      var inp = document.querySelector('#splitList input[data-split-paid="' + ids[i] + '"]');
+      var v = inp ? parseFloat(inp.value) : 0;
+      if (!v || v <= 0) { out.push(0); continue; }
+      out.push(moneyToMinor(v));
+    }
+    return out;
+  }
+  // Paid boxes ki validation: "badpaid" | "overpaid" | "".
+  function splitPaidError(total) {
+    var ids = selectedSplitIds();
+    for (var i = 0; i < ids.length; i++) {
+      var inp = document.querySelector('#splitList input[data-split-paid="' + ids[i] + '"]');
+      var v = inp ? parseFloat(inp.value) : 0;
+      if (!v) continue;
+      if (v < 0 || Math.abs(v * 100 - Math.round(v * 100)) > 1e-7) return "badpaid";
+      if (v > total) return "overpaid";
+    }
+    return "";
+  }
   function renderSplitList() {
     var me = myId();
     var html = "";
     profiles.forEach(function (p) {
       if (p.id === me) return;
-      html += '<label><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(p.id) + '" disabled></label>';
     });
     myContacts.forEach(function (c) {
       // v154: profile se jura contact yahan dobara nahi (profile list mein
@@ -11008,7 +11226,7 @@
       var isProfile = false;
       profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
       if (isProfile) return;
-      html += '<label><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(c.id) + '" disabled></label>';
     });
     $("splitList").innerHTML = html || '<p class="empty">' + tr("Abhi koi dost nahi.") + '</p>';
     updateSplitHint();
@@ -11029,7 +11247,15 @@
     // Last friend gets the leftover paisa so the split adds up to the total exactly.
     var remainder = Math.round((total - share * people) * 100) / 100;
     var extra = remainder > 0 ? " · aakhri dost ko " + fmtRs(share + remainder) + " (baaqi paisay)" : "";
-    $("splitHint").textContent = tr("Har aik ka hissa: ") + fmtRs(share) + " (" + ids.length + " " + tr("dost") + " + " + tr("aap") + " · " + tr("kull") + " " + fmtRs(total) + " · " + tr("aap ka hissa") + " " + fmtRs(share) + ")" + extra;
+    var paidMinors = splitPaidMinors();
+    var paidSumMinor = 0; paidMinors.forEach(function (m) { paidSumMinor += m; });
+    var paidTotal = moneyFromMinor(paidSumMinor);
+    var paidPart = "";
+    if (paidTotal > 0) {
+      var myPaid = Math.round((total - paidTotal) * 100) / 100;
+      paidPart = " · " + tr("Doston ne diye: ") + fmtRs(paidTotal) + " · " + tr("Aap ne diye: ") + fmtRs(myPaid);
+    }
+    $("splitHint").textContent = tr("Har aik ka hissa: ") + fmtRs(share) + " (" + ids.length + " " + tr("dost") + " + " + tr("aap") + " · " + tr("kull") + " " + fmtRs(total) + " · " + tr("aap ka hissa") + " " + fmtRs(share) + ")" + extra + paidPart;
   }
   function setSplitMode(on) {
     splitMode = on;
@@ -11047,52 +11273,83 @@
   function guestAddSplitTxns(amount, note, date, category, btn) { // v113: category flows in
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
+    var perr = splitPaidError(amount);
+    if (perr === "badpaid") { setTxnMsg("Diye hue paisay 0 se zyada aur maximum 2 decimal places mein likhein.", false); return; }
+    if (perr === "overpaid") { setTxnMsg("Doston ke diye hue paisay kull raqam se zyada hain.", false); return; }
     var me = myId();
-    var people = ids.length + 1; // friends + you — your share counts too
-    var share = Math.floor(amount / people * 100) / 100;
-    if (share <= 0) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
+    var totalMinor = moneyToMinor(amount);
+    if (totalMinor < ids.length + 1) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
+    var calc = splitMealNets(totalMinor, splitPaidMinors());
+    if (calc.error) { setTxnMsg("Doston ke diye hue paisay kull raqam se zyada hain.", false); return; }
+    var saved = 0;
     ids.forEach(function (id, idx) {
-      var amt = (idx === ids.length - 1) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
+      var net = calc.nets[idx].netMinor;
+      if (!net) return; // hissa barabar — koi record nahi
+      var amt = moneyFromMinor(Math.abs(net));
       txns.unshift({
-        id: newUuid(), payer_id: me, receiver_id: id, amount: amt,
+        id: newUuid(), payer_id: net > 0 ? me : id, receiver_id: net > 0 ? id : me, amount: amt,
         note: note, txn_date: date, category: category || null, // v113
         created_by: me, created_at: new Date().toISOString()
       });
+      saved++;
     });
     saveGuestStore();
     renderAll();
     resetTxnForm();
-    setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true);
+    if (!saved) {
+      setTxnMsg("Sab barabar — kisi par koi udhaar nahi bana.", true);
+      confirmRecordSaved(tr("Record save ho gaya!"), tr("Sab ne apna hissa de diya — koi udhaar nahi bana."));
+      return;
+    }
+    setTxnMsg(saved + " records save ho gaye (barabar baant diye)!" + (saved < ids.length ? " " + (ids.length - saved) + " dost ka hissa barabar tha." : ""), true);
+    confirmRecordSaved(tr("Record save ho gaya!"), saveSuccessDetailText(tr("%1 doston mein %2 baant diye"), ids.length, fmtRs(amount)));
   }
   function addSplitTxns(amount, note, date, category, btn) { // v113: category flows in
     var ids = selectedSplitIds();
     if (!ids.length) { setTxnMsg("Baantne ke liye kam se kam aik dost chunein.", false); return; }
+    var perr = splitPaidError(amount);
+    if (perr === "badpaid") { setTxnMsg("Diye hue paisay 0 se zyada aur maximum 2 decimal places mein likhein.", false); return; }
+    if (perr === "overpaid") { setTxnMsg("Doston ke diye hue paisay kull raqam se zyada hain.", false); return; }
     var me = myId();
-    var people = ids.length + 1; // friends + you — the total splits equally across everyone, including your share
-    var share = Math.floor(amount / people * 100) / 100;
-    if (share <= 0) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
+    var totalMinor = moneyToMinor(amount);
+    if (totalMinor < ids.length + 1) { setTxnMsg("Raqam baantne ke liye bohat choti hai.", false); return; }
+    var calc = splitMealNets(totalMinor, splitPaidMinors());
+    if (calc.error) { setTxnMsg("Doston ke diye hue paisay kull raqam se zyada hain.", false); return; }
+    var jobs = [];
+    ids.forEach(function (id, idx) {
+      var net = calc.nets[idx];
+      if (!net.netMinor) return; // hissa barabar — koi record nahi
+      jobs.push({ id: id, netMinor: net.netMinor, paidMinor: net.paidMinor, shareMinor: net.shareMinor });
+    });
     btn.disabled = true;
+    if (!jobs.length) {
+      btn.disabled = false;
+      resetTxnForm();
+      setTxnMsg("Sab barabar — kisi par koi udhaar nahi bana.", true);
+      confirmRecordSaved(tr("Record save ho gaya!"), tr("Sab ne apna hissa de diya — koi udhaar nahi bana."));
+      return;
+    }
     var done = 0, failed = 0, i = 0, offlineSaved = false;
     function next() {
-      if (i >= ids.length) {
+      if (i >= jobs.length) {
         btn.disabled = false;
         // v68: loadAll() pehle — woh shuru mein txnMsg saaf karta hai,
         // is liye confirmation message us ke BAAD lagao, warna foran mit jata hai.
         loadAll();
         if (failed) setTxnMsg(done + " records save ho gaye, " + failed + " fail — dobara check karein.", false);
-        else if (offlineSaved) { setTxnMsg(ids.length + " records phone mein save ho gaye. Internet aate hi update ho jayenge!", true); resetTxnForm(); }
-        else { setTxnMsg(ids.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); }
+        else if (offlineSaved) { setTxnMsg(jobs.length + " records phone mein save ho gaye. Internet aate hi update ho jayenge!", true); resetTxnForm(); confirmRecordSaved(tr("Record save ho gaya!"), saveSuccessDetailText(tr("%1 doston mein %2 baant diye"), ids.length, fmtRs(amount))); }
+        else { setTxnMsg(jobs.length + " records save ho gaye (barabar baant diye)!", true); resetTxnForm(); confirmRecordSaved(tr("Record save ho gaya!"), saveSuccessDetailText(tr("%1 doston mein %2 baant diye"), ids.length, fmtRs(amount))); }
         return;
       }
-      var id = ids[i++];
-      var amt = (i === ids.length) ? Math.round((amount - share * ids.length) * 100) / 100 : share;
+      var job = jobs[i++];
+      var amt = moneyFromMinor(Math.abs(job.netMinor));
       var recBody = {
         id: newUuid(), workspace_id: currentWorkspaceId,
-        payer_id: me, receiver_id: id, amount: amt,
+        payer_id: job.netMinor > 0 ? me : job.id, receiver_id: job.netMinor > 0 ? job.id : me, amount: amt,
         note: note, txn_date: date, category: category || null, created_by: me // v113
       };
       sb("khata_transactions", { method: "POST", prefer: "return=representation", body: recBody }).then(function (res) {
-        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { sendNotif(id, "record", created); triggerPush(id, myName() + " ne record add kiya", notifBodyFor(created, id), created.id); } }
+        if (res.ok) { done++; var created = res.body && res.body[0]; if (created) { var body = splitNotifBodyFor(created, job.id, job.paidMinor, job.shareMinor, totalMinor); sendNotif(job.id, "record", created, body); triggerPush(job.id, myName() + " ne record add kiya", body, created.id); } }
         else failed++;
         next();
       })
@@ -11203,6 +11460,8 @@
     if (note.length > 500) { setTxnMsg("Note zyada se zyada 500 harf ka ho sakta hai.", false); return; }
     amount = moneyFromMinor(moneyToMinor(amount));
     if (!date) { setTxnMsg("Tareekh likhein.", false); return; }
+    // v180: save popup ki detail — person/dir/amount yahan pakke hain.
+    var saveDetail = saveSuccessDetailText(dir === "given" ? tr("%1 ko %2 diye") : tr("%1 se %2 liye"), profileName(person), fmtRs(amount));
     if (splitMode && !editingId) {
       if (guestMode) { guestAddSplitTxns(amount, note, date, category, e.target.querySelector('button[type="submit"]')); return; }
       addSplitTxns(amount, note, date, category, e.target.querySelector('button[type="submit"]'));
@@ -11239,6 +11498,7 @@
         renderAll();
         resetTxnForm();
         setTxnMsg("Record update ho gaya!", true);
+        confirmRecordSaved(tr("Record update ho gaya!"), saveDetail);
         btn.disabled = false;
         return;
       }
@@ -11251,6 +11511,7 @@
       $("txnNote").value = "";
       clearTxnExtraFields(); // v113
       setTxnMsg("Record save ho gaya!", true);
+      confirmRecordSaved(tr("Record save ho gaya!"), saveDetail);
       btn.disabled = false;
       return;
     }
@@ -11260,17 +11521,19 @@
         .then(function (res) {
           btn.disabled = false;
           if (!res.ok) {
-            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Tabdeeli phone mein save ho gayi; thodi der mein khud update ho jayegi.",true);btn.disabled=false;return;}
+            if(isTransientResponse(res)){markConnectionIssue();offlineTxnUpdate(editId,body);resetTxnForm();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Tabdeeli phone mein save ho gayi; thodi der mein khud update ho jayegi.",true);confirmRecordSaved(tr("Record update ho gaya!"), saveDetail);btn.disabled=false;return;}
             setTxnMsg("Tabdeeli save nahi hui" + saveErrDetail(res) + " — dobara try karein.", false); return;
           }
           resetTxnForm();
           loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
           setTxnMsg("Record update ho gaya!", true);
+          confirmRecordSaved(tr("Record update ho gaya!"), saveDetail);
         }).catch(function () {
           btn.disabled = false;
           offlineTxnUpdate(editId, body);
           resetTxnForm();
           setTxnMsg("Tabdeeli save ho gayi. Internet aate hi update ho jayegi.", true);
+          confirmRecordSaved(tr("Record update ho gaya!"), saveDetail);
         });
       return;
     }
@@ -11278,7 +11541,7 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));maybeCreateRecurringRule(body);clearRepeatBox();$("txnAmount").value="";$("txnNote").value="";clearTxnExtraFields();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);btn.disabled=false;return;}
+          if(isTransientResponse(res)){markConnectionIssue();offlineTxnInsert(Object.assign({id:recId},body));maybeCreateRecurringRule(body);clearRepeatBox();$("txnAmount").value="";$("txnNote").value="";clearTxnExtraFields();setTxnMsg("Server se rabta nahi ho saka" + saveErrDetail(res) + ". Record phone mein save ho gaya; thodi der mein khud update ho jayega.",true);confirmRecordSaved(tr("Record save ho gaya!"), saveDetail);btn.disabled=false;return;}
           setTxnMsg("Record save nahi hua" + saveErrDetail(res) + " — dobara try karein.", false); return;
         }
         var created = res.body && res.body[0];
@@ -11290,6 +11553,7 @@
         clearRepeatBox();
         loadAll(); // v68: pehle — yeh txnMsg saaf karta hai
         setTxnMsg("Record save ho gaya!", true);
+        confirmRecordSaved(tr("Record save ho gaya!"), saveDetail);
       }).catch(function () {
         btn.disabled = false;
         offlineTxnInsert(Object.assign({ id: recId }, body));
@@ -11298,6 +11562,7 @@
         $("txnAmount").value = "";
         $("txnNote").value = "";
         setTxnMsg("Record save ho gaya. Internet aate hi update ho jayega.", true);
+        confirmRecordSaved(tr("Record save ho gaya!"), saveDetail);
       });
   }
 
@@ -11641,7 +11906,25 @@
   $("exportCsvBtn").addEventListener("click", exportFilteredLedgerPdf);
   $("txnSplit").addEventListener("change", function (e) { setSplitMode(e.target.checked); });
   $("txnAmount").addEventListener("input", function () { if (splitMode) updateSplitHint(); });
-  $("splitList").addEventListener("change", function () { updateSplitHint(); });
+  $("splitList").addEventListener("change", function (e) { // v180: tick par paid box on/off
+    var t = e.target;
+    if (t && t.getAttribute && t.getAttribute("data-split-person")) {
+      var pid = t.getAttribute("data-split-person");
+      var paid = document.querySelector('#splitList input[data-split-paid="' + pid + '"]');
+      if (paid) { paid.disabled = !t.checked; if (!t.checked) paid.value = ""; }
+    }
+    updateSplitHint();
+  });
+  $("splitList").addEventListener("input", function () { updateSplitHint(); });
+  $("txnAmount").addEventListener("input", function () { if (splitMode) updateSplitHint(); });
+  $("saveSuccessOkBtn").addEventListener("click", hideSaveSuccessPopup); // v180
+  $("saveSuccessOverlay").addEventListener("click", function (e) { if (e.target === $("saveSuccessOverlay")) hideSaveSuccessPopup(); });
+  $("autoRemindOkBtn").addEventListener("click", hideAutoRemindPopup); // v180
+  $("autoRemindOverlay").addEventListener("click", function (e) {
+    if (e.target === $("autoRemindOverlay")) { hideAutoRemindPopup(); return; }
+    var row = e.target && e.target.closest ? e.target.closest("[data-remind-person]") : null;
+    if (row) { hideAutoRemindPopup(); openPersonDetail(row.getAttribute("data-remind-person")); }
+  });
   $("peopleList").addEventListener("click", function (e) {
     var row = e.target.closest ? e.target.closest("[data-person]") : null;
     if (row) openPersonDetail(row.getAttribute("data-person"));
@@ -11754,6 +12037,14 @@
   $("menuDrawerCloseBtn").addEventListener("click", closeDrawer);
   $("menuDrawerBackdrop").addEventListener("click", closeDrawer);
   $("drawerThemeBtn").addEventListener("click", toggleTheme);
+  $("drawerSoundBtn").addEventListener("click", function () { // v180: Save awaz on/off
+    try { window.localStorage.setItem(SAVE_SOUND_KEY, saveSoundEnabled() ? "0" : "1"); } catch (e) {}
+    renderSaveSoundRow();
+  });
+  $("drawerRemindBtn").addEventListener("click", function () { // v180: auto yaad-dihani on/off
+    try { window.localStorage.setItem(AUTO_REMIND_KEY, autoRemindEnabled() ? "0" : "1"); } catch (e) {}
+    renderSaveSoundRow();
+  });
   $("drawerBudgetBtn").addEventListener("click", function () { closeDrawer(); jumpToBudget(); });
   $("drawerGoalBtn").addEventListener("click", function () { closeDrawer(); jumpToGoal(); });
   $("drawerDukaanBtn").addEventListener("click", function () { toggleDukaanMode(); renderDrawer(); });
