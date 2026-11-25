@@ -2296,3 +2296,36 @@ input,select,textarea,button{max-width:100%}
 .goal-stat span{display:block;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--muted)}
 .goal-stat strong{display:block;font-size:15px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .goal-set-row .btn{flex:none}
+
+/* ---------- v186: full responsive / dynamic / compact audit (Boss order
+   26 Nov 01:58 PKT — standing standard "Full responsive full dynamic full
+   compact"). Audit at 360/390/430px (home, drawer, Account, Map, Business,
+   Due/Goal/Household modals) found 5 concrete issues; dynamic paths were
+   already fresh (renderAll refreshes everything, modals re-render on open,
+   Business re-renders on view + after every save) — no app.js change needed.
+   Checked-and-OK, no fix: dtable 74px cols (first col ~172px), detail-actions
+   labels wrap, tools-row 3-col (6 short labels), total/stat/kpi grids,
+   biz-table contained scroll, map popup 230px, cd-menu JS-clamped, drawer
+   300px/86vw, biz-form-row 2-col (short number inputs, labels wrap). */
+@media(max-width:400px){
+  /* (1) Header title collapse — offline badge "Slow internet · 12 baqi"
+     (~147px) left ~49px for "Easy Khata" at 360px (needs ~93px). Cap the
+     badge at 120px: the count stays visible (start/middle of the text,
+     ellipsis only trims the tail), title keeps ~118px. */
+  .offline-badge{max-width:120px}
+}
+@media(max-width:520px){
+  /* (2) Admin Add User form stayed 2-col on phones — 4 fields ~150px each,
+     email/password cramped; no stacking rule existed. Stack to 1 col. */
+  .admin-add-grid{grid-template-columns:1fr}
+  /* (5) Admin panels: 17px side padding eats 34px at 360px — 14px on phones. */
+  .admin-panel{padding:14px}
+  .admin-users-panel{padding:14px}
+}
+@media(max-width:420px){
+  /* (3) Business product filter: select 150px left the search ~146px at
+     360px, placeholder truncated. 120px frees the search. */
+  .biz-filter-row select{max-width:120px}
+}
+/* (4) Balance eye 30px -> 34px touch target (matches .icon-btn at <=400px). */
+.eye-btn{width:34px;height:34px}
