@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v184";
+  var APP_VERSION = "v185";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -10321,6 +10321,8 @@
   "Abhi koi record nahi.": "No records yet.",
   "Abhi koi record nahi — upar se pehla record add karein.": "No records yet — add your first record above.",
   "Is mahine abhi koi kharcha nahi.": "No expenses this month yet.",
+  "Koi due udhaar nahi — agle 7 din mein kuch due nahi hai.": "No loans due — nothing is due in the next 7 days.",
+  "Koi bachat goal set nahi hai — upar naam aur target likh kar Goal Save karein.": "No savings goal set yet — enter a name and target above, then save the goal.",
   "Is mahine kul kharcha": "Total spent this month",
   "Abhi koi dost nahi.": "No friends yet.",
   "⚠️ Budget se zyada kharch ho gaya!": "⚠️ You spent more than the budget!",
@@ -10809,7 +10811,7 @@
   function renderSavingsGoal() {
     var body = $("goalBody"); if (!body) return;
     var goal = getSavingsGoal();
-    if (!goal) { body.innerHTML = '<p class="empty">Koi bachat goal set nahi hai — upar naam aur target likh kar Goal Save karein.</p>'; return; }
+    if (!goal) { body.innerHTML = '<div class="tool-empty"><div class="tool-empty-icon">\uD83C\uDFAF</div><p>' + tr("Koi bachat goal set nahi hai — upar naam aur target likh kar Goal Save karein.") + '</p></div>'; return; }
     var saved = goalSavedTotal(goal);
     var pct = Math.round((saved / goal.target) * 100);
     var remaining = goal.target - saved;
@@ -10817,9 +10819,9 @@
       ? '<p class="goal-done">' + tr("\uD83C\uDF89 Goal poora ho gaya — mubarak ho!") + '</p>'
       : '<p class="muted">Baqi: <strong>' + esc(fmtRs(remaining)) + '</strong> \u00B7 ' + goal.contributions.length + ' dafa bachat add ki</p>';
     body.innerHTML =
-      '<div class="goal-head"><strong>' + esc(goal.name) + '</strong><span>' + pct + '%</span></div>' +
-      '<div class="budget-bar"><i style="width:' + Math.min(pct, 100) + '%"></i></div>' +
-      '<div class="budget-nums"><span>Bachat: <strong>' + esc(fmtRs(saved)) + '</strong></span><span>Target: <strong>' + esc(fmtRs(goal.target)) + '</strong></span></div>' +
+      '<div class="goal-head"><span class="goal-name">' + esc(goal.name) + '</span><span class="goal-pct">' + pct + '%</span></div>' +
+      '<div class="budget-bar goal-bar"><i style="width:' + Math.min(pct, 100) + '%"></i></div>' +
+      '<div class="goal-stats"><div class="goal-stat"><span>Bachat</span><strong>' + esc(fmtRs(saved)) + '</strong></div><div class="goal-stat"><span>Target</span><strong>' + esc(fmtRs(goal.target)) + '</strong></div></div>' +
       doneHtml;
   }
   function saveSavingsGoal() {
@@ -10935,15 +10937,19 @@
       if (t.payer_id !== me && t.receiver_id !== me) return false;
       return d <= horizon; // overdue ya agle 7 din mein due
     }).sort(function (a, b) { return String(a.due_date).localeCompare(String(b.due_date)); });
-    if (!rows.length) { el.innerHTML = '<p class="empty">Koi due udhaar nahi — agle 7 din mein kuch due nahi hai.</p>'; return; }
+    if (!rows.length) { el.innerHTML = '<div class="tool-empty"><div class="tool-empty-icon">\u23F0</div><p>' + tr("Koi due udhaar nahi — agle 7 din mein kuch due nahi hai.") + '</p></div>'; return; }
     el.innerHTML = rows.map(function (t) {
       var iGave = t.payer_id === me;
       var st = dueStatus(String(t.due_date));
-      var remindBtn = iGave ? '<button class="btn btn-ghost" type="button" data-remind="' + esc(t.id) + '">\uD83D\uDCAC Remind</button>' : "";
-      return '<div class="due-row"><div class="due-row-main">' + partyNameMarkup(t.payer_id) + " \u2192 " + partyNameMarkup(t.receiver_id) + '</div>' +
+      var otherId = iGave ? t.receiver_id : t.payer_id;
+      var nm = profileName(otherId);
+      var initial = (nm && nm !== "Naam nahi mila") ? nm.trim().charAt(0).toUpperCase() : "?";
+      var nameHtml = (nm === "Naam nahi mila") ? partyNameMarkup(otherId) : esc(nm);
+      var remindBtn = iGave ? '<button class="btn btn-ghost due-remind" type="button" data-remind="' + esc(t.id) + '">\uD83D\uDCAC Remind</button>' : "";
+      var rowCls = st.cls === "due-over" ? " is-over" : (st.cls === "due-today" ? " is-today" : "");
+      return '<div class="due-row' + rowCls + '"><div class="due-row-top"><span class="due-avatar">' + esc(initial) + '</span><span class="due-name">' + nameHtml + '</span><strong class="' + (iGave ? "pos" : "neg") + '">' + (iGave ? "+ " : "\u2212 ") + esc(fmtRs(t.amount)) + '</strong></div>' +
         '<div class="due-row-sub">' + esc(t.note || "Food") + " \u00B7 " + esc(fmtDate(t.due_date)) + " \u00B7 " + (iGave ? "Lene hain" : "Dene hain") + txnExtraMarkup(t) + '</div>' +
-        '<div class="due-row-foot"><strong class="' + (iGave ? "pos" : "neg") + '">' + (iGave ? "+ " : "\u2212 ") + esc(fmtRs(t.amount)) + '</strong>' +
-        '<span class="due-status ' + st.cls + '">' + esc(st.label) + "</span>" + remindBtn + "</div></div>";
+        '<div class="due-row-foot"><span class="due-status ' + st.cls + '">' + esc(st.label) + "</span>" + remindBtn + "</div></div>";
     }).join("");
   }
   function remindDue(txnId) {

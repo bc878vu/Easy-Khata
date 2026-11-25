@@ -2270,3 +2270,29 @@ input,select,textarea,button{max-width:100%}
 .hh-row .hh-avatar{flex:0 0 28px;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:.8rem}
 .hh-row .hh-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hh-row.hh-member-row>strong{margin-left:auto}
+
+/* v185: Due Soon + Savings Goal polish (Boss order 25 Nov 15:19 PKT — "Ye b" x2). Shared centered empty state; Due rows: avatar + aik line naam + amount right edge, sub/foot avatar ke neeche aligned (36px), overdue/today left accent; Goal: naam ellipsis + % pill, moti bar, 2 stat cards. */
+.tool-empty{text-align:center;padding:20px 14px 16px;background:var(--accent-soft);border-radius:12px}
+.tool-empty-icon{font-size:28px;line-height:1;margin-bottom:8px}
+.tool-empty p{margin:0;color:var(--muted);font-size:.92rem}
+.due-row{padding:10px 12px}
+.due-row.is-over{border-left:3px solid var(--red)}
+.due-row.is-today{border-left:3px solid #e6a817}
+.due-row-top{display:flex;align-items:center;gap:8px}
+.due-avatar{flex:0 0 28px;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:.8rem}
+.due-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.due-row-top>strong{margin-left:auto;white-space:nowrap;font-size:15px}
+.due-row-top>strong.pos{color:var(--green-dark)}
+.due-row-top>strong.neg{color:var(--red)}
+.due-row-sub{font-size:13px;color:var(--muted);margin-top:4px;padding-left:36px}
+.due-row-foot{display:flex;align-items:center;gap:10px;margin-top:8px;padding-left:36px}
+.due-row-foot .due-remind{margin-left:auto;padding:4px 10px;min-height:30px;font-size:.8rem}
+.goal-head{align-items:center}
+.goal-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal-pct{flex:0 0 auto;background:var(--green-soft);color:var(--green-dark);font-weight:800;font-size:.8rem;padding:3px 10px;border-radius:999px}
+.goal-bar{height:14px}
+.goal-stats{display:flex;gap:8px;margin-top:10px}
+.goal-stat{flex:1;min-width:0;background:var(--accent-soft);border-radius:10px;padding:8px 10px}
+.goal-stat span{display:block;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.goal-stat strong{display:block;font-size:15px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal-set-row .btn{flex:none}
