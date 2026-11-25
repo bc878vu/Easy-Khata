@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v180";
+  var APP_VERSION = "v181";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -1004,6 +1004,7 @@
   function renderDrawer() {
     // Guest rules (Account se move hue — wahi shartein):
     var pb = $("acctPushBtn"); if (pb) pb.hidden = guestMode; // Notifications sirf logged-in
+    var pt = $("acctPushTestBtn"); if (pt) pt.hidden = guestMode; // v181: test bhi sirf logged-in
     var nb = $("drawerNotifBtn"); if (nb) nb.hidden = guestMode; // v158: inbox bhi sirf logged-in
     renderLocRow(); // acctLocBtn: guest mein chhupa (v140 s9/s19 boot contract)
     renderPinLockMenu(); // PIN label + "Abhi lock karein" visibility
@@ -4271,6 +4272,23 @@
         else setPushMsg("Notifications on ho gayi! ✓ Ab jab koi record save karega to popup aayega — app band ho to bhi.", true);
       } else setPushMsg(pushReasonText(r.reason, r.detail), false);
     });
+  }
+  // v181: local notification test (Boss order 25 Nov 15:00 PKT — "close app
+  // par bhi popup + ring"). Service worker se foran aik notification dikhao
+  // (popup + phone ki default awaz + vibration). Ye FCM/VAPID delivery ka
+  // test NAHI hai — sirf ye sabit karta hai ke is phone par notification
+  // dikhna + bajna theek hai. Asli push ke liye "Notifications On karein"
+  // chahiye (us se FCM token banta hai; /api/notify phir band app par bhi
+  // bhejta hai). Web push mein custom ringtone possible nahi — phone ki
+  // default notification awaz bajti hai.
+  function testPushNotification() {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) { setPushMsg(tr("Is browser mein notifications available nahi hain."), false); return; }
+    if (Notification.permission !== "granted") { setPushMsg(tr("Pehle Notifications On karein — permission chahiye."), false); return; }
+    swReady(4000).then(function (reg) {
+      if (!reg) throw new Error("no-sw");
+      return reg.showNotification("Easy Khata", { body: tr("Test notification — popup + awaz theek hai."), vibrate: [180, 90, 180, 90, 260], icon: "icons/icon.svg", badge: "icons/icon.svg", tag: "easy-khata-test", renotify: true, data: { url: "/?view=notifs" } });
+    }).then(function () { setPushMsg(tr("Test notification bhej di — phone par popup + awaz check karein."), true); })
+    .catch(function () { setPushMsg(tr("Test notification nahi dikhi — browser settings check karein."), false); });
   }
   function triggerPush(recipientId, title, text, txnId) {
     // Fire-and-forget: the server function sends the push to the recipient.
@@ -9863,6 +9881,13 @@
   "Yahan se record apni history mein restore karein.": "Restore a record to your history from here.",
   "Guest hisaab transfer karein": "Transfer guest ledger",
   "Notifications On karein": "Turn Notifications On",
+  "Test notification bajayein": "Play a test notification",
+  "Test notification — popup + awaz theek hai.": "Test notification — popup and sound are working.",
+  "Test notification bhej di — phone par popup + awaz check karein.": "Test notification sent — check the popup and sound on your phone.",
+  "Test notification nahi dikhi — browser settings check karein.": "Test notification did not show — check your browser settings.",
+  "Pehle Notifications On karein — permission chahiye.": "Turn Notifications On first — permission is needed.",
+  "Is browser mein notifications available nahi hain.": "Notifications are not available in this browser.",
+  "Service worker ready nahi hua — app band kar ke dobara kholein.": "Service worker is not ready — close and reopen the app.",
   "Admin Panel": "Admin Panel",
   "Admin": "Admin",
   "Admin Dashboard": "Admin Dashboard",
@@ -11216,7 +11241,7 @@
     var html = "";
     profiles.forEach(function (p) {
       if (p.id === me) return;
-      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(p.id) + '"> ' + esc(p.name || p.email) + '</span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(p.id) + '" disabled></label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(p.id) + '"><span class="split-name">' + esc(p.name || p.email) + '</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(p.id) + '" disabled></label>';
     });
     myContacts.forEach(function (c) {
       // v154: profile se jura contact yahan dobara nahi (profile list mein
@@ -11226,7 +11251,7 @@
       var isProfile = false;
       profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
       if (isProfile) return;
-      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(c.id) + '"> ' + esc(c.name || "Unknown") + ' (manual)</span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(c.id) + '" disabled></label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(c.id) + '"><span class="split-name">' + esc(c.name || "Unknown") + ' (manual)</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(c.id) + '" disabled></label>';
     });
     $("splitList").innerHTML = html || '<p class="empty">' + tr("Abhi koi dost nahi.") + '</p>';
     updateSplitHint();
@@ -11720,6 +11745,7 @@
   $("acctPdfBtn").addEventListener("click", exportPdf); // v24.5: PDF Report
   $("acctXlsxBtn").addEventListener("click", exportXlsx); // v24.9: Excel Report
   $("acctPushBtn").addEventListener("click", enablePushFromButton);
+  $("acctPushTestBtn").addEventListener("click", testPushNotification);
   $("acctLocBtn").addEventListener("click", onLocToggle); // v140: location sharing toggle
   $("mapRefreshBtn").addEventListener("click", refreshMap); // v140: map refresh
   // v146: guest popup ka "Login karein" button — popup HTML Leaflet
