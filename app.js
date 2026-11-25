@@ -195,7 +195,7 @@
   var AUTH_TIMEOUT_MS = 60000;
   // v139: login screen par version stamp — yahi aik source of truth hai;
   // index.html mein "v139" sirf fallback hai, showAuth() isay set karta hai.
-  var APP_VERSION = "v181";
+  var APP_VERSION = "v182";
   function authCall(path, body) {
     return fetchWithTimeout(API + "/auth/v1" + path, {
       method: "POST",
@@ -9959,6 +9959,7 @@
   "Udhaar ki yaad-dihani": "Balance reminders",
   "Ye hisaab abhi baaqi hai.": "These balances are still outstanding.",
   "Diye (Rs)": "Paid (Rs)",
+  "Diye": "Paid",
   "Cancel karein": "Cancel",
   "Cancel": "Cancel",
   "Band karein": "Close",
@@ -11241,7 +11242,7 @@
     var html = "";
     profiles.forEach(function (p) {
       if (p.id === me) return;
-      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(p.id) + '"><span class="split-name">' + esc(p.name || p.email) + '</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(p.id) + '" disabled></label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(p.id) + '"><span class="split-name">' + esc(p.name || p.email) + '</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye" data-i18n-ph="Diye" data-split-paid="' + esc(p.id) + '" disabled></label>';
     });
     myContacts.forEach(function (c) {
       // v154: profile se jura contact yahan dobara nahi (profile list mein
@@ -11251,7 +11252,7 @@
       var isProfile = false;
       profiles.forEach(function (p) { if (p.id === c.id) isProfile = true; });
       if (isProfile) return;
-      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(c.id) + '"><span class="split-name">' + esc(c.name || "Unknown") + ' (manual)</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye (Rs)" data-i18n-ph="Diye (Rs)" data-split-paid="' + esc(c.id) + '" disabled></label>';
+      html += '<label class="split-row"><span class="split-row-main"><input type="checkbox" data-split-person="' + esc(c.id) + '"><span class="split-name">' + esc(c.name || "Unknown") + ' (manual)</span></span><input class="split-paid-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Diye" data-i18n-ph="Diye" data-split-paid="' + esc(c.id) + '" disabled></label>';
     });
     $("splitList").innerHTML = html || '<p class="empty">' + tr("Abhi koi dost nahi.") + '</p>';
     updateSplitHint();
